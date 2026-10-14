@@ -30,7 +30,7 @@ int main(void){
  }
  p.mixer.ch[5].swing=1; p.song.patterns[1].ch[4][11].note=73;
  uint32_t n=0;assert(track_store_encode(&p,a,sizeof(a),&n)==0);
- assert(a[4]==8u && n<TRACK_JOURNAL_BANK_BYTES);
+ assert(a[4]==TRACK_STORE_VERSION && n<TRACK_JOURNAL_BANK_BYTES);
  assert(track_store_decode(&q,a,n)==0);
  for(int i=0;i<4;i++)assert(memcmp(&q.instruments[i],&p.instruments[i],sizeof(p.instruments[i]))==0);
  assert(q.mixer.ch[5].swing==1&&q.song.patterns[1].ch[4][11].note==73);

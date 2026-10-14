@@ -7,7 +7,7 @@
 #include "track_core.h"
 #define TRACK_SONG_ENTRIES 64u
 #define TRACK_SONG_FX_EVENTS 24u
-struct track_song_event {uint8_t step,fx,down;};
+struct track_song_event {uint8_t step:4,fx:3;uint8_t down:2;uint8_t param;}; /* 3 packed RAM bytes, down=2: ALGORITHM automation */
 struct track_song_clip {
  struct track_song_event data[TRACK_SONG_FX_EVENTS];
  uint8_t count,overflow;
@@ -31,6 +31,8 @@ int track_song_insert(struct track_song_bank *bank,uint8_t after);
 int track_song_delete(struct track_song_bank *bank,uint8_t at);
 int track_song_change(struct track_song_bank *bank,uint8_t row,uint8_t col,int32_t delta);
 int track_song_record(struct track_song_bank *bank,uint8_t pattern,uint8_t step,uint8_t fx,uint8_t pressed);
+int track_song_record_value(struct track_song_bank *bank,uint8_t pattern,uint8_t step,uint8_t fx,uint8_t kind,uint8_t value);
+uint8_t track_song_effect_parameter(const struct track_song_bank *bank,uint8_t pat,uint8_t step,uint8_t fx,uint8_t fallback);
 /* Reconstruct active recorded effects at a step (applies on step boundaries). */
 uint8_t track_song_effect_mask(const struct track_song_bank *bank,uint8_t pattern,uint8_t step);
 #endif

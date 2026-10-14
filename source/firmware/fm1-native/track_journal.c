@@ -73,6 +73,46 @@ static int choose(const struct bank_status b[2],uint8_t *bank){
  if(b[0].kind==2||b[1].kind==2)return TRACK_JOURNAL_FOREIGN;
  return 0;
 }
+/* V0.49: constant-time project picker. Full journal inspection scans up to
+ * 24 KiB per slot (including erased tails), which stalls encoder polling.
+ * The browser needs only a title; every actual LOAD and SAVE continues to
+ * use the original full CRC/ownership and foreign-sector safety checks. */
+int track_journal_preview(const struct track_journal_io *io,uint8_t slot,char title[13]){
+ if(!valid_io(io,slot)||!title)return TRACK_JOURNAL_INVALID;
+ title[0]=0;
+ uint8_t found=0u,blank_count=0u;
+ uint32_t generation=0u;
+ for(uint8_t bank=0u;bank<2u;bank++){
+  uint8_t h[TRACK_JOURNAL_HEADER_BYTES];
+  if(io->read(io->ctx,slot,bank,0u,h,sizeof(h)))return TRACK_JOURNAL_IO;
+  uint8_t blank=1u;
+  for(uint8_t j=0u;j<sizeof(h);j++)if(h[j]!=0xFFu){blank=0u;break;}
+  if(blank){blank_count++;continue;}
+  uint32_t size=rd32(h+12u);
+  if(rd32(h)!=TRACK_JOURNAL_MAGIC||rd16(h+4u)!=1u||
+     h[6]!=slot||h[7]!=(uint8_t)(slot^0xFFu)||h[20]!=0u||
+     rd32(h+24u)!=track_store_crc32(h,20u)||size<42u||
+     size>TRACK_STORE_MAX||size+TRACK_JOURNAL_HEADER_BYTES>TRACK_JOURNAL_BANK_BYTES)continue;
+  uint8_t prefix[36];
+  if(io->read(io->ctx,slot,bank,TRACK_JOURNAL_HEADER_BYTES,prefix,sizeof(prefix)))return TRACK_JOURNAL_IO;
+  uint16_t version=rd16(prefix+4u);
+  if(rd32(prefix)!=TRACK_STORE_MAGIC||version<1u||version>TRACK_STORE_VERSION||
+     rd16(prefix+6u)!=slot||rd32(prefix+8u)!=size||
+     rd32(prefix+16u)!=track_store_crc32(prefix,16u))continue;
+  uint32_t gen=rd32(h+8u);
+  if(found && !newer(gen,generation))continue;
+  found=1u;generation=gen;
+  for(uint8_t j=0u;j<12u;j++){
+   uint8_t ch=prefix[24u+j];
+   title[j]=(char)(ch>=32u&&ch<=126u?ch:' ');
+  }
+  title[12]=0;
+ }
+ if(found)return TRACK_JOURNAL_OK;
+ /* An FF header does not prove the underlying bank is empty. This preview
+  * is never trusted for writing: save/load perform comprehensive scans. */
+ return blank_count==2u?TRACK_JOURNAL_NO_PROJECT:TRACK_JOURNAL_INVALID;
+}
 int track_journal_load(const struct track_journal_io *i,uint8_t slot,
  struct track_store_project *out,uint8_t *scratch,uint32_t cap,
  struct track_journal_status *status){

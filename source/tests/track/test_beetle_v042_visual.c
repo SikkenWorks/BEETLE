@@ -28,9 +28,11 @@ int main(void){
   beetle_boot_art(frame);
   memcpy(screens[frame],screen,sizeof screen);
   assert(invalid_draw==0);
-  uint32_t pixels=0;for(uint32_t i=0;i<240*240;i++)if(screen[i]){ assert(screen[i]==0xF81A);pixels++;}
-  assert(pixels>200);
-  printf("boot frame %d: %u magenta pixels\n",frame,pixels);
+  uint32_t pixels=0,tree=0;for(uint32_t i=0;i<240*240;i++)if(screen[i]){
+   if(screen[i]==0xF81E)pixels++;else tree++;
+  }
+  assert(pixels>1600 && tree>4900);
+  printf("boot frame %d: %u magenta / %u tree pixels\n",frame,pixels,tree);
  }
  assert(memcmp(screens[0],screens[1],sizeof screen)!=0);
  for(int frame=0;frame<2;frame++){

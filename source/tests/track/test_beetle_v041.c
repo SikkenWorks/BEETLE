@@ -19,7 +19,7 @@ int main(void){
  assert(kit.components[4].pitch!=kit.components[6].pitch);
  assert(kit.components[7].release>kit.components[2].release);
  struct track_mixer mix;track_mixer_init(&mix);
- assert(mix.ch[TRACK_DRUM_CHANNEL].volume==100);
+ assert(mix.ch[TRACK_DRUM_CHANNEL].volume==80);
  assert(mix.ch[0].volume==80);
  assert(track_drum_trigger(&kit,0));track_drum_render(&kit,&mix,pcm,512);
  unsigned nonzero=0;for(unsigned i=0;i<1024;i++)nonzero|=pcm[i]!=0;
@@ -35,7 +35,7 @@ int main(void){
  const uint8_t params[5]={19,88,0,71,43};
  memcpy(project.punch_param,params,sizeof(params));
  uint32_t used=0;assert(track_store_encode(&project,bytes,sizeof(bytes),&used)==0);
- assert(bytes[4]==8u);
+ assert(bytes[4]==TRACK_STORE_VERSION);
  assert(!track_store_decode(&loaded,bytes,used));
  assert(!memcmp(params,loaded.punch_param,5));
  assert(!memcmp(project.drum,loaded.drum,sizeof(project.drum)));

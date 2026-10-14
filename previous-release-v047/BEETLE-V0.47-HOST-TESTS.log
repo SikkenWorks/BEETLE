@@ -1,0 +1,18 @@
+frame 0: pink=2160 tree=4970
+frame 1: pink=1632 tree=4970
+PASS: native 240x240 two-frame splash with safe stripe coordinates
+/mnt/data/beetle_work/BEETLE-V0.47/source/tests/track/test_beetle_v047_visual.py:18: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+  expected=[((r>>3)<<11)|((g>>2)<<5)|(b>>3) for r,g,b in rgb.getdata()]
+PASS: 100ms frame 0, all 57,600 pixels match original GIF in RGB565
+PASS: 100ms frame 1, all 57,600 pixels match original GIF in RGB565
+BEETLE V0.46 PASS: 80% drum fader with boosted PCM, step ALGORITHM record/save/replay, no release gain jump
+BEETLE V0.45 PASS: twelve-slot isolation; 14 loops stable gain; sustained FX, pitch, stop
+BEETLE V0.44: 16 real ROM one-shots, 14 voices, snare RR, closed hat choke, pitch +/-36, silence, headroom PASS
+BEETLE V0.43: 14 differentiated factory drums; kick/snare envelopes, open/closed hats, crash/ride tails, edit/reset, mute, headroom & choke PASS
+BEETLE V0.41 PASS: factory kit; drum gain; V8 save/load; retained ALGORITHM; reversed PCM; V0.40 V7 fixture; recover
+decode rc=0 used=1000 fmt=9
+V0.40 PASS: lane clipboard + audible drum meter + +/-36 pitch + V8 save/load
+PASS: repeat frozen snapshot, reverse actual backwards playback
+PASS: tape-stop decreases playback rate, stutter gates live audio, filter value retained
+PASS: real V0.37 V6 file loads and migrates into V8
+PASS: full V0.37 A/B NOR journal LOAD into V0.39, no erase

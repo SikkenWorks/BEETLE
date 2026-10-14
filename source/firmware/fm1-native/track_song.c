@@ -63,14 +63,23 @@ int track_song_change(struct track_song_bank *b,uint8_t row,uint8_t col,int32_t 
  else e->repeats=(uint8_t)bound((int32_t)e->repeats+delta,1,16);
  return 0;
 }
-int track_song_record(struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t fx,uint8_t down){
- if(!b||pat>=TRACK_PATTERNS||step>=TRACK_STEPS||fx>=TRACK_PUNCH_COUNT||down>1u)return -1;
+int track_song_record_value(struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t fx,uint8_t down,uint8_t value){
+ if(!b||pat>=TRACK_PATTERNS||step>=TRACK_STEPS||fx>=TRACK_PUNCH_COUNT||down>2u||
+     (value>100u&&value!=255u))return -1;
  struct track_song_clip *clip=&b->clips[pat];
+ /* At 16-step resolution keep only the latest encoder position for each
+  * effect in each row. Prevent rapid turns from exhausting the event bank. */
+ if(down==2u){
+  for(int i=(int)clip->count-1;i>=0;i--){
+   struct track_song_event *ev=&clip->data[i];
+   if(ev->step==step&&ev->fx==fx&&ev->down==2u){ev->param=value;return 0;}
+  }
+ }
  if(clip->count>=TRACK_SONG_FX_EVENTS){clip->overflow=1u;return -2;}
  /* A punch shorter than one sequencer step must still be visible and
   * replayable: move its STP boundary to the next step, rather than
   * recording ON and OFF at the same timestamp and cancelling both. */
- if(!down){
+ if(down==0u){
   for(int i=(int)clip->count-1;i>=0;i--){
    if(clip->data[i].fx==fx){
     if(clip->data[i].down && clip->data[i].step==step)
@@ -82,7 +91,27 @@ int track_song_record(struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t
  clip->data[clip->count].step=step;
  clip->data[clip->count].fx=fx;
  clip->data[clip->count].down=down;
+ clip->data[clip->count].param=value;
  clip->count++;return 0;
+}
+int track_song_record(struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t fx,uint8_t down){
+ return track_song_record_value(b,pat,step,fx,down,255u);
+}
+uint8_t track_song_effect_parameter(const struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t fx,uint8_t fallback){
+ if(!b||pat>=TRACK_PATTERNS||step>=TRACK_STEPS||fx>=5u)return fallback;
+ const struct track_song_clip *clip=&b->clips[pat];
+ int best=-1,best_time=-1;
+ for(uint8_t i=0u;i<clip->count;i++){
+  const struct track_song_event *e=&clip->data[i];
+  if(e->fx!=fx||e->step>step||e->down==0u||e->param>100u)continue;
+  if((int)e->step>=best_time){best_time=e->step;best=i;}
+ }
+ if(best<0)for(uint8_t i=0u;i<clip->count;i++){
+  const struct track_song_event *e=&clip->data[i];
+  if(e->fx!=fx||e->down==0u||e->param>100u)continue;
+  if((int)e->step>=best_time){best_time=e->step;best=i;}
+ }
+ return best<0?fallback:clip->data[best].param;
 }
 uint8_t track_song_effect_mask(const struct track_song_bank *b,uint8_t pat,uint8_t step){
  if(!b||pat>=TRACK_PATTERNS||step>=TRACK_STEPS)return 0u;
@@ -94,14 +123,14 @@ uint8_t track_song_effect_mask(const struct track_song_bank *b,uint8_t pat,uint8
   int best=-1;int best_time=-1;
   for(uint8_t i=0;i<clip->count;i++){
    const struct track_song_event *ev=&clip->data[i];
-   if(ev->fx!=fx||ev->step>step)continue;
+   if(ev->fx!=fx||ev->step>step||ev->down>1u)continue;
    if((int)ev->step>=best_time){best_time=ev->step;best=i;}
   }
   if(best<0){
    /* Carry a long-held Punch through the next pattern wrap. */
    for(uint8_t i=0;i<clip->count;i++){
     const struct track_song_event *ev=&clip->data[i];
-    if(ev->fx!=fx)continue;
+    if(ev->fx!=fx||ev->down>1u)continue;
     if((int)ev->step>=best_time){best_time=ev->step;best=i;}
    }
   }

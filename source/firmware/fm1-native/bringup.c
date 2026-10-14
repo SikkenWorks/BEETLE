@@ -172,7 +172,7 @@ static volatile uint32_t native_nested_ticks, native_nested_count;
 #define ETCH_NATIVE_OTA 0
 #endif
 #define FELUCCA_OTA ETCH_NATIVE_OTA
-#define FELUCCA_ID "FM-1_2045"
+#define FELUCCA_ID "FM-1_2047"
 #define ETCH_UI_VERSION "V043"
 #define FELUCCA_OTA_DRYRUN 0
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
@@ -273,12 +273,13 @@ static void label_large(const char *text,uint32_t x,uint32_t y,uint16_t color){
 #endif
 /* Boot branding is intentionally shown before the audio IRQ begins.
  * No waiting in the realtime audio thread or application main loop. */
-/* Minimal centered splash: nothing else on screen. */
+/* Original 240 x 240 animated splash, no scaling or extra UI. */
 static void etch_boot_splash(void){
 #ifdef TRACK_FIRMWARE
- beetle_boot_art(0u);lcd_sync();fm1_wdt_feed();
- fm1_delay_ms(120u);fm1_wdt_feed();
- beetle_boot_art(1u);lcd_sync();fm1_wdt_feed();
+ for(uint8_t f=0u;f<2u;f++){
+  beetle_boot_art(f);lcd_sync();fm1_wdt_feed();
+  fm1_delay_ms(100u);fm1_wdt_feed();
+ }
 #else
  lcd_fill(0,0,240,240,0x0000);
  label_large("SIKKENWORKS",32,95,0xffff);

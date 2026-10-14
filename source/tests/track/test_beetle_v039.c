@@ -74,7 +74,7 @@ static void migration(void){
  track_master_default(&old_project.master);
  for(unsigned i=0;i<TRACK_DRUM_COUNT;i++)track_drum_timbre_default(&old_project.drum[i]);
  uint32_t used=0;assert(track_store_encode(&old_project,legacy,sizeof(legacy),&used)==0);
- assert(legacy[4]==8u);
+ assert(legacy[4]==TRACK_STORE_VERSION);
  static struct track_store_project roundtrip;
  assert(track_store_decode(&roundtrip,legacy,used)==0);
  assert(roundtrip.song.patterns[0].ch[TRACK_DRUM_CHANNEL][0].note==3u);

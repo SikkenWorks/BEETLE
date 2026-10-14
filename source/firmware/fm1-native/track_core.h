@@ -30,6 +30,9 @@ void track_init(struct track_engine *e);
 int track_enter_note(struct track_engine *e,uint8_t note);
 int track_set_note(struct track_engine *e,uint8_t channel,uint8_t step,uint8_t note);
 int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step);
+/* True if the current pattern contains any musical event in this lane.
+ * Ignore the default instrument and step value: those exist on empty lanes. */
+uint8_t track_lane_has_data(const struct track_pattern *pattern,uint8_t channel);
 int track_adjust_octave(struct track_engine *e,int8_t semitones);
 void track_rotate_select(struct track_engine *e,int8_t direction);
 void track_set_channel(struct track_engine *e,uint8_t channel);

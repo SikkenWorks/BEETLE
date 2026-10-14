@@ -1,3 +1,9 @@
+# BEETLE V0.47 ANIMATED BOOT
+
+See `../BEETLE-V0.47-README-NL.md` for exact source-asset provenance, full pixel tests and experimental flash warnings. All BEETLE V0.46 audio/mixer/Punch-In code remains.
+
+**Huidige source: BEETLE V0.46.** Zie `../README.md` voor wijzigingen, V9-projectformaat, V0.45-migratie en flashwaarschuwing.
+
 # BEETLE V0.45 — Isolated Overwrite, Persistent Step FX & Stable Loop Loudness
 
 This version fixes three concrete regressions in BEETLE V0.44:

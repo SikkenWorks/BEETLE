@@ -1,30 +1,34 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * BEETLE 0.42: intentionally only the play-icon animation at power on.
- * Two 22x23 bitmap frames, scaled exactly x3 via nearest neighbor.
- * No image-run arithmetic, no persistent disk/flash reads.
+ * BEETLE V0.47: exact user-provided two-frame 240x240 loading art.
+ * Transparent beetle is composited over the original tree at original scale.
+ * 100 ms/frame, repeating while the boot splash is displayed.
+ * All drawing happens in the normal two-stripe LCD compositor. No heap.
  */
 #pragma once
 #include <stdint.h>
-#include "beetle_play_icon.h"
-static inline void beetle_boot_art_rows(uint8_t frame){
- const uint32_t *glyph=beetle_play_icon[frame&1u];
- const uint16_t size=3u, origin_x=87u, origin_y=85u;
- lcd_fill(0u,0u,240u,240u,0x0000u);
- for(uint16_t y=0u;y<23u;y++){
-  const uint32_t bits=glyph[y];
-  for(uint16_t x=0u;x<22u;){
-   if(!(bits&(1u<<(21u-x)))){x++;continue;}
-   uint16_t begin=x;
-   while(x<22u&&(bits&(1u<<(21u-x))))x++;
-   lcd_fill(origin_x+begin*size,origin_y+y*size,(x-begin)*size,size,0xF81Au);
-  }
+#include "beetle_boot_frames.h"
+#include "beetle_play_icon.h" /* still used by PLAY/STOP indicator, not splash */
+
+static inline void beetle_boot_art_rows(uint8_t frame,uint16_t start,uint16_t end){
+ lcd_fill(0u,start,240u,(uint16_t)(end-start),0x0000u);
+ for(uint32_t i=0;i<BEETLE_BOOT_TREE_RUNS;i++){
+  const struct beetle_boot_base_run *r=&beetle_boot_tree[i];
+  if(r->y<start||r->y>=end)continue;
+  lcd_fill(r->x,r->y,r->w,1u,beetle_boot_colors[r->color]);
+ }
+ const struct beetle_boot_pink_run *bug=(frame&1u)?beetle_boot_bug1:beetle_boot_bug0;
+ uint32_t count=(frame&1u)?BEETLE_BOOT_BUG1_RUNS:BEETLE_BOOT_BUG0_RUNS;
+ for(uint32_t i=0u;i<count;i++){
+  const struct beetle_boot_pink_run *r=&bug[i];
+  if(r->y<start||r->y>=end)continue;
+  lcd_fill(r->x,r->y,r->w,1u,0xF81Eu); /* original #FF00F0 */
  }
 }
 static inline void beetle_boot_art(uint8_t frame){
  for(uint16_t top=0u;top<240u;top+=120u){
   etch_scope_origin=top;etch_scope_height=120u;
   etch_scope_active=1u;etch_panel_composite=1u;
-  beetle_boot_art_rows(frame);
+  beetle_boot_art_rows(frame,top,(uint16_t)(top+120u));
   etch_panel_commit();
  }
 }

@@ -1,4 +1,4 @@
-/* BEETLE V0.45: persistent per-lane step FX, GPL-3.0-only. */
+/* BEETLE V0.46: persistent per-lane step FX, GPL-3.0-only. */
 #ifndef BEETLE_TRACK_SUSTAIN_FX_H
 #define BEETLE_TRACK_SUSTAIN_FX_H
 #include "track_chip.h"

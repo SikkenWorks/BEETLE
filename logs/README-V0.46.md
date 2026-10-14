@@ -1,0 +1,1 @@
+V0.46: `host-regression-v046.log`, `build-readonly-v046.log`, `build-pilot-v046.log`, `build-storage-v046.log`, `firmware-pack-v046.log`, `installer-v046.log`. V0.45 logs zijn ongewijzigd behouden als historisch bewijs.

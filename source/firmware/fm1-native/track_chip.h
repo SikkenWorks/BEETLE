@@ -49,6 +49,8 @@ struct track_chip_engine {
  uint8_t step_gain[TRACK_CHANNELS]; /* persistent per-channel 0..100% volume automation */
  uint8_t mono; /* 1: held last note priority; 0: up to 8 voices */
  uint32_t alloc_serial,steal_count,restart_count,health_cookie;
+ uint16_t phrase_div_q8; /* Q8 mix divisor, smoothed per sample */
+ uint8_t phrase_max_voices; /* preserve headroom until entire phrase ends */
  uint32_t step_samples,cut_after[TRACK_CHANNELS];
  uint32_t fx_samples[TRACK_SYNTH_CHANNELS]; /* FX age survives empty tracker steps */
  uint16_t release_left;

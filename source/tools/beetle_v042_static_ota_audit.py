@@ -20,5 +20,5 @@ assert 'ETCH-OTA-STAGE-1' in ota
 assert 'const char etch[]="ETCH"' not in mat
 assert 'beetle_play_icon' in mat and 'beetle_play_icon' in boot
 assert '0xF81Au' in mat
-assert '0xF81Au' in boot
+assert '0xF81Eu' in boot  # exact RGB565 conversion of source #FF00F0
 print('PASS V0.42 static OTA policy and boot visual checks (not a physical flash test)')

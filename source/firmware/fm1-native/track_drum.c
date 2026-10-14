@@ -166,7 +166,8 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
    level=(int32_t)(((int64_t)level*v->env_q24)>>24u);
    level=(int32_t)(((int64_t)level*v->gain_q8)>>8u);
    if(v->release_frames)level=level*v->release_frames/48;
-   mono+=level/3;  /* six simultaneous drumvoices and synthvoice headroom */
+   mono+=(level*7)/12; /* V0.46: +4.86 dB native drum gain, independent of mixer fader.
+                       * 6-voice mix still keeps downstream master headroom. */
    v->phase+=v->phase_step;v->age++;
    uint32_t loss=(uint32_t)(((uint64_t)v->env_q24*v->env_loss_q16+32768u)>>16u);
    if(!loss&&v->env_q24)loss=1u;
@@ -176,6 +177,11 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
    if(v->release_frames){v->release_frames--;if(!v->release_frames)v->active=0u;}
   }
   mono=(mono*(int32_t)gain*(int32_t)d->step_gain)/10000;
+  /* Soft knee only for exceptionally dense drum hits: prevent six-voice
+   * clipping without sacrificing the increased single-drum attack. */
+  if(mono>24000)mono=24000+(mono-24000)/4;
+  else if(mono< -24000)mono=-24000+(mono+24000)/4;
+  if(mono>31500)mono=31500;else if(mono< -31500)mono=-31500;
   uint32_t peak=(uint32_t)(mono<0?-(int64_t)mono:mono);
   if(peak>32767u)peak=32767u;
   if(peak>track_lane_pcm_peak[TRACK_DRUM_CHANNEL])track_lane_pcm_peak[TRACK_DRUM_CHANNEL]=(uint16_t)peak;

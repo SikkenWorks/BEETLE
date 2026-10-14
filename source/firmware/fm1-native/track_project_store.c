@@ -78,8 +78,12 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
   PUT1(clip->count);
   for(uint8_t x=0;x<clip->count;x++){
    const struct track_song_event *e=&clip->data[x];
-   if(e->step>=TRACK_STEPS||e->fx>=TRACK_PUNCH_COUNT||e->down>1u)return -1;
-   PUT1((uint8_t)(e->step|(e->fx<<4u)|(e->down<<7u)));
+   if(e->step>=TRACK_STEPS||e->fx>=TRACK_PUNCH_COUNT||e->down>2u||
+      (e->param>100u&&(e->param!=255u||e->down==2u)))return -1;
+   PUT1((uint8_t)(e->step|(e->fx<<4u)|((e->down==0u?0u:1u)<<7u)));
+   /* 127 encodes unspecified value for legacy callers (255 in RAM).
+    * Bit 7 marks an ALGORITHM change without changing the ON/OFF mask. */
+   PUT1(e->down==2u?(uint8_t)(e->param|0x80u):(e->param==255u?127u:e->param));
   }
  }
  for(c=0;c<4u;c++){
@@ -120,7 +124,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -145,6 +149,10 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   if(rd16(data+4u)>=3u){GET1(m->swing);if(rd16(data+4u)<7u)m->swing=m->swing?50u:0u;}else m->swing=0u;
   if(m->volume>100u||m->pan< -100||m->pan>100||
      m->mute>1u||m->solo>1u||m->swing>100u)return -3;
+  /* V0.45 initialized the drum fader at 100 to compensate for quiet PCM.
+   * Migrate that specific old factory default to 80; V0.46 stores the
+   * user's own slider choice verbatim (including a deliberate 100). */
+  if(rd16(data+4u)==8u&&lane==TRACK_DRUM_CHANNEL&&m->volume==100u)m->volume=80u;
  }
  for(r=0;r<TRACK_PATTERNS;r++){
   struct track_pattern *pat=&p->song.patterns[r];GET1(pat->length);
@@ -182,10 +190,17 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   for(uint8_t x=0;x<clip->count;x++){
    if(rd16(data+4u)>=4u){uint8_t ev;GET1(ev);
     clip->data[x].step=ev&15u;clip->data[x].fx=(ev>>4u)&7u;clip->data[x].down=ev>>7u;
+    clip->data[x].param=255u;
+    if(rd16(data+4u)>=9u){uint8_t aux;GET1(aux);
+     if(aux&0x80u){clip->data[x].down=2u;clip->data[x].param=(uint8_t)(aux&0x7Fu);}
+     else clip->data[x].param=(aux==127u?255u:aux);
+    }
    }else{
     GET1(clip->data[x].step);GET1(clip->data[x].fx);GET1(clip->data[x].down);
+    clip->data[x].param=255u;
    }
-   if(clip->data[x].step>=TRACK_STEPS||clip->data[x].fx>=TRACK_PUNCH_COUNT||clip->data[x].down>1u)return -3;
+   if(clip->data[x].step>=TRACK_STEPS||clip->data[x].fx>=TRACK_PUNCH_COUNT||clip->data[x].down>2u||
+      (clip->data[x].param>100u&&clip->data[x].param!=255u))return -3;
   }
  }
  if(rd16(data+4u)>=2u){

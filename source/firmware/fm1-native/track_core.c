@@ -22,6 +22,15 @@ uint8_t track_note_scroll(uint8_t note,int32_t delta,uint8_t drum){
  at=((at+(delta%total))%total+total)%total;
  return (uint8_t)(at==count?TRACK_NOTE_EMPTY:at==count+1?TRACK_NOTE_STOP:at);
 }
+uint8_t track_lane_has_data(const struct track_pattern *pattern,uint8_t channel){
+ if(!pattern||channel>=TRACK_CHANNELS)return 0u;
+ for(uint8_t row=0u;row<TRACK_STEPS;row++){
+  const struct track_step *step=&pattern->ch[channel][row];
+  /* STP is meaningful data. FX and drum NOTE2/chord count even without NOTE. */
+  if(step->note!=TRACK_NOTE_EMPTY||step->chord!=0u||step->effect!=0u)return 1u;
+ }
+ return 0u;
+}
 int track_set_note(struct track_engine *e,uint8_t channel,uint8_t st,uint8_t note){if(!e||channel>=TRACK_CHANNELS||st>=TRACK_STEPS||(note>127u&&note!=TRACK_NOTE_STOP&&note!=TRACK_NOTE_EMPTY))return -1;e->active.ch[channel][st].note=note;e->dirty=1u;return 0;}
 /* Clear the entire step, not merely the pitch. Keep the cursor where it is.
  * Default instrument matches track_init() for each synth/drum lane. */

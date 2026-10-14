@@ -75,7 +75,7 @@ static int32_t va_shape(uint8_t wave,uint32_t phase,uint32_t step,uint8_t width)
 }
 void track_chip_init(struct track_chip_engine *s){
  if(!s)return;
- memset(s,0,sizeof(*s));s->health_cookie=TRACK_CHIP_COOKIE;
+ memset(s,0,sizeof(*s));s->health_cookie=TRACK_CHIP_COOKIE;s->phrase_div_q8=256u;
  for(unsigned i=0;i<8;i++)s->punch_param[i]=50u;
  s->punch_param[2]=0u;
  for(unsigned i=0;i<TRACK_CHANNELS;i++){s->step_gain[i]=100u;s->fx_type[i]=0u;s->fx_value[i]=50u;s->duty[i]=2u;s->cutoff[i]=96u;s->cut_after[i]=0xFFFFFFFFu;}
@@ -126,7 +126,7 @@ void track_chip_silence(struct track_chip_engine *s){
  if(!s)return;
  if(!track_chip_health(s))track_chip_recover(s);
  s->tail_left=s->prev_left;s->tail_right=s->prev_right;s->release_left=64u;
- s->voice_count=0u;memset(s->voices,0,sizeof(s->voices));
+ s->voice_count=0u;memset(s->voices,0,sizeof(s->voices));s->phrase_max_voices=0u;s->phrase_div_q8=256u;
 }
 void track_chip_set_mono(struct track_chip_engine *s,uint8_t mono){
  if(!s)return;
@@ -366,7 +366,7 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
  if(!track_chip_health(s))track_chip_recover(s);
  for(uint32_t f=0;f<frames;f++){
   int64_t left=0,right=0;
-  uint8_t foreground=0u; /* count sounding unreleased voices, not historical pool size */
+  uint8_t foreground=0u,active_voices=0u; /* normal and ADSR-release voices counted separately */
   for(uint8_t i=0;i<s->voice_count;i++){
    struct track_chip_voice *v=&s->voices[i];
    if(!v->active)continue;
@@ -384,7 +384,9 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
     if(m->mute||(solo&&!m->solo))continue;
     vol=m->volume;pan=m->pan;}
    mono=(int32_t)(((int64_t)mono*vol*s->step_gain[v->channel])/10000);
-   if(!v->released && vol && s->step_gain[v->channel])foreground++;
+   if(v->active && vol && s->step_gain[v->channel]){
+    active_voices++;if(!v->released)foreground++;
+   }
    /* Meter is tapped after lane mute/solo, gain, and step FX. */
    uint32_t peak=(uint32_t)(mono<0?-(int64_t)mono:mono);
    if(peak>32767u)peak=32767u;
@@ -392,15 +394,23 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
    left+=((int64_t)mono*(100-pan))/100;
    right+=((int64_t)mono*(100+pan))/100;
   }
-  /* Live voice headroom, never the high-water voice_count slot count.
-   * A note at step 0 must be equally loud on loop 1, loop 2 and loop 20.
-   * Exclude short crossfading note-off voices from the denominator. */
-  uint32_t divisor=1u+(uint32_t)foreground/2u;
-  /* The mixer output is bounded by eight voices and stays well below signed
-   * 32-bit range. Use 32-bit division to avoid pulling the unavailable
-   * __divdi3 runtime helper into the FM1 image. */
-  left=(int32_t)left/(int32_t)divisor;
-  right=(int32_t)right/(int32_t)divisor;
+  /* V0.46: latch the highest *audible* polyphony in the current phrase.
+   * An ADSR note-off cannot halve the divisor and boost the final sustained
+   * note by +6 dB. Reset only when all audible voices have ended. Smooth
+   * increases (~1 ms) so concurrent onsets cannot jump the normalization. */
+  if(foreground>s->phrase_max_voices)s->phrase_max_voices=foreground;
+  if(!active_voices)s->phrase_max_voices=0u;
+  uint32_t target=(1u+(uint32_t)s->phrase_max_voices/2u)*256u;
+  if(!s->phrase_div_q8)s->phrase_div_q8=256u;
+  if(s->phrase_div_q8<target){
+   uint32_t next=(uint32_t)s->phrase_div_q8+8u;
+   s->phrase_div_q8=(uint16_t)(next>target?target:next);
+  }else if(s->phrase_div_q8>target){
+   uint32_t step=foreground?1u:16u;
+   s->phrase_div_q8=(uint16_t)(s->phrase_div_q8-target<step?target:s->phrase_div_q8-step);
+  }
+  left=((int32_t)left*256)/(int32_t)s->phrase_div_q8;
+  right=((int32_t)right*256)/(int32_t)s->phrase_div_q8;
   if(s->release_left){
    left+=((int64_t)s->tail_left*s->release_left)/64;
    right+=((int64_t)s->tail_right*s->release_left)/64;
