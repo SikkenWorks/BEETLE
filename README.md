@@ -1,36 +1,3 @@
-
-<style>
-  html, body {
-    background: #000000 !important;
-    color: #FFFFFF !important;
-  }
-
-  body, p, li, td, th, .main-content {
-    color: #FFFFFF !important;
-  }
-
-  header, main, .page-header, .main-content {
-    background: #000000 !important;
-    background-image: none !important;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    color: #FF00D6 !important;
-  }
-
-  a {
-    color: #FF00D6 !important;
-  }
-
-  a:hover {
-    color: #FFFFFF !important;
-  }
-</style>
-
-<p align="center">
-  <img src="BEETLE.png" alt="BEETLE" width="400">
-</p>
-
 # BEETLE
 
 **An open-source, six-lane tracker and digital drum machine for the M-VAVE FM1.**  
