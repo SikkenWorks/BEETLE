@@ -9,7 +9,7 @@
 
 
 <div align="center">
-  <a href="/simulator.html">
+  <a href="https://sikkenworks.github.io/BEETLE/simulator.html">
     <img
       src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_WEB_SIMULATOR-000000?style=for-the-badge&logoColor=white"
       alt="Launch BEETLE Web Simulator"
