@@ -28,6 +28,7 @@
 #define TRACK_WHITE 0xFFFFu
 #define TRACK_DARK 0x0000u
 #include "beetle_keyboard_octave.h"
+#include "beetle_help.h"
 static struct track_engine track_state;
 static struct track_drum_engine track_drum __attribute__((section(".beetle_song"),aligned(16)));
 static struct track_master_settings track_master_cfg;
@@ -58,6 +59,7 @@ static uint32_t track_old_note_mask;
 static struct track_name_editor track_editor;
 static char track_title[TRACK_NAME_MAX+1u];
 static uint8_t track_named,track_page,track_menu_index,track_fx_cursor,track_osc_cursor,track_osc_bank;
+static uint8_t track_help_offset; /* V0.54: scroll state, not project data. */
 static uint8_t track_audio_started,track_prev_notes[TRACK_CHANNELS][5];
 static uint8_t track_lane_instrument[TRACK_SYNTH_CHANNELS];
 static uint8_t track_prev_note_count[TRACK_CHANNELS];
@@ -221,7 +223,8 @@ static void track_ui_inst_reset(void){
  }
 }
 
-/* 0 TRACK / 1 PROJECTS / 2 NAME / 3 PER STEP FX / 4 PUNCH / 5 EDIT
+/* 19 = HELP / SHORTCUTS, only opened explicitly from PROJECTS.
+ * 0 TRACK / 1 PROJECTS / 2 NAME / 3 PER STEP FX / 4 PUNCH / 5 EDIT
  * 6 MIXER / 7 SCALE/LOCK / 8 PROJECT SLOT SAVE STATUS / 9 SONG
  * 10 PUNCH EVENT TRACKER (REC held 1.5s) */
 /* Guard against invalid cursor/data before indexing. A bad state is surfaced
@@ -237,7 +240,7 @@ static void track_runtime_validate(void){
   }
   track_state.active.length=16u;faulty=1u;
  }
- if(track_page>18u){track_page=0u;faulty=1u;}
+ if(track_page>19u){track_page=0u;faulty=1u;}
  if(track_state.transport.edit_channel>=TRACK_CHANNELS){track_state.transport.edit_channel=0u;faulty=1u;}
  if(track_state.transport.edit_step>=TRACK_STEPS){track_state.transport.edit_step=0u;faulty=1u;}
  if(track_state.transport.edit_column>=TRACK_NAV_COLUMNS){track_state.transport.edit_column=0u;faulty=1u;}
@@ -716,25 +719,31 @@ static void track_fm1_drum_editor_screen(void){
  track_pix_text("SELECT DRUM  K1 FIELD  K3 VALUE",4u,219u,TRACK_PINK);
 }
 /* Pixel-perfect 4-knob MASTER FX UI, small enough for 240x240 OLED. */
+/* Fully circular, filled pixel knob. No floating-point calculations in UI.
+ * Scanline widths form a true round rim; the pointer starts at the center.
+ * One horizontal span per row avoids hundreds of SPI-facing point doodles. */
 static void track_master_knob(uint16_t x,uint16_t y,uint8_t value){
- static const int8_t ticks_x[12]={-10,-9,-6,-2,2,6,9,10,9,6,2,-2};
- static const int8_t ticks_y[12]={5,1,-5,-9,-9,-5,1,5,9,11,11,9};
- /* 13 indexed needle positions, from 7 o'clock to 5 o'clock. */
- static const int8_t needle_x[13]={-7,-9,-9,-8,-6,-3,0,3,6,8,9,9,7};
- static const int8_t needle_y[13]={7,4,0,-4,-7,-9,-10,-9,-7,-4,0,4,7};
- lcd_fill(x-12u,y-12u,25u,25u,0x1803u);
- for(uint8_t i=0u;i<12u;i++){
-  uint16_t px=(uint16_t)((int)x+ticks_x[i]),py=(uint16_t)((int)y+ticks_y[i]);
-  lcd_fill(px,py,2u,2u,0x8C11u);
+ static const uint8_t rim[12]={11,10,10,10,10,9,9,8,7,6,4,0};
+ static const uint8_t face[10]={9,8,8,8,8,7,7,6,4,0};
+ /* 13 positions on a 270-degree arc, clockwise from lower-left. */
+ static const int8_t pointer_x[13]={-7,-9,-9,-8,-6,-3,0,3,6,8,9,9,7};
+ static const int8_t pointer_y[13]={ 7, 4, 0,-4,-7,-9,-9,-9,-7,-4,0,4,7};
+ for(int8_t dy=-11;dy<=11;dy++){
+  uint8_t a=(uint8_t)(dy<0?-dy:dy);
+  uint8_t r=rim[a];
+  lcd_fill((uint16_t)(x-r),(uint16_t)((int)y+dy),(uint16_t)(r*2u+1u),1u,TRACK_BRIGHT);
+  if(a<=9u){uint8_t f=face[a];
+   lcd_fill((uint16_t)(x-f),(uint16_t)((int)y+dy),(uint16_t)(f*2u+1u),1u,0x1803u);
+  }
  }
- lcd_fill(x-2u,y-2u,5u,5u,TRACK_WHITE);
+ /* Bright marker on a solid knob, connected rather than scattered dots. */
  uint8_t idx=(uint8_t)((uint16_t)value*12u/100u);
- int8_t nx=needle_x[idx],ny=needle_y[idx];
- for(uint8_t i=3u;i<=9u;i+=2u){
-  uint16_t px=(uint16_t)((int)x+(int)nx*(int)i/10);
-  uint16_t py=(uint16_t)((int)y+(int)ny*(int)i/10);
-  lcd_fill(px,py,2u,2u,TRACK_PINK);
+ int32_t nx=pointer_x[idx],ny=pointer_y[idx];
+ for(int32_t d=2;d<=8;d++){
+  int32_t px=(int32_t)x+nx*d/9,py=(int32_t)y+ny*d/9;
+  lcd_fill((uint16_t)px,(uint16_t)py,2u,2u,TRACK_PINK);
  }
+ lcd_fill(x-1u,y-1u,3u,3u,TRACK_WHITE);
 }
 static void track_fm1_master_screen(void){
  track_page_header("MASTER / FX CHAIN",43u);
@@ -968,10 +977,39 @@ static void track_fm1_paint(void){
   track_pix_text(track_edit_poly?"POLY AUDITION":"MONO AUDITION",17u,202u,TRACK_PINK);
   beetle_draw_keyboard_octave(216u);return;
  }
+ if(track_page==19u){
+  track_page_header("HELP / SHORTCUTS",43u);
+  track_pix_text("K1 SCROLL  K4 PAGE",9u,49u,TRACK_PINK);
+  lcd_fill(9u,62u,221u,1u,0x4807u);
+  for(uint8_t row=0u;row<BEETLE_HELP_VISIBLE;row++){
+   uint8_t idx=(uint8_t)(track_help_offset+row);
+   if(idx>=BEETLE_HELP_COUNT)break;
+   uint16_t y=(uint16_t)(68u+(uint16_t)row*13u);
+   const char *str=beetle_help_lines[idx];
+   if(str[0]=='#'){
+    lcd_fill(8u,y-2u,218u,11u,0x3005u);
+    track_pix_text(str+2,12u,y,TRACK_PINK);
+   }else track_pix_text(str,12u,y,TRACK_WHITE);
+  }
+  /* A small scrollbar shows progress through the complete list. */
+  lcd_fill(231u,68u,2u,125u,0x3807u);
+  uint8_t max=beetle_help_last_offset();
+  uint16_t thumb_y=(uint16_t)(68u+(max?(uint32_t)track_help_offset*104u/max:0u));
+  lcd_fill(230u,thumb_y,4u,21u,TRACK_PINK);
+  lcd_fill(9u,201u,221u,1u,0x4807u);
+  track_pix_text("HOME: MENU  SEQ: TRACKER",10u,208u,TRACK_BRIGHT);
+  char count[18]="";char a[8],b[8];
+  track_fmt_int(a,(uint32_t)track_help_offset+1u);
+  track_fmt_int(b,BEETLE_HELP_COUNT);
+  uint8_t n=0u,j=0u;while(a[j]&&n<8u)count[n++]=a[j++];count[n++]='/';
+  j=0u;while(b[j]&&n<15u)count[n++]=b[j++];count[n]=0;
+  track_pix_center(count,120u,225u,TRACK_PINK);
+  return;
+ }
  if(track_page==1u){
   track_page_header("PROJECTS",43u);
-  const char *const entries[]={"SAVE","SAVE AS","LOAD PROJECT","NEW PROJECT"};
-  track_web_list(entries,4u,track_menu_index,60u,30u);
+  const char *const entries[]={"SAVE","SAVE AS","LOAD PROJECT","NEW PROJECT","HELP"};
+  track_web_list(entries,5u,track_menu_index,54u,26u);
   char status[24]="SLOT ";track_fmt_int(status+5u,(uint32_t)track_state.project_slot+1u);
   track_pix_text(status,20u,188u,TRACK_PINK);
   track_pix_text("K1 MENU K4 SLOT",20u,203u,TRACK_WHITE);
@@ -1314,6 +1352,20 @@ static void track_fm1_poll(void){
   }
   if(track_page==14u && track_load_scan<TRACK_PROJECTS){beetle_project_scan_one();changed=1u;}
   if(changed||now-track_last_paint>=((track_state.transport.playing||(int32_t)(track_boot_splash_until-now)>0)?90u:850u)){screen();track_last_paint=now;}
+  return;
+ }
+ /* HELP never changes patterns, instrument state, slots or tempo.
+  * Trap navigation here so HOME does not accidentally arm long-press guide. */
+ if(track_page==19u){
+  if(k1||k4){
+   track_help_offset=beetle_help_scroll(track_help_offset,k1+3*k4);
+   changed=1u;
+  }
+  if(pressed&(1u<<8)){track_page=1u;track_home_fired=1u;track_home_since=now;changed=1u;}
+  if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
+  if(released&(1u<<11)){track_page=0u;changed=1u;}
+  (void)fm1_input_note_edges();
+  if(changed||now-track_last_paint>=750u){screen();track_last_paint=now;}
   return;
  }
  /* Allow preview voices to release even when switching channels/pages,
@@ -1799,7 +1851,7 @@ static void track_fm1_poll(void){
     if(v<0)v=0;if(v>=(int32_t)TRACK_PROJECTS)v=TRACK_PROJECTS-1;track_state.project_slot=(uint8_t)v;
    }
    if(track_page==1u && k1){
-    int32_t m=(int32_t)track_menu_index+k1;if(m<0)m=0;if(m>3)m=3;track_menu_index=(uint8_t)m;
+    int32_t m=(int32_t)track_menu_index+k1;if(m<0)m=0;if(m>4)m=4;track_menu_index=(uint8_t)m;
    }
    if(track_page==1u && (pressed&(1u<<3))){
     if(track_menu_index==0u){
@@ -1809,6 +1861,8 @@ static void track_fm1_poll(void){
      /* SAVE AS always opens the title editor. K4 can select any of 12 slots. */
      if(track_state.project_slot+1u<TRACK_PROJECTS)track_state.project_slot++;
      track_overwrite_wait=0u;track_begin_save();
+    }else if(track_menu_index==4u){
+     track_help_offset=0u;track_page=19u;changed=1u;
     }else if(track_menu_index==3u){
      if(track_state.dirty){track_unsaved_action=2u;track_page=13u;}
      else beetle_project_new_session();

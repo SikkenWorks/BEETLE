@@ -4,6 +4,45 @@ Release notes for the documented BEETLE firmware versions, newest first. Not eve
 
 For current features, controls, safety information, and licence credits, see [README.md](README.md).
 
+## V0.54 — On-device HELP and circular MASTER FX controls
+
+Built on V0.53. No project serialization or audio-DSP algorithms were changed.
+
+### Added
+
+- **PROJECTS → HELP:** new fifth item under NEW PROJECT, opening a dedicated full-screen 240×240 reference containing 43 concise lines covering tracker, shortcuts, per-lane copy/paste, instrument editing, Punch-In, projects, song and MASTER FX.
+- **Scrollable help:** K1 scrolls line-by-line; K4 jumps three lines at a time. HOME returns to PROJECTS; SEQ returns directly to the tracker. Both LCD and websimulator bound the visible content to ten rows with scrollbar and position feedback. The copy shortcut explicitly refers to **one lane**, not every lane in a pattern.
+
+### Fixed
+
+- **MASTER FX visual knobs:** replaced scattered point/doodle controls for Compressor and Reverb with filled circular pixel knobs, a coherent outline and attached magenta needle; same K1–K4 parameter mappings and values.
+- **WebSimulator parity:** new fifth Projects action, help navigation and circular MASTER control rendering. The audio engine and project format are unchanged.
+- **Housekeeping:** V0.54 version identity and installer package updated; historical compiled outputs and superseded release tools cleaned from the source distribution.
+
+### Validation and cautions
+
+- Compiled native JieLi builds and checked on-device help scroll bounds, 5×7 typography and simulator interaction; see `TEST-RESULTS-V0.54.md` for exact scope.
+- The experimental persistent-storage OTA build is not hardware-certified. Do not flash without a tested full-backup and recovery route.
+
+## V0.53 — Distinct SID 6581 and 8580 sound characters
+
+Built on V0.52. This release corrects the near-identical sound of the two SID chip-inspired instrument types without changing the existing six-lane tracker workflow or project format.
+
+### Changes
+
+- **SID 6581:** separate, darker nonlinear filter-cutoff response, different resonance behavior and asymmetric saturation to give it a warmer, rougher character.
+- **SID 8580:** separate, brighter and cleaner filter response and resonance behavior, without the 6581-style nonlinear distortion.
+- **Output level matching:** compensated differences in loudness to keep the comparison focused on timbre rather than gain. Native host tests compared four cutoff positions with near-matched output energy.
+- **WebSimulator:** distinct 6581/8580 filter and coloration behavior in the browser. WebAudio is an approximation, not a bit-identical rendering of the FM1 DSP.
+- **Regression/compatibility:** existing SID flavors, audio/MASTER FX, tracker, project serialization and reSID/Dag Lem attribution are retained. The original reSID C++ emulator is **not** linked or included.
+- **Release cleanup:** removed obsolete generated release artifacts in the V0.53 package and retained the current sources, build outputs, tests and web tools.
+
+### Testing and limitations
+
+- Three native JieLi FM1 build variants compiled successfully in the V0.53 release process.
+- Gain-normalized waveform comparisons at four cutoff positions and selected project-storage, MASTER FX and browser-simulator checks passed.
+- **Not physically validated on an FM1.** The storage-capable firmware and OTA update path remain experimental; flashing can cause data loss and may not be recoverable.
+
 ## V0.52 — SID instrument flavors + MASTER FX stability / UI
 
 This source project is built from V0.51, preserving the six-lane tracker, project workflow, keyboard octave, audio, boot animation and web simulator.

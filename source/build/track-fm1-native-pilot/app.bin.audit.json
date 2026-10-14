@@ -1,20 +1,20 @@
 {
   "target": "M-VAVE FM-1 / JieLi AC791N-WL82 / pi32v2",
-  "app_bytes": 387060,
-  "app_sha256": "fe68a3b63ec0e24b854b89185f58038042a146084651cffe245fe913e97e0ae9",
+  "app_bytes": 389384,
+  "app_sha256": "f5d412d5a17dbf26b9c6ac9099755972667fcb47c3e921244542a9e6802c25d5",
   "app_slot_bytes": 581564,
-  "headroom_bytes": 194504,
+  "headroom_bytes": 192180,
   "expected_start": "0x2000120",
   "entry_stub_ok": true,
   "safe_ram": [
     "0x1c00000",
     "0x1c7f000"
   ],
-  "symbol_count": 788,
+  "symbol_count": 792,
   "sections": [
     {
       "name": ".text",
-      "size": 384200,
+      "size": 386524,
       "vma": 33554720,
       "lma": 33554720,
       "file_offset": 800,
@@ -24,16 +24,16 @@
       "name": ".ram_text",
       "size": 2784,
       "vma": 29360128,
-      "lma": 33938920,
-      "file_offset": 386048,
+      "lma": 33941244,
+      "file_offset": 387328,
       "nobits": false
     },
     {
       "name": ".data",
       "size": 76,
       "vma": 29392896,
-      "lma": 33941704,
-      "file_offset": 389376,
+      "lma": 33944028,
+      "file_offset": 390656,
       "nobits": false
     },
     {
@@ -41,7 +41,7 @@
       "size": 98052,
       "vma": 29392976,
       "lma": 29392976,
-      "file_offset": 389456,
+      "file_offset": 390736,
       "nobits": true
     },
     {

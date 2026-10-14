@@ -265,11 +265,11 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   uint8_t style=v->type;
   uint8_t cut=s->cutoff[v->channel],reso=p->drive,mode=p->morph;
   uint8_t wa=p->wave_a,wb=p->wave_b,mix=p->mix;
-  if(style==TRACK_CHIP_SID_8580){cut=(uint8_t)((uint32_t)cut*4u/5u+18u);reso=(uint8_t)(reso*2u/3u);}
+  /* Chip-specific character lives in beetle_sid_sample, not a 2-point cutoff tweak. */
   if(style==TRACK_CHIP_SID_DIRTY){reso=(uint8_t)(60u+reso*2u/5u);mode=65u;}
   if(style==TRACK_CHIP_SID_BASS){wa=1u;wb=2u;mode=14u;cut=(uint8_t)(cut/2u+8u);}
   if(style==TRACK_CHIP_SID_NOISE){wa=3u;wb=2u;mix=20u;mode=80u;}
-  level=beetle_sid_sample(v->phase,step,&v->lfsr,&v->lowpass,&v->sid_bandpass,
+  level=beetle_sid_sample(style,v->phase,step,&v->lfsr,&v->lowpass,&v->sid_bandpass,
    wa,wb,p->pulse_width,p->pulse_width_b,mix,cut,reso,mode);
   /* Soft 6581-style asymmetric saturation. Character variations remain
    * bounded to avoid feeding huge peaks into MASTER dynamics. */

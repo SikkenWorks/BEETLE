@@ -7,18 +7,24 @@
 **An open-source, six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks — Born out of passion.**
 
-**Current documented release: V0.52** · [Changelog](CHANGELOG.md)
+**Current documented release: V0.54** · [Release history and changes](CHANGELOG.md)
 
 BEETLE turns the FM1 into a small, hands-on music workstation. Its native firmware combines **five synth tracks sharing eight synthesizer voices**, **one two-note-per-step drum track**, a 16-step tracker with **48 patterns**, **12 project slots**, real-time Punch-In effects, and song sequencing. It is intended to be played and programmed on the device, using the physical keyboard, rotary encoders, and dedicated buttons.
 
-> **Release status: V0.52 experimental, not hardware-certified.** Builds, simulation tests and firmware-header checks are **not** proof of correct operation on an actual FM1. The storage-enabled firmware can erase existing user data, and recovery from a failed update is not guaranteed.
+> **Release status: V0.54 experimental, not hardware-certified.** Builds, simulation tests and firmware-header checks are **not** proof of correct operation on an actual FM1. The storage-enabled firmware can erase existing user data, and recovery from a failed update is not guaranteed.
+
+## On-device HELP (V0.54)
+
+Open **HOME → PROJECTS → HELP**. K1 moves one help line; K4 jumps three lines; HOME returns to PROJECTS; SEQ returns to the tracker. The guide includes the per-lane `SEQ + OP1` (copy) and `SEQ + OP2` (paste) shortcuts. Whole-pattern copy across all six lanes is not implemented.
+
+MASTER Compressor and Reverb use circular pixel knobs, still mapped to K1–K4. This is a visual improvement; their DSP and parameter ranges are unchanged.
 
 ## What you can make
 
 - Write independent 16-step patterns for **CH1–CH5 (synth)** and **CH6 (digital drums)**; chain them in Song Mode.
 - Play up to **eight shared synth voices**. The drum synthesizer has its own voice pool; this is not a promise that every voice combination can run without glitches on physical hardware.
 - Use the **14-component, sample-ROM digital drum kit**: kick, snare, closed/open hats, three toms, crash, ride, clap, three percussion sounds and rim. Voices have individual editable pitch (−36 to +36 semitones), attack, decay, sustain, tail/release, three-band tonal controls and level.
-- Use shared synth presets, VA oscillators, ADSR, detune, oscillator blending, drive, sub oscillator, noise and FM depth. EDIT offers nine instrument TYPE options, including five SID-inspired flavors (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`). These are not the original reSID engine.
+- Use shared synth presets, VA oscillators, ADSR, detune, oscillator blending, drive, sub oscillator, noise and FM depth. EDIT offers nine instrument TYPE options, including five SID-inspired flavors (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`). Since V0.54 the 6581 and 8580 variants have separate filter and saturation character. These are not the original reSID engine.
 - Adjust **volume, pan, mute, solo and swing (0–100)** for each lane. The drum channel defaults to mixer volume 100.
 - Add tracker step effects, including **volume and drum-pitch automation**, and use **[STP]** to stop sustained notes.
 - Apply eight live Punch-In commands: **REPEAT, REVERSE, FILTER, TAPE STOP, STUTTER, OCTAVE UP, OCTAVE DOWN and MUTE**. For effects 1–5, hold the relevant key and turn ALGORITHM to edit that effect's parameter.
@@ -107,7 +113,7 @@ The enlarged two-frame pink loading artwork is derived from an image **provided 
 
 **reSID — original author: Dag Lem.** reSID is a reverse-engineered emulation of the MOS6581 SID (Sound Interface Device), developed for Commodore 64 audio. See the original project: **[libsidplayfp/reSID](https://github.com/libsidplayfp/resid)** (a mirror of VICE's reSID), including its `AUTHORS` and licensing notices.
 
-BEETLE acknowledges **Dag Lem and the reSID project** as an influence on its SID-inspired instrument design. BEETLE V0.52 includes five SID-style instruments (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, and `SID NOISE`), implemented in BEETLE's separate lightweight synth engine. **BEETLE does not bundle, compile, link, or run the original reSID C++ source code.** It is not cycle-accurate reSID emulation.
+BEETLE acknowledges **Dag Lem and the reSID project** as an influence on its SID-inspired instrument design. BEETLE includes five SID-style instruments (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, and `SID NOISE`), implemented in BEETLE's separate lightweight synth engine. **BEETLE does not bundle, compile, link, or run the original reSID C++ source code.** It is not cycle-accurate reSID emulation.
 
 The full attribution and distinction between incorporated code and inspirations are documented in [`source/CREDITS-AND-LICENSES.md`](source/CREDITS-AND-LICENSES.md).
 
