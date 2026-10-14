@@ -19,7 +19,37 @@
 #define TRACK_CHORD_COUNT 12u
 #define TRACK_PUNCH_COUNT 8u
 /* Sparse pattern backing store: an inactive pattern may be loaded on demand. */
-struct track_step {uint8_t note;uint8_t instrument;uint8_t chord;uint8_t effect;uint8_t value;};
+/* A 5-byte packed step: 8 NOTE + 2 INST + 4 CHORD + 4 FX + 7 VALUE
+ * + 8 dynamics bits. Keeps the 48-pattern bank the SAME RAM size.
+ * dyn=0 has legacy velocity 94 and legato gate. Nibbles are independent.
+ * Fields never address-taken. Explicit wire serialization avoids ABI issues. */
+struct __attribute__((packed)) track_step {
+ uint8_t note;
+ unsigned int instrument:2;
+ unsigned int chord:4;
+ unsigned int effect:4;
+ unsigned int value:7;
+ unsigned int dynamics:8;
+ unsigned int groove:7; /* 3-bit micro-delay, 2-bit ratchet, 2-bit probability */
+};
+/* 7 bit groove 0=original timing, one hit, 100% probability.
+ * Micro 0..7 = delayed by micro/64 of a step, sample-exact. All offsets
+ * are non-negative to avoid pretriggering the NEXT pattern/song position. */
+#define TRACK_GROOVE_MICRO(S) ((uint8_t)((S)->groove&7u))
+#define TRACK_GROOVE_RATCHET(S) ((uint8_t)(1u+(((S)->groove>>3u)&3u)))
+#define TRACK_GROOVE_PROB(S) ((uint8_t)(100u-25u*(((S)->groove>>5u)&3u)))
+static inline void track_groove_set_micro(struct track_step *s,uint8_t v){s->groove=(s->groove&~7u)|(v&7u);}
+static inline void track_groove_set_ratchet(struct track_step *s,uint8_t v){s->groove=(s->groove&~24u)|(((v-1u)&3u)<<3u);}
+static inline void track_groove_set_probability(struct track_step *s,uint8_t v){s->groove=(s->groove&~96u)|((v&3u)<<5u);}
+#define TRACK_DYN_VEL(D) (((D)>>4)&15u)
+#define TRACK_DYN_GATE(D) ((D)&15u)
+static inline uint8_t track_step_velocity(const struct track_step *s){
+ uint8_t v=(uint8_t)TRACK_DYN_VEL(s->dynamics);return v?(uint8_t)(v*8u):94u;
+}
+static inline uint8_t track_step_gate(const struct track_step *s){return (uint8_t)TRACK_DYN_GATE(s->dynamics);}
+static inline void track_step_set_vel(struct track_step *s,uint8_t v){s->dynamics=(uint8_t)(((v&15u)<<4)|(s->dynamics&15u));}
+static inline void track_step_set_gate(struct track_step *s,uint8_t v){s->dynamics=(uint8_t)((s->dynamics&240u)|(v&15u));}
+_Static_assert(sizeof(struct track_step)==5u,"BEETLE step must stay 5 bytes for FM1 RAM");
 struct track_pattern {struct track_step ch[TRACK_CHANNELS][TRACK_STEPS];uint8_t length;};
 struct track_harmony {uint8_t root,mode,keylock;};
 struct track_transport {uint16_t bpm;uint8_t playing,play_step,edit_step,edit_column,edit_channel,stop_step;uint32_t tick_remainder;};
@@ -37,6 +67,7 @@ int track_adjust_octave(struct track_engine *e,int8_t semitones);
 void track_rotate_select(struct track_engine *e,int8_t direction);
 void track_set_channel(struct track_engine *e,uint8_t channel);
 void track_set_bpm(struct track_engine *e,uint16_t bpm);
+int track_set_pattern_length(struct track_engine *e,uint8_t length);
 void track_play(struct track_engine *e);
 void track_stop(struct track_engine *e);
 int track_tick(struct track_engine *e); /* 1 on next step, 0 if stopped */
@@ -46,7 +77,9 @@ void track_punch(struct track_engine *e,uint8_t effect,uint8_t held);
 int track_is_lit(uint8_t button); /* FN indices 2..13; ARP=10 remains off */
 uint32_t track_home_action(uint32_t held_ms,uint8_t released); /* 1 HOME short, 2 GUIDE long */
 /* Pure endian-defined codec: fixed 324-byte pattern, no flash access. */
-#define TRACK_PATTERN_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*5u)
+#define TRACK_PATTERN_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*7u)
+#define TRACK_PATTERN_V2_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*6u)
+#define TRACK_PATTERN_LEGACY_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*5u)
 int track_pattern_encode(const struct track_pattern *pattern,uint8_t *dst,uint32_t cap);
 int track_pattern_decode(struct track_pattern *pattern,const uint8_t *src,uint32_t len);
 #endif

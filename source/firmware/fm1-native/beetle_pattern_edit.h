@@ -68,6 +68,8 @@ static inline int beetle_edit_apply_image(struct track_song_bank *bank,struct tr
  if(!bank||!eng||!img||pat>=TRACK_PATTERNS)return 0;
  if(pat!=eng->pattern_slot)(void)track_song_switch(bank,eng,pat);
  eng->active=img->pattern;bank->patterns[pat]=img->pattern;
+ if(eng->active.length>=1u&&eng->active.length<=TRACK_STEPS && eng->transport.edit_step>=eng->active.length)
+  eng->transport.edit_step=(uint8_t)(eng->active.length-1u);
  bank->clips[pat]=img->punch;eng->dirty=1u;return 1;
 }
 /* Undo/redo use the same snapshot slot. On every move, swap its pattern
@@ -96,11 +98,17 @@ static inline int beetle_edit_paste_pattern(struct beetle_pattern_editor *ed,str
  if(!ed||!ed->whole_valid)return 0;
  beetle_edit_begin(ed,bank,eng);
  eng->active=ed->whole_clip->pattern;
+ if(eng->active.length>=1u&&eng->active.length<=TRACK_STEPS && eng->transport.edit_step>=eng->active.length)
+  eng->transport.edit_step=(uint8_t)(eng->active.length-1u);
  bank->clips[eng->pattern_slot]=ed->whole_clip->punch;
  if(beetle_edit_commit(ed,bank,eng)){eng->dirty=1u;return 1;}
  return 0;
 }
-static inline uint8_t beetle_block_bound(int32_t v){return (uint8_t)(v<0?0:v>=TRACK_STEPS?TRACK_STEPS-1:v);}
+static inline uint8_t beetle_block_bound_length(int32_t v,uint8_t length){
+ if(length<1u||length>TRACK_STEPS)length=TRACK_STEPS;
+ return (uint8_t)(v<0?0:v>=(int32_t)length?length-1u:v);
+}
+static inline uint8_t beetle_block_bound(int32_t v){return beetle_block_bound_length(v,TRACK_STEPS);}
 static inline void beetle_edit_block_copy(struct beetle_pattern_editor *ed,const struct track_engine *eng){
  if(!ed||!eng)return;
  uint8_t a=ed->first<ed->last?ed->first:ed->last;
@@ -109,13 +117,18 @@ static inline void beetle_edit_block_copy(struct beetle_pattern_editor *ed,const
  ed->block_count=(uint8_t)(b-a+1u);ed->block_valid=1u;
 }
 static inline void beetle_edit_blank(struct track_step *st){
- st->note=TRACK_NOTE_EMPTY;st->chord=0u;st->effect=0u;st->value=50u;
+ st->note=TRACK_NOTE_EMPTY;st->chord=0u;st->effect=0u;st->value=50u;st->dynamics=0u;
 }
 /* Operation 0 copy, 1 paste at FIRST, 2 clear, 3 transpose, 4 shift with
  * zero-blank vacated cells, 5 undo, 6 redo. Selection is limited to one lane.
  * Whole-pattern operations are independent and include all 6 lanes + Punch. */
 static inline int beetle_edit_block_execute(struct beetle_pattern_editor *ed,struct track_song_bank *bank,struct track_engine *eng){
  if(!ed||!bank||!eng||eng->transport.edit_channel>=TRACK_CHANNELS)return 0;
+ /* Restrict destructive block edits to active rows. Steps beyond the
+  * pattern end must survive a later expansion back to 16. */
+ const uint8_t len=(eng->active.length>=1u&&eng->active.length<=TRACK_STEPS)?eng->active.length:TRACK_STEPS;
+ ed->first=beetle_block_bound_length(ed->first,len);
+ ed->last=beetle_block_bound_length(ed->last,len);
  const uint8_t a=ed->first<ed->last?ed->first:ed->last;
  const uint8_t b=ed->first>ed->last?ed->first:ed->last;
  const uint8_t ch=eng->transport.edit_channel;
@@ -125,7 +138,7 @@ static inline int beetle_edit_block_execute(struct beetle_pattern_editor *ed,str
  if(ed->action==1u&&!ed->block_valid){ed->status=4u;return 0;}
  beetle_edit_begin(ed,bank,eng);
  if(ed->action==1u){
-  for(uint8_t i=0u;i<ed->block_count&&ed->first+i<TRACK_STEPS;i++)eng->active.ch[ch][ed->first+i]=ed->block[i];
+  for(uint8_t i=0u;i<ed->block_count&&ed->first+i<len;i++)eng->active.ch[ch][ed->first+i]=ed->block[i];
  }else if(ed->action==2u){
   for(uint8_t i=a;i<=b;i++)beetle_edit_blank(&eng->active.ch[ch][i]);
  }else if(ed->action==3u && ch!=(TRACK_CHANNELS-1u)){

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * BEETLE V0.47: exact user-provided two-frame 240x240 loading art.
- * Transparent beetle is composited over the original tree at original scale.
- * 100 ms/frame, repeating while the boot splash is displayed.
+ * BEETLE V0.58: exact user-provided moon/tree 240x240 backdrop.
+ * Original two-frame beetle is composited above the fixed moon/tree.
+ * 100 ms/frame, repeating until the tracker screen is ready.
  * All drawing happens in the normal two-stripe LCD compositor. No heap.
  */
 #pragma once

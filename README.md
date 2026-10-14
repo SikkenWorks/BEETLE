@@ -7,33 +7,44 @@
 **An open-source, six-lane tracker for the M-VAVE FM1.**  
 **SikkenWorks — Born out of passion.**
 
-**Current documented release: V0.56** · [Release history and changes](CHANGELOG.md)
+**Current documented release: V0.63** · [Release history and changes](CHANGELOG.md)
 
 BEETLE turns the FM1 into a small, hands-on music workstation. Its native firmware combines **five synth tracks sharing eight synthesizer voices**, **one two-note-per-step drum track**, a 16-step tracker with **48 patterns**, **12 project slots**, real-time Punch-In effects, and song sequencing. It is intended to be played and programmed on the device, using the physical keyboard, rotary encoders, and dedicated buttons.
 
-> **Release status: V0.56 experimental, not hardware-certified.** Builds, simulation tests and firmware-header checks are **not** proof of correct operation on an actual FM1. The storage-enabled firmware can erase existing user data, and recovery from a failed update is not guaranteed.
+> **Release status: V0.63 experimental, not hardware-certified.** Builds, simulation tests and firmware-header checks are **not** proof of correct operation on an actual FM1. The storage-enabled firmware can erase existing user data, and recovery from a failed update is not guaranteed.
+
+**V0.63:** STEP GROOVE adds sample-clock microtiming **0–7/64 step late**, 1–4 ratchets, and 100/75/50/25% step probability. Open with **SEQ+ENV**, use K1 to pick a step, K2 a parameter, K3 to adjust, and SEL to reset. **Drum NOTE2** now supports physical PRESET switching between the selected drum sample, `[---]` and `[STP]`. The new V12 project schema reads older V11 and pre-V11 projects without altering their original timing. Native firmware and WebSimulator are included. See [CHANGELOG.md](CHANGELOG.md) for full details and limitations.
+
+**V0.62:** Fixed a cursor bug: K1 now stops at the final active row of a shortened pattern (e.g. an 8-step pattern only allows steps 00–07). DYNAMICS and Block Editor obey the same limit, and focus is corrected after switching patterns, STOP, Undo/Redo, and LOAD. Hidden step data are preserved when shortening and later extending a pattern. V0.61 previously fixed SEQ+K4 and made HELP K1-only.
+
+**V0.60:** Sequencer 2.0 adds 1–16 step lengths (SEQ+K4 when stopped), quantized manual pattern changes (ALGORITHM while playing), K4 chapter navigation in HELP (removed in V0.61) and protection against stale SEL presses after project LOAD. V0.59 added per-step velocity and gate with a new STEP DYNAMICS screen (SEQ+FX). Project format V11 introduced these values; V12 additionally stores groove settings; V10 and earlier supported projects remain readable. The V0.58 moon-and-tree loading animation is retained. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Current workflow
 
-- **WebSimulator:** six-channel MIXER and 19 240×240 interface screens, with ARP for SONG MODE, GLO for MIXER, SEQ for TRACKER.
-- **PROJECTS → HELP:** scrollable on-device controls; K1 scrolls by one entry, K4 by three, HOME returns to PROJECTS and SEQ to the tracker. Includes the V0.56 editing shortcuts.
+- **Sequencer 2.0 (V0.62):** K1 cannot move past the current pattern length. Stop transport, hold SEQ and turn K4 to adjust current pattern length (1–16), or queue a pattern while playing with ALGORITHM. A queued change starts on the next pattern boundary, not immediately. Song Mode continues to control song sequencing. In the WebSimulator use PAT LEN −/+, hold SEQ while turning K4, or Shift+click a K4 button.
+- **Project LOAD safety:** SEL pressed during project reading will not clear a step upon return to the tracker. Wait until the load finishes and release the key before editing.
+
+- **Step Dynamics (V0.59):** `SEQ + FX` from the tracker opens velocity/gate editing. K1 selects step, K2 selects velocity or gate, K3 edits, SEL resets; SEQ/HOME returns to tracker. Default gate remains legato for older projects.
+
+- **WebSimulator:** six-channel MIXER and 21 240×240 interface screens, with ARP for SONG MODE, GLO for MIXER, SEQ for TRACKER.
+- **PROJECTS → HELP:** scrollable on-device controls; K1 scrolls by one entry; K4 does nothing in HELP, HOME returns to PROJECTS and SEQ to the tracker. Includes the V0.57 editing shortcuts.
 - **MASTER FX:** Compressor and Reverb show four circular pixel knobs controlled by K1–K4, with the existing DSP preserved.
-- **Editing:** V0.56 adds full-pattern copy/paste, six-step RAM-only Undo/Redo and a one-lane block editor; see below and [CHANGELOG.md](CHANGELOG.md).
+- **Editing:** V0.57 adds full-pattern copy/paste, six-level RAM-only Undo/Redo and a one-lane block editor; see below and [CHANGELOG.md](CHANGELOG.md).
 
 ## What you can make
 
-- Write independent 16-step patterns for **CH1–CH5 (synth)** and **CH6 (digital drums)**; chain them in Song Mode.
+- Write independent 1–16-step patterns for **CH1–CH5 (synth)** and **CH6 (digital drums)**; chain them in Song Mode.
 - Play up to **eight shared synth voices**. The drum synthesizer has its own voice pool; this is not a promise that every voice combination can run without glitches on physical hardware.
 - Use the **14-component, sample-ROM digital drum kit**: kick, snare, closed/open hats, three toms, crash, ride, clap, three percussion sounds and rim. Voices have individual editable pitch (−36 to +36 semitones), attack, decay, sustain, tail/release, three-band tonal controls and level.
 - Use shared synth presets, VA oscillators, ADSR, detune, oscillator blending, drive, sub oscillator, noise and FM depth. EDIT offers nine instrument TYPE options, including five SID-inspired flavors (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`). Since V0.53 the 6581 and 8580 variants have separate filter and saturation character. These are not the original reSID engine.
 - Adjust **volume, pan, mute, solo and swing (0–100)** for each lane. The drum channel defaults to mixer volume 80, with increased internal drum source gain.
-- Add tracker step effects, including **volume and drum-pitch automation**, and use **[STP]** to stop sustained notes.
+- Add tracker step effects, including **volume and drum-pitch automation**, plus **velocity/gate per step (V0.59)**; use **[STP]** to stop sustained notes.
 - Apply eight live Punch-In commands: **REPEAT, REVERSE, FILTER, TAPE STOP, STUTTER, OCTAVE UP, OCTAVE DOWN and MUTE**. For effects 1–5, hold the relevant key and turn ALGORITHM to edit that effect's parameter.
 - Open a separate MASTER screen with a four-band graphical EQ, compressor, reverb and reorderable processing blocks. V0.52 adds compressor Attack and reverb Width, with four pixel-art knobs controlled independently by K1–K4. Hold SEQ and turn K4 to reorder the processing chain. These are FM1-constrained implementations, not bit-identical copies of desktop effects.
 
-## Professional editing (V0.56)
+## Professional editing (V0.57)
 
-In the tracker while transport is stopped, hold **SEQ** and press the physical black OP keys: **OP1** copies a lane, **OP2** pastes a lane, **OP3** copies the entire six-lane pattern plus recorded Punch-In FX, **OP4** pastes it, **OP5** Undo, **OP6** Redo. **SEQ + SEL** opens Block Editing (K4 start, K1 end, K2 action, K3 amount, SEL apply; HOME/SEQ exit). Native Undo/Redo stores six edit actions in RAM, not on flash. A new edit after Undo discards the redo branch. The WebSimulator provides explicit buttons for the same actions.
+In the tracker while transport is stopped, hold **SEQ** and press the physical black OP keys: **OP1** copies a lane, **OP2** pastes a lane, **OP3** copies the entire six-lane pattern plus recorded Punch-In FX, **OP4** pastes it, **OP5** Undo, **OP6** Redo. **SEQ + SEL** opens Block Editing (K4 start, K1 end, K2 action, K3 amount, SEL apply; HOME/SEQ exit). Native Undo/Redo stores six edit actions in RAM, not on flash. A new edit after Undo discards the redo branch. The WebSimulator provides explicit buttons for the same actions. The Block Editor uses the same black/white/magenta 1-bit BEETLE styling as the tracker.
 
 ## Controls and workflow
 
@@ -78,7 +89,7 @@ BEETLE boots with a **preconfigured digital kit**, not fourteen identical generi
 ## Projects, compatibility and storage safety
 
 - **12 project slots**, with journalled A/B storage where the experimental storage backend is enabled.
-- **Current project schema: V10.** Newly saved projects include the extra MASTER parameters (compressor Attack and reverb Width). Supported older projects, including V9 and earlier formats, remain readable; missing settings are initialized to defaults and old project data are not silently rewritten. V8 previously added the five Punch-In values; V6/V7/V8 compatibility was included in earlier regression tests.
+- **Current project schema: V11.** Newly saved projects include per-step velocity and gate as well as the earlier MASTER parameters (compressor Attack and reverb Width). Supported older projects, including V10, V9 and earlier formats, remain readable; missing settings are initialized to defaults and old project data are not silently rewritten. V8 previously added the five Punch-In values; V6/V7/V8 compatibility was included in earlier regression tests.
 - The physical project record has a **finite capacity**. A fully populated project may not fit. An oversized project is rejected *before* any flash erase; do not assume all 48 six-lane patterns can be filled to capacity simultaneously.
 - **WARNING:** the storage-enabled build requires explicit first-use setup. The experimental storage region can overwrite legacy user data at addresses **`0x97000–0xDFFFF`**. Never initialize it without a verified full-flash backup and an independently working recovery path. Project writes are *disabled* in the pilot build.
 - The WebInstaller does not make a complete backup. Even a verified OTA transfer does not guarantee that the new firmware will boot or that USB recovery will remain available.

@@ -1,3 +1,44 @@
+# BEETLE V0.63 - Sequencer 2.0: Step Groove + Drum NOTE2 PRESET
+
+* Native 5-byte steps now have 7-bit groove fields: micro offset 0-7/64 step (late only); ratchets 1-4 triggers; probability 100/75/50/25%. Values are encoded in project V12; previous project versions V1-V11 remain readable.
+* SEQ+ENV: STEP GROOVE editor. K1 step, K2 parameter, K3 adjust, SEL reset focused parameter, SEQ/HOME exit. Microtiming is **positive delay only**, not anticipation/negative timing.
+* Physical PRESET now handles drum NOTE2 with DRUM -> [---] -> [STP] -> DRUM; NOTE1 unchanged. STP stops the previously triggered NOTE2 voice when possible.
+* Real-time scheduling uses preallocated state and sample-accurate timestamps. No allocation/storage/UI in the audio interrupt.
+* WebSimulator approximates equivalent behavior via scheduled WebAudio events and mirrors the editor and NOTE2 PRESET.
+* FM1 firmware and project flash/OTA remain **experimental**, not physically validated. Verify backup and recovery before installing.
+
+## V0.62 — Reliable SEQ + K4, K1-only HELP
+
+- In HELP, **K1 is the only encoder that scrolls**. K4 is inactive on that screen, and does not change BPM.
+- While the tracker is stopped, **hold SEQ and turn K4** to change the selected pattern length from 1 to 16 steps. The rotary events are consumed before the BPM path and are undoable. K4 alone continues to control BPM.
+- The WebSimulator supports SEQ hold + K4, **Shift+click K4**, and explicit PAT LEN buttons.
+- Source format and audio DSP are unchanged; existing V11 projects remain compatible.
+- See root `CHANGELOG.md` for release history. No hardware validation of this experimental firmware.
+
+## V0.60 — Sequencer 2.0 and post-load input safety (historical)
+
+- Historical V0.60 behavior: HELP K4 jumped chapter headings. **Removed in V0.62: only K1 scrolls HELP.**
+- Project LOAD clears buffered SEL and requires release plus 320 ms quiet period before the tracker accepts a new SEL press.
+- Per-pattern length is 1–16 steps; native stopped transport shortcut SEQ+K4, fixed in V0.62. HELP uses K1 only. WebSimulator includes PAT LEN ± controls.
+- ALGORITHM during playback queues a pattern change at the next pattern boundary, not immediately.
+- No changes to the V11 on-flash project format, voice DSP, 6 lanes or moon boot animation.
+- Run `bash tests/track/run_v060.sh`, `python tests/web/test_beetle_v060_browser.py` and `node tests/ota/test_stock_install_v061.cjs`.
+- Native build and OTA tests are software-only; external recovery and safe flashing remain unproven.
+
+## V0.59 — Step Dynamics (velocity and gate)
+
+The current native firmware and WebSimulator add `SEQ+FX` STEP DYNAMICS: K1 step, K2 velocity/gate, K3 value, SEL default, SEQ/HOME exit. Five-byte packed in-RAM step is unchanged; new project schema V11 preserves 4-bit velocity/gate fields. V10 legacy compatibility has a binary migration fixture. The native audio render applies variable gate release at sample granularity; WebAudio is an approximation. See `../CHANGELOG.md`.
+
+## V0.58 Moon boot artwork
+
+Static 240×240 user-provided moon/tree backdrop with the unchanged two-frame Beetle animation looping until the tracker opens. Generate with `python tools/generate_beetle_boot.py`. See `../CHANGELOG.md` for release notes.
+
+# BEETLE V0.57 — Archived release notes
+
+See [README.md](../README.md) for controls and installation warnings and [CHANGELOG.md](../CHANGELOG.md) for all release changes.
+
+V0.57: native Block Editor page guard, pixel-consistent BEETLE block UI, clearer lane/full-pattern HELP. No changes to audio DSP or project format.
+
 # BEETLE V0.55 — WebSimulator layout & ARP navigation
 
 De native FM1 ARP/GLO mapping bestond al. De V0.55 WebSimulator corrigeert de navigatie, mixer en andere schermlayout. Zie de root CHANGELOG.md voor details.

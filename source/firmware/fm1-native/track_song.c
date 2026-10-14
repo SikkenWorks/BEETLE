@@ -25,6 +25,10 @@ int track_song_switch(struct track_song_bank *b,struct track_engine *e,uint8_t i
  if(!b||!e||index>=TRACK_PATTERNS)return -1;
  track_song_capture(b,e);
  e->active=b->patterns[index];e->pattern_slot=index;
+ /* Different patterns may have different lengths. Never leave focus on an
+  * invisible step after manual, queued, or song-controlled switching. */
+ uint8_t len=e->active.length>=1u&&e->active.length<=TRACK_STEPS?e->active.length:TRACK_STEPS;
+ if(e->transport.edit_step>=len)e->transport.edit_step=(uint8_t)(len-1u);
  return 0;
 }
 void track_song_start(struct track_song_bank *b,struct track_engine *e){

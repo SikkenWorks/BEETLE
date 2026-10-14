@@ -13,16 +13,18 @@ uint32_t track_store_crc32(const uint8_t *p,uint32_t n){
  * 25-bit non-default steps. Older v1..v4 four-lane projects decode with
  * the drum channel remapped CH4 -> CH6. Flash bank stays 12KiB; payloads
  * exceeding that capacity are refused BEFORE any erase (not truncated). */
-#define TRACK_PACKED_STEP_BITS 25u
+#define TRACK_PACKED_STEP_BITS 25u /* V4-V10 */
+#define TRACK_V11_PACKED_STEP_BITS 33u /* adds 8 dynamics bits */
+#define TRACK_V12_PACKED_STEP_BITS 40u /* additional 7 groove bits */
 #define TRACK_PACKED_PATTERN_BYTES ((4u*TRACK_STEPS*TRACK_PACKED_STEP_BITS+7u)/8u)
 #define TRACK_V5_MASK_BYTES ((TRACK_CHANNELS*TRACK_STEPS+7u)/8u)
 static struct track_step empty_step(uint8_t lane){
- struct track_step v={TRACK_NOTE_EMPTY,(uint8_t)(lane==TRACK_DRUM_CHANNEL?3u:(lane&3u)),0u,0u,50u};return v;
+ struct track_step v={TRACK_NOTE_EMPTY,(uint8_t)(lane==TRACK_DRUM_CHANNEL?3u:(lane&3u)),0u,0u,50u,0u,0u};return v;
 }
 static uint8_t valid_step(const struct track_step *st,uint8_t lane){
  return st->instrument<=3u && st->effect<TRACK_FX_COUNT && st->value<=100u &&
  (lane==TRACK_DRUM_CHANNEL ?
-  ((st->note==TRACK_NOTE_EMPTY||st->note==TRACK_NOTE_STOP||st->note<TRACK_DRUM_COUNT)&&st->chord<=TRACK_DRUM_COUNT) :
+  ((st->note==TRACK_NOTE_EMPTY||st->note==TRACK_NOTE_STOP||st->note<TRACK_DRUM_COUNT)&&st->chord<=15u) :
   ((st->note==TRACK_NOTE_EMPTY||st->note==TRACK_NOTE_STOP||st->note<=127u)&&st->chord<TRACK_CHORD_COUNT));
 }
 static void pack_bits(uint8_t *p,uint32_t *bit,uint32_t value,uint8_t count){
@@ -62,7 +64,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
     out[mask_at+(pos>>3)]|=(uint8_t)(1u<<(pos&7u));populated++;
    }
   }
-  uint32_t packed=(populated*TRACK_PACKED_STEP_BITS+7u)/8u;
+  uint32_t packed=(populated*TRACK_V12_PACKED_STEP_BITS+7u)/8u;
   if(i+packed>cap)return -2;
   memset(out+i,0,packed);uint32_t bit=0u;
   for(c=0;c<TRACK_CHANNELS;c++)for(s=0;s<TRACK_STEPS;s++){
@@ -72,6 +74,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
    pack_bits(out+i,&bit,st->note,8u);pack_bits(out+i,&bit,st->instrument,2u);
    pack_bits(out+i,&bit,st->chord,4u);pack_bits(out+i,&bit,st->effect,4u);
    pack_bits(out+i,&bit,st->value,7u);
+   pack_bits(out+i,&bit,st->dynamics,8u);pack_bits(out+i,&bit,st->groove,7u);
   }
   i+=packed;
   const struct track_song_clip *clip=&p->song.clips[r];if(clip->count>TRACK_SONG_FX_EVENTS)return -1;
@@ -126,7 +129,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -166,7 +169,7 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
    memcpy(present,data+i,TRACK_V5_MASK_BYTES);i+=TRACK_V5_MASK_BYTES;
    uint32_t count=0u;
    for(uint8_t x=0u;x<TRACK_V5_MASK_BYTES;x++)for(uint8_t b=0u;b<8u;b++)count+=(present[x]>>b)&1u;
-   packed=(count*TRACK_PACKED_STEP_BITS+7u)/8u;
+   packed=(count*(rd16(data+4u)>=12u?TRACK_V12_PACKED_STEP_BITS:rd16(data+4u)>=11u?TRACK_V11_PACKED_STEP_BITS:TRACK_PACKED_STEP_BITS)+7u)/8u;
    if(i+packed>n)return -2;
   }else if(rd16(data+4u)>=4u){
    packed=TRACK_PACKED_PATTERN_BYTES;if(i+packed>n)return -2;
@@ -181,6 +184,8 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
     st->chord=(uint8_t)unpack_bits(data+i,&bit,4u);
     st->effect=(uint8_t)unpack_bits(data+i,&bit,4u);
     st->value=(uint8_t)unpack_bits(data+i,&bit,7u);
+    st->dynamics=rd16(data+4u)>=11u?(uint8_t)unpack_bits(data+i,&bit,8u):0u;
+    st->groove=rd16(data+4u)>=12u?(uint8_t)unpack_bits(data+i,&bit,7u):0u;
    }else{
     GET1(st->note);GET1(st->instrument);GET1(st->chord);GET1(st->effect);GET1(st->value);
    }

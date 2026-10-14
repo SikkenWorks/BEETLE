@@ -9,19 +9,30 @@
 static const char *const beetle_help_lines[] = {
  "# TRACKER",
  "K1 STEP   K2 CELL  K3 VALUE",
- "K4 BPM IN TRACKER",
+ "HELP: K1 SCROLLS ONLY",
+ "K4 BPM  SEQ+K4 PAT LEN 1-16",
+ "PLAY+ALG: QUEUE NEXT PATTERN",
  "SELECT: CHANNEL 1-6",
  "ALGORITHM: PATTERN 1-48",
  "PRESET: NOTE / EMPTY / STP",
  "ENV: INSERT STOP [STP]",
  "SEL: CLEAR SELECTED STEP",
- "SEQ+OP1: COPY CURRENT LANE",
- "SEQ+OP2: PASTE CURRENT LANE",
- "SEQ+OP3: COPY ALL 6 LANES",
- "SEQ+OP4: PASTE ALL LANES + FX",
+ "SEQ+OP1: COPY ONE LANE",
+ "SEQ+OP2: PASTE ONE LANE",
+ "SEQ+OP3: COPY WHOLE PATTERN",
+ "SEQ+OP4: PASTE PATTERN + PUNCH FX",
  "SEQ+OP5: UNDO LAST EDIT",
  "SEQ+OP6: REDO LAST EDIT",
  "SEQ+SEL: BLOCK EDIT MENU",
+ "SEQ+FX: STEP VELOCITY/GATE",
+ "SEQ+ENV: STEP GROOVE EDIT",
+ "GROOVE K1 STEP K2 PARAM K3 VAL",
+ "MICRO 0-7/64 STEP (LATE)",
+ "RATCHET 1-4 PROB 100/75/50/25",
+ "PRESET NOTE2: DRUM/---/STP",
+ "DYNAMICS K1 STEP K2 VEL/GATE",
+ "DYNAMICS K3 VALUE SEL RESET",
+ "GATE 0 LEGATO, 1-15 SHORT",
  "BLOCK: K4 START, K1 END",
  "BLOCK: K2 ACTION K3 AMOUNT",
  "BLOCK: SEL APPLY",
@@ -61,6 +72,24 @@ static const char *const beetle_help_lines[] = {
 #define BEETLE_HELP_COUNT ((uint8_t)(sizeof(beetle_help_lines)/sizeof(beetle_help_lines[0])))
 static inline uint8_t beetle_help_last_offset(void){
  return BEETLE_HELP_COUNT>BEETLE_HELP_VISIBLE?(uint8_t)(BEETLE_HELP_COUNT-BEETLE_HELP_VISIBLE):0u;
+}
+/* Jump directly between real chapter headings, not arbitrary pages. */
+static inline uint8_t beetle_help_heading(uint8_t current,int32_t detents){
+ int8_t dir=(detents>0)?1:-1;
+ while(detents){
+  uint8_t found=current;uint8_t got=0u;
+  if(dir>0){
+   for(uint8_t i=(uint8_t)(current+1u);i<BEETLE_HELP_COUNT;i++)
+    if(beetle_help_lines[i][0]=='#'){found=i;got=1u;break;}
+  }else{
+   for(int32_t i=(int32_t)current-1;i>=0;i--)
+    if(beetle_help_lines[i][0]=='#'){found=(uint8_t)i;got=1u;break;}
+  }
+  if(got){current=found>beetle_help_last_offset()?beetle_help_last_offset():found;}
+  else if(dir>0)current=beetle_help_last_offset();else current=0u;
+  if(detents>0)detents--;else detents++;
+ }
+ return current;
 }
 static inline uint8_t beetle_help_scroll(uint8_t current,int32_t delta){
  int32_t next=(int32_t)current+delta;
