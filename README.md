@@ -15,6 +15,15 @@
   </a>
 </div>
 
+<div align="center">
+  <a href="https://sikkenworks.github.io/BEETLE/BEETLE-V0.54-WebInstaller.html">
+    <img
+      src="https://img.shields.io/badge/▶_INSTALL-BEETLE_(CHROME/EDGE)-000000?style=for-the-badge&logoColor=white"
+      alt="Launch BEETLE Web Simulator"
+      width="450"
+    />
+  </a>
+</div>
 
 **Current documented release: V0.54** · [Release history and changes](CHANGELOG.md)
 
