@@ -1,6 +1,6 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-p=Path(__file__).resolve().parents[2]/'web/BEETLE-V0.54-WebSimulator.html'
+p=Path(__file__).resolve().parents[2]/'web/BEETLE-V0.55-WebSimulator.html'
 s=p.read_text().replace('const audio=new TrackAudio();', "window.__v054=()=>({screen:model.screen,menu:model.menuIndex,help:model.helpOffset,len:HELP_LINES.length,fx:model.masterFocus});const audio=new TrackAudio();")
 with sync_playwright() as playwright:
  browser=playwright.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage'])

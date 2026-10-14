@@ -16,4 +16,4 @@ cc -std=c11 -O2 -Wall -Wextra -Werror -I firmware/fm1-native tests/track/test_be
 python tests/web/test_beetle_v054_browser.py
 python tests/web/test_beetle_v054_previous_browser.py
 python tests/web/test_beetle_v054_sid_color.py
-node tests/ota/test_stock_install_v054.cjs
+node tests/ota/test_stock_install_v055.cjs

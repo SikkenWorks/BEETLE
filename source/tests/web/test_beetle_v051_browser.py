@@ -1,6 +1,6 @@
 from playwright.sync_api import sync_playwright
 from pathlib import Path
-p=Path(__file__).resolve().parents[2]/'web/BEETLE-V0.51-WebSimulator.html'
+p=Path(__file__).resolve().parents[2]/'web/BEETLE-V0.55-WebSimulator.html'
 s=p.read_text().replace('const audio=new TrackAudio();', '''window.__beetleDev=()=>({oct:model.keyboardOctave,ch:model.ch,screen:model.screen,poly:model.editPoly,notes:pattern(model.project,model.project.selectedPattern,false)?.channels[model.ch]?.[model.row]?.note,slots:PROJECT_COUNT});const audio=new TrackAudio();''')
 with sync_playwright() as play:
  browser=play.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage'])

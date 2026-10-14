@@ -1,3 +1,7 @@
+# BEETLE V0.55 — WebSimulator layout & ARP navigation
+
+De native FM1 ARP/GLO mapping bestond al. De V0.55 WebSimulator corrigeert de navigatie, mixer en andere schermlayout. Zie de root CHANGELOG.md voor details.
+
 # BEETLE V0.54 — HELP & MASTER FX pixel knob visuals
 
 - New scrollable on-device PROJECTS > HELP screen (K1 per line, K4 page step, HOME back to menu, SEQ tracker).

@@ -30,6 +30,11 @@ SECTIONS
     .beetle_mem_gap (NOLOAD) : { _beetle_mem_gap_start = .; . = . + 128; _beetle_mem_gap_end = .; } > POOL
     .beetle_lcd_frame (NOLOAD) : { . = ALIGN(64); _beetle_frame_start = .; KEEP(*(.beetle_lcd_frame*)); . = ALIGN(64); _beetle_frame_end = .; _pool_end = .; } > POOL
     .noinit (NOLOAD) : { *(.noinit*) } > NOINIT
+    /* Dedicated scratch after the established retained boot/noinit layout.
+     * All data are overwritten before use; no overlap with ROM boot mailboxes. */
+    .beetle_edit_scratch (NOLOAD) : { . = ALIGN(16); _beetle_edit_start = .;
+       KEEP(*(.beetle_edit_scratch)); . = ALIGN(16); _beetle_edit_end = .; } > NOINIT
+    ASSERT(_beetle_edit_end <= ORIGIN(NOINIT) + LENGTH(NOINIT), "BEETLE: edit scratch overlaps boot mailbox")
     _guard0 = 0x01C74000; _ustack_lo = 0x01C74100; _ustack_top = 0x01C7A000;
     _guard1 = 0x01C7A000; _sstack_lo = 0x01C7A100; _sstack_top = 0x01C7C000;
     ASSERT((_beetle_mem_gap_end - _beetle_mem_gap_start) >= 128, "BEETLE: memory isolation gap missing")

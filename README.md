@@ -2,52 +2,38 @@
   <img src="BEETLE.png" alt="BEETLE" width="400">
 </p>
 
-**An open-source, six-lane tracker and digital drum machine for the M-VAVE FM1.**  
+# BEETLE
+
+**An open-source, six-lane tracker for the M-VAVE FM1.**  
 **SikkenWorks — Born out of passion.**
 
-
-<div align="center">
-  <a href="https://sikkenworks.github.io/BEETLE/simulator.html">
-    <img
-      src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_WEB_SIMULATOR-000000?style=for-the-badge&logoColor=white"
-      alt="Launch BEETLE Web Simulator"
-      width="450"
-    />
-  </a>
-</div>
-
-<div align="center">
-  <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html">
-    <img
-      src="https://img.shields.io/badge/▲_INSTALL-BEETLE_(CHROME/EDGE)-000000?style=for-the-badge&logoColor=white"
-      alt="Launch BEETLE Web Simulator"
-      width="450"
-    />
-  </a>
-</div>
-
-**Current documented release: V0.54** · [Release history and changes](CHANGELOG.md)
+**Current documented release: V0.56** · [Release history and changes](CHANGELOG.md)
 
 BEETLE turns the FM1 into a small, hands-on music workstation. Its native firmware combines **five synth tracks sharing eight synthesizer voices**, **one two-note-per-step drum track**, a 16-step tracker with **48 patterns**, **12 project slots**, real-time Punch-In effects, and song sequencing. It is intended to be played and programmed on the device, using the physical keyboard, rotary encoders, and dedicated buttons.
 
-> **Release status: V0.54 experimental, not hardware-certified.** Builds, simulation tests and firmware-header checks are **not** proof of correct operation on an actual FM1. The storage-enabled firmware can erase existing user data, and recovery from a failed update is not guaranteed.
+> **Release status: V0.56 experimental, not hardware-certified.** Builds, simulation tests and firmware-header checks are **not** proof of correct operation on an actual FM1. The storage-enabled firmware can erase existing user data, and recovery from a failed update is not guaranteed.
 
-## On-device HELP (V0.54)
+## Current workflow
 
-Open **HOME → PROJECTS → HELP**. K1 moves one help line; K4 jumps three lines; HOME returns to PROJECTS; SEQ returns to the tracker. The guide includes the per-lane `SEQ + OP1` (copy) and `SEQ + OP2` (paste) shortcuts. Whole-pattern copy across all six lanes is not implemented.
-
-MASTER Compressor and Reverb use circular pixel knobs, still mapped to K1–K4. This is a visual improvement; their DSP and parameter ranges are unchanged.
+- **WebSimulator:** six-channel MIXER and 19 240×240 interface screens, with ARP for SONG MODE, GLO for MIXER, SEQ for TRACKER.
+- **PROJECTS → HELP:** scrollable on-device controls; K1 scrolls by one entry, K4 by three, HOME returns to PROJECTS and SEQ to the tracker. Includes the V0.56 editing shortcuts.
+- **MASTER FX:** Compressor and Reverb show four circular pixel knobs controlled by K1–K4, with the existing DSP preserved.
+- **Editing:** V0.56 adds full-pattern copy/paste, six-step RAM-only Undo/Redo and a one-lane block editor; see below and [CHANGELOG.md](CHANGELOG.md).
 
 ## What you can make
 
 - Write independent 16-step patterns for **CH1–CH5 (synth)** and **CH6 (digital drums)**; chain them in Song Mode.
 - Play up to **eight shared synth voices**. The drum synthesizer has its own voice pool; this is not a promise that every voice combination can run without glitches on physical hardware.
 - Use the **14-component, sample-ROM digital drum kit**: kick, snare, closed/open hats, three toms, crash, ride, clap, three percussion sounds and rim. Voices have individual editable pitch (−36 to +36 semitones), attack, decay, sustain, tail/release, three-band tonal controls and level.
-- Use shared synth presets, VA oscillators, ADSR, detune, oscillator blending, drive, sub oscillator, noise and FM depth. EDIT offers nine instrument TYPE options, including five SID-inspired flavors (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`). Since V0.54 the 6581 and 8580 variants have separate filter and saturation character. These are not the original reSID engine.
-- Adjust **volume, pan, mute, solo and swing (0–100)** for each lane. The drum channel defaults to mixer volume 100.
+- Use shared synth presets, VA oscillators, ADSR, detune, oscillator blending, drive, sub oscillator, noise and FM depth. EDIT offers nine instrument TYPE options, including five SID-inspired flavors (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`). Since V0.53 the 6581 and 8580 variants have separate filter and saturation character. These are not the original reSID engine.
+- Adjust **volume, pan, mute, solo and swing (0–100)** for each lane. The drum channel defaults to mixer volume 80, with increased internal drum source gain.
 - Add tracker step effects, including **volume and drum-pitch automation**, and use **[STP]** to stop sustained notes.
 - Apply eight live Punch-In commands: **REPEAT, REVERSE, FILTER, TAPE STOP, STUTTER, OCTAVE UP, OCTAVE DOWN and MUTE**. For effects 1–5, hold the relevant key and turn ALGORITHM to edit that effect's parameter.
 - Open a separate MASTER screen with a four-band graphical EQ, compressor, reverb and reorderable processing blocks. V0.52 adds compressor Attack and reverb Width, with four pixel-art knobs controlled independently by K1–K4. Hold SEQ and turn K4 to reorder the processing chain. These are FM1-constrained implementations, not bit-identical copies of desktop effects.
+
+## Professional editing (V0.56)
+
+In the tracker while transport is stopped, hold **SEQ** and press the physical black OP keys: **OP1** copies a lane, **OP2** pastes a lane, **OP3** copies the entire six-lane pattern plus recorded Punch-In FX, **OP4** pastes it, **OP5** Undo, **OP6** Redo. **SEQ + SEL** opens Block Editing (K4 start, K1 end, K2 action, K3 amount, SEL apply; HOME/SEQ exit). Native Undo/Redo stores six edit actions in RAM, not on flash. A new edit after Undo discards the redo branch. The WebSimulator provides explicit buttons for the same actions.
 
 ## Controls and workflow
 

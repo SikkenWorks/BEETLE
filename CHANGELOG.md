@@ -4,6 +4,39 @@ Release notes for the documented BEETLE firmware versions, newest first. Not eve
 
 For current features, controls, safety information, and licence credits, see [README.md](README.md).
 
+## V0.56 — Professional Pattern Editing (14 October 2026)
+
+### Added
+- **Full Pattern Copy/Paste:** `SEQ + OP3` copies all six tracker lanes **and** the current pattern's recorded Punch-In events (virtual FX lane). `SEQ + OP4` pastes this entire pattern to the destination pattern. Existing per-lane `SEQ + OP1/OP2` remains available. Pasting is undoable.
+- **Undo/Redo:** `SEQ + OP5` / `SEQ + OP6` restore pattern edits. The native FM1 uses a **6-operation bounded RAM history** to fit the actual hardware memory map. Redo is invalidated by a new edit; history is cleared on project LOAD/NEW but retained when switching patterns. Changes are undoable across pattern switches. No flash writes are performed by Undo.
+- **Block Editor:** `SEQ + SEL` while stopped opens a dedicated screen for a step selection inside the current lane. K4 sets the start row, K1 the end, K2 chooses COPY/PASTE/CLEAR/TRANSPOSE/SHIFT/UNDO/REDO, K3 changes the amount and SEL applies. HOME or SEQ returns to tracker. Drum notes are deliberately not transposed.
+- **Browser controls:** WebSimulator includes working buttons for full-pattern copy/paste, lane copy/paste, Undo/Redo and Block Editing, plus Ctrl+Z/Y/C/V/B keyboard shortcuts.
+- **HELP** updated with the new shortcuts.
+
+### Technical and safety notes
+- No change to the project serialization format or instrument and audio DSP. Pattern clipboard includes all 16 steps in all six lanes and the stored Punch-In clip. The in-memory undo/clipboard are deliberately not saved to project files.
+- Scratch edit buffers use a separate bounded non-initialized RAM section with explicit initialization of ownership flags. No allocation or copy occurs in the real-time audio interrupt, and no flash erase/write is triggered by pattern editing.
+- Older project formats and existing audio behavior are preserved. **Physical hardware testing and independent OTA recovery validation are still outstanding; flash-enabled builds are experimental.**
+
+## V0.55 — WebSimulator layout and ARP shortcut parity
+
+Based on V0.54; **UI and web workflow repair**, without changes to the native synthesizer, DSP, project formats, or protected loader.
+
+### Fixed
+
+- **Six-channel MIXER layout:** compact 23-pixel channel spacing fits all six lines and leaves room for the K1/K2/K3 footer. The selected channel, selected parameter, and the bottom row no longer overlap or spill off the 240×240 display.
+- **MIXER encoder controls:** K1 now reaches all six lanes rather than stopping at lane 4. K2 only selects valid editable columns. K3 now changes the selected Volume, Pan, Mute or Solo parameter rather than the next field.
+- **SONG MODE:** footer and step-row layout adjusted so the eighth visible item does not overlap transport controls.
+- **Project slot browser:** all 12 slots fit above a separate footer with a clear divider; no visual overlap at slot 12.
+- **Dedicated ARP key in WebSimulator:** enabled as a physical-button simulation and opens SONG MODE immediately. GLO opens/closes MIXER only; second GLO returns to TRACKER. SEQ returns to TRACKER without the obsolete long-SEQ Song Mode gesture. The native FM1 firmware already had the ARP/GLO mapping in V0.54.
+- **Restricted browser storage:** a blocked localStorage does not make every slot appear corrupted. Session-only save fallback displays a warning to export a backup.
+- **UI audit:** 19 simulator screens rendered in Chromium and audited for graphics outside the 240×240 display. Specific tests cover ARP/GLO/SEQ routing, Mixer K1/K2/K3 actions, and full six-channel visibility.
+
+### Release and safety
+
+- Rebuilt the native FM1 variants with identification **FM-1_2055**, retaining the V0.54 native audio/UI behavior. Updated WebSimulator, experimental WebInstaller, firmware hashes, and `CHANGELOG.md`.
+- Software simulation does not establish safety of flashing, data preservation or physical FM1 timing. Keep a verified independent recovery path before installing experimental storage firmware.
+
 ## V0.54 — On-device HELP and circular MASTER FX controls
 
 Built on V0.53. No project serialization or audio-DSP algorithms were changed.

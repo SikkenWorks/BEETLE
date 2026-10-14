@@ -1,7 +1,7 @@
 """Browser smoke check for non-identical SID filter and edit non-SID sound."""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-p=Path(__file__).resolve().parents[2]/'web/BEETLE-V0.54-WebSimulator.html'
+p=Path(__file__).resolve().parents[2]/'web/BEETLE-V0.55-WebSimulator.html'
 with sync_playwright() as pw:
  browser=pw.chromium.launch(headless=True, executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=no-user-gesture-required'])
  page=browser.new_page()
