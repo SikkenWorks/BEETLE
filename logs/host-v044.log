@@ -1,0 +1,19 @@
+BEETLE V0.44: 16 real ROM one-shots, 14 voices, snare RR, closed hat choke, pitch +/-36, silence, headroom PASS
+BEETLE V0.43: 14 differentiated factory drums; kick/snare envelopes, open/closed hats, crash/ride tails, edit/reset, mute, headroom & choke PASS
+BEETLE V0.41 PASS: factory kit; drum gain; V8 save/load; retained ALGORITHM; reversed PCM; V0.40 V7 fixture; recover
+decode rc=0 used=1000 fmt=8
+V0.40 PASS: lane clipboard + audible drum meter + +/-36 pitch + V8 save/load
+PASS: repeat frozen snapshot, reverse actual backwards playback
+PASS: tape-stop decreases playback rate, stutter gates live audio, filter value retained
+PASS: real V0.37 V6 file loads and migrates into V8
+PASS: full V0.37 A/B NOR journal LOAD into V0.39, no erase
+BEETLE V7 sparse project 1114 bytes; physical max 12256
+BEETLE V0.38 V7 storage, swing (0-100) PASS
+BEETLE V0.38 master 3-chain DSP, DRUM, VIBRATO no injected tone PASS
+BEETLE V0.36 UI/mixer/clear/5-sec semantics PASS
+NOTICE: V0.31/V0.34 legacy fixtures were not included in the supplied V0.37 release; testing current V7 journal without external binary fixtures.
+PASS V0.35 six lanes, 8 synth voices/steal, swing six, 12 CRC A/B projects, all parameters, torn write rollback, capacity lock, legacy V3 migration
+BEETLE V0.36 VA live-update and V7 project codec PASS
+V0.37 DRUM: 14 distinct rendered outputs, 16-bit peak headroom, -12 pitch PASS
+V0.37 PUNCH: repeat/reverse/filter/tape/stutter DSP and filter retention PASS
+V0.37 PROJECT: drum -12/0/+12 step FX persisted, Punch short-hit and step15 wrap PASS

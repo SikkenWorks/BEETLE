@@ -1,0 +1,9 @@
+PASS 19 audited upstream HAL/boot hashes verified; USB/OTA excluded from parity claims
+wrote /mnt/data/beetle_v043/BEETLE-V0.42/source/build/track-fm1-native-test/app.bin: 186896 B, headroom 394668 B
+ OK _start=0x02000120
+ETCH FM-1 app audit: /mnt/data/beetle_v043/BEETLE-V0.42/source/build/track-fm1-native-test/app.bin
+ OK  _start=0x02000120
+ app: 186896 B / 581564 B, headroom 394668 B
+ entry stub: OK
+PASS linked readonly symbol audit /mnt/data/beetle_v043/BEETLE-V0.42/source/build/track-fm1-native-test/track-native.elf checked 11 forbidden entries
+Compiled BEETLE V0.43 READ-ONLY ; BEETLE persistent storage experimental: False ; updater writes: False ; hardware verification NOT completed.

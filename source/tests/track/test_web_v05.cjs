@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'../fixtures/legacy_web');
+const a=fs.readFileSync(path.join(root,'TRACK-WebSimulator-V0.7.1.html'),'utf8');
+const b=fs.readFileSync(path.join(root,'TRACK-WebInstaller-V0.7.1.html'),'utf8');
+assert.match(a,/TRACK V0\.7\.1/);
+assert.match(b,/TRACK V0\.7\.1/);
+assert.match(a,/canvas id="screen" width="240" height="240"/);
+assert.match(a,/image-rendering:pixelated/);
+assert.match(b,/<button disabled id="install"/);
+assert.match(b,/INSTALLATION LOCKED/);
+assert.ok(!b.includes('output.send('));
+assert.ok(!b.includes('sendSysex('));
+assert.match(b,/m\.version==='0\.7'/);
+console.log('TRACK V0.7.1 web: assets, version, and installer read-only controls PASS');

@@ -1,0 +1,21 @@
+{
+  "app_sha256": "abb7bca35ad3b5fb1b54692c4ef6e343f1e5fd378d20540a19cc55f53dfdc1fa",
+  "beetle_storage_experimental": false,
+  "storage_writes": false,
+  "ota_writes": false,
+  "readonly_hardware_test": true,
+  "flash_read_only": true,
+  "version": "BEETLE-0.44",
+  "pilot_ota_enabled_no_project_writes": false,
+  "storage_requires_destructive_user_consent": false,
+  "overwrites_prior_ETCH_Felucca_user_storage": false,
+  "hardware_verified": false,
+  "intended_use": "OTA lab; BEETLE project flash writes locked",
+  "usb_audio_44100": false,
+  "usb_audio_48000_experimental": false,
+  "extended_store_experimental": false,
+  "multi_project_experimental": false,
+  "product": "FM-1_2044",
+  "brand": "BEETLE",
+  "legacy_project_format": "TRACK-compatible"
+}
