@@ -1,6 +1,7 @@
 <p align="center">
   <img src="BEETLE.png" alt="BEETLE" width="400">
 </p>
+
 **An open-source, six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks — Born out of passion.**
 
@@ -18,7 +19,7 @@
 <div align="center">
   <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html">
     <img
-      src="https://img.shields.io/badge/▶_INSTALL-BEETLE_(CHROME/EDGE)-000000?style=for-the-badge&logoColor=white"
+      src="https://img.shields.io/badge/▲_INSTALL-BEETLE_(CHROME/EDGE)-000000?style=for-the-badge&logoColor=white"
       alt="Launch BEETLE Web Simulator"
       width="450"
     />
