@@ -1,4 +1,3 @@
-# BEETLE
 <p align="center">
   <img src="BEETLE.png" alt="BEETLE" width="400">
 </p>
