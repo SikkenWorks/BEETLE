@@ -7,6 +7,18 @@
 **An open-source, six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks — Born out of passion.**
 
+
+<div align="center">
+  <a href="/simulator.html">
+    <img
+      src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_WEB_SIMULATOR-000000?style=for-the-badge&logoColor=white"
+      alt="Launch BEETLE Web Simulator"
+      width="450"
+    />
+  </a>
+</div>
+
+
 **Current documented release: V0.54** · [Release history and changes](CHANGELOG.md)
 
 BEETLE turns the FM1 into a small, hands-on music workstation. Its native firmware combines **five synth tracks sharing eight synthesizer voices**, **one two-note-per-step drum track**, a 16-step tracker with **48 patterns**, **12 project slots**, real-time Punch-In effects, and song sequencing. It is intended to be played and programmed on the device, using the physical keyboard, rotary encoders, and dedicated buttons.
