@@ -172,7 +172,7 @@ static volatile uint32_t native_nested_ticks, native_nested_count;
 #define ETCH_NATIVE_OTA 0
 #endif
 #define FELUCCA_OTA ETCH_NATIVE_OTA
-#define FELUCCA_ID "FM-1_2051"
+#define FELUCCA_ID "FM-1_2052"
 #define ETCH_UI_VERSION "V043"
 #define FELUCCA_OTA_DRYRUN 0
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
@@ -2256,17 +2256,23 @@ void fm1_cstart(void){
    }
   }else native_audio_rearm_held=0;
   disconnected=gone;
-  /* Stage 0 proved input/USB on hardware, but full ETCH DMA can miss a
-   * deadline under display/USB load. Restart at most three times after a
-   * 1-second cool-off, on the MAIN thread, never in the audio ISR. A true
-   * persistent fault stays stopped for diagnosis and manual HOME+PLAY. */
+  /* Deadline faults are recoverable WITHOUT firmware reboot. Back off after
+   * repeated stalls to protect the amplifier, USB and audio pipeline. The
+   * main loop feeds WDT throughout; never restart DMA inside the ISR. */
   if(!muted && native_tripped && !native_updating){
    if(!native_auto_fault_at)native_auto_fault_at=etch_ms?etch_ms:1u;
-   if(native_auto_restarts<3u && (uint32_t)(etch_ms-native_auto_fault_at)>=1000u){
-    fm1_irq_off();native_start();fm1_irq_enable_all();
-    native_auto_restarts++;native_auto_fault_at=0;first_frame=1;
+   uint32_t backoff=1000u+(uint32_t)(native_auto_restarts<8u?native_auto_restarts:8u)*1000u;
+   if((uint32_t)(etch_ms-native_auto_fault_at)>=backoff){
+    fm1_irq_off();native_stop();native_tripped=0;native_start();fm1_irq_enable_all();
+    if(native_auto_restarts<8u)native_auto_restarts++;
+    native_auto_fault_at=0;first_frame=1;
    }
-  }else native_auto_fault_at=0;
+  }else{
+   native_auto_fault_at=0;
+   /* Forget repeated short glitches once playback remains healthy. */
+   if(!native_tripped && native_auto_restarts &&
+      native_healthy_blocks>600u)native_auto_restarts=0u;
+  }
   if(muted||native_tripped){
    fm1_irq_off();native_midi_drain(0);fm1_irq_enable_all();
    if(native_tripped && usb.config)etch_perf_midi_flush(&native_perf_out,native_panel_usb_emit,0);

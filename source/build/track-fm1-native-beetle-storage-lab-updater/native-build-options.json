@@ -1,11 +1,11 @@
 {
-  "app_sha256": "40b6201da389f2d0f39903dddb9042d51c0cfba20455376d32216bbe4c9c8d67",
+  "app_sha256": "f7c1b616f4ea3b4cc19ff23548300d918db2421779e17269bdcc2c6c1d639b6d",
   "beetle_storage_experimental": true,
   "storage_writes": false,
   "ota_writes": true,
   "readonly_hardware_test": false,
   "flash_read_only": false,
-  "version": "BEETLE-0.51",
+  "version": "BEETLE-0.52",
   "pilot_ota_enabled_no_project_writes": false,
   "storage_requires_destructive_user_consent": true,
   "overwrites_prior_ETCH_Felucca_user_storage": true,
@@ -15,7 +15,7 @@
   "usb_audio_48000_experimental": false,
   "extended_store_experimental": false,
   "multi_project_experimental": false,
-  "product": "FM-1_2051",
+  "product": "FM-1_2052",
   "brand": "BEETLE",
   "legacy_project_format": "TRACK-compatible"
 }

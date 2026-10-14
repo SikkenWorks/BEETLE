@@ -14,7 +14,12 @@
 #define TRACK_CHIP_VA_OSC 2u
 #define TRACK_CHIP_VA_OSC2 3u
 #define TRACK_CHIP_RESID_LITE 4u
-#define TRACK_CHIP_TYPES 5u
+#define TRACK_CHIP_SID_6581 4u
+#define TRACK_CHIP_SID_8580 5u
+#define TRACK_CHIP_SID_DIRTY 6u
+#define TRACK_CHIP_SID_BASS 7u
+#define TRACK_CHIP_SID_NOISE 8u
+#define TRACK_CHIP_TYPES 9u
 /* VA shapes: harmonic-limited saw, triangle, square, sine, variable-width pulse. */
 #define TRACK_VA_SHAPES 5u
 struct track_va_patch {

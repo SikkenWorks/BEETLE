@@ -2,6 +2,28 @@
   <img src="BEETLE.png" alt="BEETLE" width="400">
 </p>
 
+# BEETLE V0.52 · SID instrument flavors + MASTER FX stability / UI
+
+This source project is built from V0.51, preserving the six-lane tracker, project workflow, keyboard octave, audio, boot animation and web simulator.
+
+## Changes in V0.52
+
+- **TYPE selection in EDIT:** encoders queue individual detents and repaint after each step. Left and right browsing retain proper wraparound across all nine instrument types, without skipping types on accelerated encoder input.
+- **Five SID-flavored synth types:** `SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`. They are distinct character modes on the embedded SID-style synthesizer, not the original reSID C++ library. Existing `RESID-LITE` project instruments map to the first SID variant with the same numeric type ID.
+- **MASTER FX screen:** four visible pixel-art rotary knobs for compressor and reverb, with independent K1/K2/K3/K4 control. Compressor adds Attack. Reverb adds Width. Hold SEQ and turn K4 to reorder the chain. MASTER footer fits inside 240x240 display.
+- **More robust master DSP:** skip flat EQ calculations, move per-block dynamics/filter coefficients outside the per-sample loop, validate DSP state before dereferencing a reverb index and recover a damaged DSP state without restarting firmware. The audio deadline-stop path automatically retries with capped progressive backoff rather than permanently giving up after the third attempt.
+- **Project compatibility:** project encoding schema V10 saves the extra two MASTER parameters; V9 and older supported formats remain readable and initialize missing parameters to defaults. This changes the format only for newly saved files; old project data are not silently rewritten.
+- **Web simulator:** latest visual controls and SID type selection; simulated WebAudio remains distinct from native FM1 DSP.
+- **reSID credit:** reSID was originally authored by **Dag Lem**. The BEETLE SID types are independent SID-inspired implementations; original reSID source is not embedded. See the explicit acknowledgment below and `source/CREDITS-AND-LICENSES.md`.
+
+## reSID credits and acknowledgment
+
+**reSID — original author: Dag Lem.** reSID is a reverse-engineered emulation of the MOS6581 SID (Sound Interface Device), developed for Commodore 64 audio. See the original project: **[libsidplayfp/reSID](https://github.com/libsidplayfp/resid)** (a mirror of VICE's reSID), including its `AUTHORS` and licensing notices.
+
+BEETLE acknowledges **Dag Lem and the reSID project** as an influence on its SID-inspired instrument design. BEETLE V0.52 includes five SID-style instruments (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, and `SID NOISE`), implemented in BEETLE's separate lightweight synth engine. **BEETLE does not bundle, compile, link, or run the original reSID C++ source code.** It is not cycle-accurate reSID emulation.
+
+The full attribution and distinction between incorporated code and inspirations are documented in [`source/CREDITS-AND-LICENSES.md`](source/CREDITS-AND-LICENSES.md).
+
 # BEETLE V0.51 · Responsive keyboard + WebSimulator
 
 Complete source for the M-VAVE FM1 experiment, based on V0.50.
@@ -184,6 +206,8 @@ BEETLE is **not a clean-room firmware**. Parts of its low-level architecture and
 1. **Felucca**, by **Leo Kuroshita (@kurogedelic), Hügelton Instruments** — original M-VAVE FM1 hardware abstraction, startup and linker foundations, LCD, input scanning, audio and boot/OTA infrastructure used or carried forward in the ETCH/BEETLE native tree. [Felucca](https://github.com/hugelton/Felucca) is distributed under **GPL-3.0-only**. BEETLE includes a recorded SHA-256 audit for 19 preserved critical Felucca/HAL/bootstrap files in `source/reference/felucca-hal-sha256.json`; this proves equivalence only for the enumerated files, **not** that the entire application is unchanged upstream code.
 2. **ETCH**, by **SikkenWorks** — the prior SikkenWorks FM1 firmware and working **ETCH V1.37 firmware container/bootloader reference** on which BEETLE's device startup and `.fwsc` packaging workflow were based. Some `native_*`, flash/OTA, UI and shared hardware support modules retain ETCH lineage; the tracker, new digital drum instruments and project workflow are BEETLE-specific additions. The protected bootloader is intentionally kept unchanged for compatibility; the loader may still display older branding. [ETCH](https://github.com/SikkenWorks/ETCH).
 3. **JieLi Technology** — manufacturer of the AC79-series chip, target architecture, and tooling used to compile and package firmware. The released container inherits necessary device/SDK-format material from the verified reference package. Refer to original JieLi licensing terms and the upstream Felucca licence notices; third-party toolchain binaries are not part of this repository.
+
+4. **reSID**, originally developed by **Dag Lem** — acknowledged for its historical and technical contribution to SID chip emulation and as an inspiration for BEETLE's SID-style instruments. **Not included as a compiled or linked dependency.** [reSID repository](https://github.com/libsidplayfp/resid). See `source/CREDITS-AND-LICENSES.md` for further detail.
 
 Felucca's own attribution document, preserved at **`source/LICENSES/FELUCCA-LICENSING.txt`**, identifies additional third-party projects in the broader upstream repository: **DaisySP** (Electrosmith / Emilie Gillet, MIT), **Rings** (Emilie Gillet, MIT), **msfa/Dexed** (Google / Pascal Gauthier, Apache-2.0), **CrispyZebra**, **Fukiai**, **Inter Tight**, **DotGothic16**, **Versilian Studios VSCO-2**, **klattsch**, and **X0X**. Those are upstream acknowledgments: **this BEETLE target build does not claim to embed all of those engines, fonts, or audio assets**. See Felucca's corresponding source and notices for the actual upstream file-level relationships.
 

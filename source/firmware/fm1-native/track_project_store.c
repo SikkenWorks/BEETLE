@@ -117,6 +117,8 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
  for(c=0u;c<3u;c++)PUT1(p->master.enabled[c]);
  for(c=0u;c<3u;c++)PUT1(p->master.order[c]);
  for(c=0u;c<5u;c++){if(p->punch_param[c]>100u)return -1;PUT1(p->punch_param[c]);}
+ if(p->master.comp_attack>100u||p->master.reverb_spread>100u)return -1;
+ PUT1(p->master.comp_attack);PUT1(p->master.reverb_spread);
  wr32(out,TRACK_STORE_MAGIC);wr16(out+4,TRACK_STORE_VERSION);
  wr16(out+6,(uint16_t)p->slot);wr32(out+8,i);wr32(out+12,track_store_crc32(out+24u,i-24u));
  wr32(out+16,track_store_crc32(out,16u));wr32(out+20,0u);
@@ -124,7 +126,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -256,6 +258,10 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   for(c=0u;c<5u;c++)p->punch_param[c]=50u;
   p->punch_param[2]=0u;
  }
+ if(rd16(data+4u)>=10u){
+  GET1(p->master.comp_attack);GET1(p->master.reverb_spread);
+  if(p->master.comp_attack>100u||p->master.reverb_spread>100u)return -3;
+ }else{p->master.comp_attack=28u;p->master.reverb_spread=50u;}
  if(i!=n)return -3;
  return 0;
 }

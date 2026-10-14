@@ -1,8 +1,0 @@
-PASS 19 audited upstream HAL/boot hashes verified; USB/OTA excluded from parity claims
-wrote /mnt/data/beetle_work/BEETLE-V0.45/source/build/track-fm1-native-beetle-storage-lab-updater/app.bin: 387016 B, headroom 194548 B
- OK _start=0x02000120
-ETCH FM-1 app audit: /mnt/data/beetle_work/BEETLE-V0.45/source/build/track-fm1-native-beetle-storage-lab-updater/app.bin
- OK  _start=0x02000120
- app: 387016 B / 581564 B, headroom 194548 B
- entry stub: OK
-Compiled BEETLE V0.46 OTA-LAB ; BEETLE persistent storage experimental: True ; updater writes: True ; hardware verification NOT completed.

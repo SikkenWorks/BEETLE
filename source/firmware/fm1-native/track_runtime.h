@@ -74,6 +74,7 @@ static uint8_t track_song_preplay_row,track_song_follow_active;
 static uint32_t track_rec_since;
 static uint8_t track_rec_long,track_punch_edit_row,track_punch_edit_index;
 static uint8_t track_fx_drum_lane,track_edit_poly;
+static int16_t track_type_queued;
 /* Global live keyboard octave is native_controls.octave. Shared by EDIT and
  * TRACKER, never written into project notes unless a note is entered.
  * Using chord-aware key-up handling prevents OCT-+OCT+ from shifting pitch. */
@@ -300,7 +301,8 @@ static void track_fm1_boot(void){
  track_init(&track_state);track_mixer_init(&track_mix);track_drum_init(&track_drum);
  track_master_default(&track_master_cfg);track_drum_component=0u;track_drum_field=0u;
  track_master_focus=0u;track_master_chain_edit=0u;
- for(uint32_t z=0u;z<sizeof(track_master_dsp)/sizeof(uint32_t);z++)((uint32_t*)&track_master_dsp)[z]=0u;track_punch_clear(&track_rec_events);
+ for(uint32_t z=0u;z<sizeof(track_master_dsp)/sizeof(uint32_t);z++)((uint32_t*)&track_master_dsp)[z]=0u;
+ track_master_dsp_init(&track_master_dsp);track_punch_clear(&track_rec_events);
  track_song_init(&track_song,&track_state);track_chip_init(&track_chip);
  for(uint8_t k=0u;k<5u;k++)track_punch_base_param[k]=track_chip.punch_param[k];
  track_chip_fx_reset();track_ui_inst_reset();track_drum_init(&track_drum);track_old_note_mask=0;track_page=0u;track_named=0u;
@@ -310,7 +312,7 @@ static void track_fm1_boot(void){
  track_scroll_preview_active=0u;track_scroll_preview_until=0u;
  track_audio_clock=0u;track_audio_started=0u;track_swing_pending_mask=0u;for(uint8_t ci=0;ci<TRACK_CHANNELS;ci++)track_swing_pending_at[ci]=0u;track_preview_mask=0u;
  for(uint8_t k=0u;k<27u;k++){track_preview_channel[k]=255u;track_preview_note[k]=255u;track_edit_last_onset_ms[k]=0u;}
- track_rec_since=0u;track_rec_long=0u;track_punch_edit_row=0u;track_punch_edit_index=0u;
+ track_type_queued=0;track_rec_since=0u;track_rec_long=0u;track_punch_edit_row=0u;track_punch_edit_index=0u;
  track_preset_last_note=60u;track_boot_splash_until=etch_ms+900u;
  track_fx_drum_lane=0u;track_edit_poly=0u;track_key_oct_chord.last=0u;track_key_oct_chord.combo_latched=0u;
  native_controls.octave=0;track_edit_prev_keys=0u;track_edit_serial=0u;track_overwrite_wait=0u;
@@ -713,6 +715,27 @@ static void track_fm1_drum_editor_screen(void){
  }
  track_pix_text("SELECT DRUM  K1 FIELD  K3 VALUE",4u,219u,TRACK_PINK);
 }
+/* Pixel-perfect 4-knob MASTER FX UI, small enough for 240x240 OLED. */
+static void track_master_knob(uint16_t x,uint16_t y,uint8_t value){
+ static const int8_t ticks_x[12]={-10,-9,-6,-2,2,6,9,10,9,6,2,-2};
+ static const int8_t ticks_y[12]={5,1,-5,-9,-9,-5,1,5,9,11,11,9};
+ /* 13 indexed needle positions, from 7 o'clock to 5 o'clock. */
+ static const int8_t needle_x[13]={-7,-9,-9,-8,-6,-3,0,3,6,8,9,9,7};
+ static const int8_t needle_y[13]={7,4,0,-4,-7,-9,-10,-9,-7,-4,0,4,7};
+ lcd_fill(x-12u,y-12u,25u,25u,0x1803u);
+ for(uint8_t i=0u;i<12u;i++){
+  uint16_t px=(uint16_t)((int)x+ticks_x[i]),py=(uint16_t)((int)y+ticks_y[i]);
+  lcd_fill(px,py,2u,2u,0x8C11u);
+ }
+ lcd_fill(x-2u,y-2u,5u,5u,TRACK_WHITE);
+ uint8_t idx=(uint8_t)((uint16_t)value*12u/100u);
+ int8_t nx=needle_x[idx],ny=needle_y[idx];
+ for(uint8_t i=3u;i<=9u;i+=2u){
+  uint16_t px=(uint16_t)((int)x+(int)nx*(int)i/10);
+  uint16_t py=(uint16_t)((int)y+(int)ny*(int)i/10);
+  lcd_fill(px,py,2u,2u,TRACK_PINK);
+ }
+}
 static void track_fm1_master_screen(void){
  track_page_header("MASTER / FX CHAIN",43u);
  static const char *const labels[]={"4 BAND EQ","COMPRESSOR","REVERB"};
@@ -749,16 +772,28 @@ static void track_fm1_master_screen(void){
    if(y<144)y=144;if(y>187)y=187;
    lcd_fill((uint16_t)(17u+i*4u),(uint16_t)y,2u,1u,TRACK_BRIGHT);
   }
-  track_pix_text("OCT- WIDTH OCT+ FREQ",10u,216u,TRACK_WHITE);
-  track_pix_text("K1-4 EQ SEQ+K4 ORDER",10u,228u,TRACK_PINK);
+  track_pix_text("OCT- WIDTH OCT+ FREQ",10u,207u,TRACK_WHITE);
+  track_pix_text("K1-4 EQ SEQ+K4 ORDER",10u,219u,TRACK_PINK);
  }else{
-  char line[40],num[12];const char *a=fx==1u?"THRESHOLD":"WET";
-  uint8_t val=fx==1u?track_master_cfg.comp_threshold:track_master_cfg.reverb_wet;
-  track_fmt_int(num,val);uint8_t i=0u;while(a[i]&&i<25u){line[i]=a[i];i++;}line[i++]=' ';uint8_t n=0;while(num[n]&&i<37u)line[i++]=num[n++];line[i]=0;
-  track_pix_text(line,15u,135u,TRACK_PINK);
-  track_pix_text(fx==1u?"K1 THR K2 RATIO K3 GAIN":"K1 WET K2 TAIL K3 TONE",10u,174u,TRACK_WHITE);
+  const uint8_t values[4]={
+   fx==1u?track_master_cfg.comp_threshold:track_master_cfg.reverb_wet,
+   fx==1u?track_master_cfg.comp_ratio:track_master_cfg.reverb_feedback,
+   fx==1u?track_master_cfg.comp_gain:track_master_cfg.reverb_tone,
+   fx==1u?track_master_cfg.comp_attack:track_master_cfg.reverb_spread};
+  static const char *const comp[] = {"THR","RATIO","MAKEUP","ATTACK"};
+  static const char *const rev[] = {"WET","TAIL","TONE","WIDTH"};
+  const char *const *names=fx==1u?comp:rev;
+  track_pix_text(fx==1u?"COMPRESSOR / DYNAMICS":"REVERB / SPACE",17u,118u,TRACK_PINK);
+  for(uint8_t i=0u;i<4u;i++){
+   uint16_t x=(uint16_t)(15u+i*57u),cx=(uint16_t)(x+16u),cy=165u;
+   track_pix_text(names[i],x,135u,TRACK_WHITE);
+   track_master_knob(cx,cy,values[i]);
+   char num[12];track_fmt_int(num,values[i]);
+   track_pix_center(num,cx,188u,TRACK_BRIGHT);
+  }
+  track_pix_text(fx==1u?"K1 THR K2 RAT K3 GAIN K4 ATK":"K1 WET K2 TAIL K3 TONE K4 WID",6u,210u,TRACK_WHITE);
  }
- track_pix_text("SEL FOCUS  ENV ON/OFF",4u,235u,TRACK_PINK);
+ track_pix_text("SEL FX  ENV ON/OFF  SEQ+K4 ORDER",3u,224u,TRACK_PINK);
 }
 static void beetle_draw_keyboard_octave(uint16_t y){
  char msg[24]="KEY OCT ";int8_t v=native_controls.octave;
@@ -883,7 +918,7 @@ static void track_fm1_paint(void){
    static const char *const sidcombine[]={"DETUNE B","MIX A/B","FILT MODE","RESONANCE","SUB OSC","NOISE","FM DEPTH"};
    const struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
    const struct track_va_patch *p=&track_chip.patches[st->instrument&3u];
-   const uint8_t sid_mode=(uint8_t)(track_chip.osc_type[st->instrument&3u]==TRACK_CHIP_RESID_LITE);
+   const uint8_t sid_mode=(uint8_t)(track_chip.osc_type[st->instrument&3u]>=TRACK_CHIP_RESID_LITE);
    char values[7][24],items[7][40];const char *entries[7];
    uint8_t count=(track_osc_bank==3u)?7u:4u;
    for(uint8_t i=0;i<count;i++){
@@ -906,7 +941,7 @@ static void track_fm1_paint(void){
    track_pix_text("K1 SELECT  K3 EDIT",12u,195u,TRACK_PINK);
    beetle_draw_keyboard_octave(214u);return;
   }
-  static const char *const types[]={"RETRO PULSE","RETRO WAVE","VA OSC","VA OSC2","RESID-LITE"};
+  static const char *const types[]={"RETRO PULSE","RETRO WAVE","VA OSC","VA OSC2","SID 6581","SID 8580","SID DIRTY","SID BASS","SID NOISE"};
   static const char *const keys[]={"TYPE","ATTACK","DECAY","SUSTAIN","RELEASE","DUTY","CUTOFF","VOLUME"};
   const struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
   const struct track_instrument_ui_values *v=&track_ui_inst[st->instrument&3u];
@@ -1387,7 +1422,7 @@ static void track_fm1_poll(void){
      track_fx_drum_lane=(uint8_t)(track_state.transport.edit_column==1u);
     track_page=track_page==3u?4u:3u;
    }
-  if(pressed&(1u<<6)){track_page=(uint8_t)(track_page==5u?16u:5u);track_osc_cursor=0u;track_osc_bank=0u;}
+  if(pressed&(1u<<6)){track_page=(uint8_t)(track_page==5u?16u:5u);track_osc_cursor=0u;track_osc_bank=0u;track_type_queued=0;}
   if(pressed&(1u<<5)){track_page=17u;track_osc_cursor=0u;} /* LFO => MASTER */
   if(pressed&(1u<<10)){track_page=9u;} /* ARP => SONG */
   /* GLO is the dedicated MIXER shortcut. ARP alone opens SONG.
@@ -1645,6 +1680,14 @@ static void track_fm1_poll(void){
     if(k1){int32_t v=(int32_t)track_osc_cursor+k1;
      uint8_t max_row=track_osc_bank==3u?6u:track_osc_bank?3u:7u;
      if(v<0)v=0;if(v>max_row)v=max_row;track_osc_cursor=(uint8_t)v;}
+    if(track_osc_bank==0u && track_osc_cursor==0u){
+     int32_t accum=(int32_t)track_type_queued+k3;
+     if(accum>32)accum=32;if(accum< -32)accum=-32;
+     track_type_queued=(int16_t)accum;
+     if(track_type_queued>0){k3=1;track_type_queued--;changed=1u;}
+     else if(track_type_queued<0){k3=-1;track_type_queued++;changed=1u;}
+     else k3=0;
+    }else track_type_queued=0;
     if(k3){fm1_irq_off();
      struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
      uint8_t ch=track_state.transport.edit_channel;
@@ -1674,7 +1717,7 @@ static void track_fm1_poll(void){
        v=(int32_t)*target+k3*5;if(v<0)v=0;if(v>100)v=100;*target=(uint8_t)v;
       }
      }else if(track_osc_cursor==0u){v=(int32_t)track_chip.osc_type[st->instrument&3u]+k3;
-      track_chip.osc_type[st->instrument&3u]=(uint8_t)((v%TRACK_CHIP_TYPES+TRACK_CHIP_TYPES)%TRACK_CHIP_TYPES);
+      track_chip.osc_type[st->instrument&3u]=(uint8_t)((v+(int32_t)TRACK_CHIP_TYPES)%TRACK_CHIP_TYPES);
      }else if(track_osc_cursor>=1u&&track_osc_cursor<=4u){
       uint8_t *ptr=track_osc_cursor==1u?&ui->attack:track_osc_cursor==2u?&ui->decay:
        track_osc_cursor==3u?&ui->sustain:&ui->release;
@@ -1715,7 +1758,7 @@ static void track_fm1_poll(void){
     if(sel){int32_t v=(int32_t)track_master_focus+sel;if(v<0)v=0;if(v>2)v=2;track_master_focus=(uint8_t)v;}
     uint8_t fx=track_master_cfg.order[track_master_focus];
     if(pressed&(1u<<4)){track_master_cfg.enabled[fx]^=1u;track_state.dirty=1u;}
-    if(k4 && (fx!=0u || (buttons&(1u<<11)))){
+    if(k4 && (buttons&(1u<<11))){
       int32_t j=(int32_t)track_master_focus+(k4>0?1:-1);
       if(j>=0&&j<3){uint8_t x=track_master_cfg.order[track_master_focus];track_master_cfg.order[track_master_focus]=track_master_cfg.order[j];track_master_cfg.order[j]=x;track_master_focus=(uint8_t)j;track_state.dirty=1u;}
      }
@@ -1732,8 +1775,9 @@ static void track_fm1_poll(void){
      uint8_t *f0=fx==1u?&track_master_cfg.comp_threshold:&track_master_cfg.reverb_wet;
      uint8_t *f1=fx==1u?&track_master_cfg.comp_ratio:&track_master_cfg.reverb_feedback;
      uint8_t *f2=fx==1u?&track_master_cfg.comp_gain:&track_master_cfg.reverb_tone;
-     uint8_t *fields[3]={f0,f1,f2};int32_t d[3]={k1,k2,k3};
-     for(uint8_t i=0u;i<3u;i++)if(d[i]){int32_t v=(int32_t)*fields[i]+d[i];if(v<0)v=0;if(v>100)v=100;*fields[i]=(uint8_t)v;track_state.dirty=1u;}
+     uint8_t *f3=fx==1u?&track_master_cfg.comp_attack:&track_master_cfg.reverb_spread;
+     uint8_t *fields[4]={f0,f1,f2,f3};int32_t d[4]={k1,k2,k3,(buttons&(1u<<11))?0:k4};
+     for(uint8_t i=0u;i<4u;i++)if(d[i]){int32_t v=(int32_t)*fields[i]+d[i];if(v<0)v=0;if(v>100)v=100;*fields[i]=(uint8_t)v;track_state.dirty=1u;}
     }
    }
    if(track_page==6u){

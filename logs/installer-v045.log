@@ -1,4 +1,0 @@
-PASS simulated OTA source FM-1_015 stages stage:check,stage:check,stage:loader,stage:write,stage:write,stage:reboot,stage:done
-PASS simulated OTA source FM-1_2042 stages stage:check,stage:check,stage:loader,stage:write,stage:write,stage:reboot,stage:done
-PASS simulated OTA source ota-FM-1_015 stages stage:write,stage:write,stage:reboot,stage:done
-PASS integrity 4f3fde26b7cf1e92163d5cd25c916451de004fd192b931bafcd60e80bd71cf4a bytes 610086 unknown rejected, modified firmware rejected

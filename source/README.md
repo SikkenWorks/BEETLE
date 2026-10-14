@@ -1,20 +1,29 @@
-# BEETLE V0.51 · Responsive keyboard + WebSimulator
+# BEETLE V0.52 · SID instrument flavors + MASTER FX stability / UI
 
-Complete source for the M-VAVE FM1 experiment, based on V0.50.
+This source project is built from V0.51, preserving the six-lane tracker, project workflow, keyboard octave, audio, boot animation and web simulator.
 
-- **Shared OCTAVE**: EDIT and TRACKER use the same keyboard octave (-4...+3). Press and release OCT- or OCT+ to move an octave. In EDIT both together still toggle MONO/POLY without shifting the octave. Playing notes from the physical keyboard uses the selected octave on both screens. Existing pattern notes are never transposed by changing the keyboard octave. K3 remains the note/instrument cell editor.
-- **Correct note-offs**: live EDIT/TRACKER voices remember the actual MIDI note and release that exact note after changing octave or channel. Held EDIT notes are retriggered under the updated octave.
-- **WebSimulator**: `BEETLE-V0.51-WebSimulator.html` is a browser-only simulator, updated to six lanes and 12 project slots. The same shared keyboard-octave control is simulated, and the original animated beetle boot art is included. It uses WebAudio rather than the exact native JieLi DSP, so audio parity with the FM1 is not claimed.
-- **Source cleanup**: only current release firmware, latest webinstaller, simulator, source, fixture/reference files, production toolchain scripts, and retained regression tests. Old generated binaries, historical installers, duplicate art and build logs excluded.
+## Changes in V0.52
 
-## Experimental firmware safety
+- **TYPE selection in EDIT:** encoders queue individual detents and repaint after each step. Left and right browsing retain proper wraparound across all nine instrument types, without skipping types on accelerated encoder input.
+- **Five SID-flavored synth types:** `SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`. They are distinct character modes on the embedded SID-style synthesizer, not the original reSID C++ library. Existing `RESID-LITE` project instruments map to the first SID variant with the same numeric type ID.
+- **MASTER FX screen:** four visible pixel-art rotary knobs for compressor and reverb, with independent K1/K2/K3/K4 control. Compressor adds Attack. Reverb adds Width. Hold SEQ and turn K4 to reorder the chain. MASTER footer fits inside 240x240 display.
+- **More robust master DSP:** skip flat EQ calculations, move per-block dynamics/filter coefficients outside the per-sample loop, validate DSP state before dereferencing a reverb index and recover a damaged DSP state without restarting firmware. The audio deadline-stop path automatically retries with capped progressive backoff rather than permanently giving up after the third attempt.
+- **Project compatibility:** project encoding schema V10 saves the extra two MASTER parameters; V9 and older supported formats remain readable and initialize missing parameters to defaults. This changes the format only for newly saved files; old project data are not silently rewritten.
+- **Web simulator:** latest visual controls and SID type selection; simulated WebAudio remains distinct from native FM1 DSP.
+- **Credits:** see `source/CREDITS-AND-LICENSES.md`. Original reSID is not shipped or embedded.
 
-Hardware is not tested. Even when a C build, OTA container and simulated install pass, the storage firmware can still cause data loss or boot failures. Don't flash without a verified complete dump, working recovery route and knowledge of the risks.
+## Important limitations
+
+Read-only/native/OTA/store builds are **software validation only**, not physical FM1 validation. Source and .fwsc are experimental; a tested recovery method and full verified backup are strongly recommended before use. Any audio fault involving an unrecoverable CPU, flash, stack or power failure is outside the scope of the DSP self-heal mechanism, so a "never crashes" guarantee would not be truthful.
 
 ## Build
 
-Set `JIELI_TOOLCHAIN` to directory holding `pi32v2/` and `common/`.
-Run `python source/firmware/fm1-native/build.py --hardware-test` for read-only.
-The OTA pilot uses `--pilot`; the storage lab uses `--updater --beetle-storage-lab` and requires informed confirmation before destructive initial storage takeover.
+Set `JIELI_TOOLCHAIN` to the directory containing `pi32v2` and `common`. Then run:
 
-Original reSID is not bundled; `RESID-LITE` is the compact native BEETLE SID-style instrument added in V0.50.
+```sh
+python source/firmware/fm1-native/build.py --hardware-test
+python source/firmware/fm1-native/build.py --pilot
+python source/firmware/fm1-native/build.py --updater --beetle-storage-lab
+```
+
+`source/tools/clean_release.py --apply` removes generated intermediates and stale versioned installer files, but preserves sources, assets, tests, and necessary firmware references.

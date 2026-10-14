@@ -259,11 +259,22 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   level=v->phase<ratios[s->duty[v->channel]&3u]?11000:-11000;
  }break;
  case TRACK_CHIP_RETRO_WAVE:level=((int32_t)retro_wave[v->phase>>27u]-8)*1800;break;
- case TRACK_CHIP_RESID_LITE:{
+ case TRACK_CHIP_SID_6581: case TRACK_CHIP_SID_8580:
+ case TRACK_CHIP_SID_DIRTY: case TRACK_CHIP_SID_BASS: case TRACK_CHIP_SID_NOISE:{
   const struct track_va_patch *p=&s->patches[v->instrument];
+  uint8_t style=v->type;
+  uint8_t cut=s->cutoff[v->channel],reso=p->drive,mode=p->morph;
+  uint8_t wa=p->wave_a,wb=p->wave_b,mix=p->mix;
+  if(style==TRACK_CHIP_SID_8580){cut=(uint8_t)((uint32_t)cut*4u/5u+18u);reso=(uint8_t)(reso*2u/3u);}
+  if(style==TRACK_CHIP_SID_DIRTY){reso=(uint8_t)(60u+reso*2u/5u);mode=65u;}
+  if(style==TRACK_CHIP_SID_BASS){wa=1u;wb=2u;mode=14u;cut=(uint8_t)(cut/2u+8u);}
+  if(style==TRACK_CHIP_SID_NOISE){wa=3u;wb=2u;mix=20u;mode=80u;}
   level=beetle_sid_sample(v->phase,step,&v->lfsr,&v->lowpass,&v->sid_bandpass,
-   p->wave_a,p->wave_b,p->pulse_width,p->pulse_width_b,p->mix,
-   s->cutoff[v->channel],p->drive,p->morph);
+   wa,wb,p->pulse_width,p->pulse_width_b,mix,cut,reso,mode);
+  /* Soft 6581-style asymmetric saturation. Character variations remain
+   * bounded to avoid feeding huge peaks into MASTER dynamics. */
+  if(style==TRACK_CHIP_SID_DIRTY){level=(level*7)/5;
+   if(level>13500)level=13500;if(level< -12500)level=-12500;}
  }break;
  case TRACK_CHIP_VA_OSC:{
   /* Morph between independently tuned and shaped bandlimited oscillators. */

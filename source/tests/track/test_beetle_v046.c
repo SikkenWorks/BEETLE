@@ -33,7 +33,7 @@ static void test_punch(void){
  for(unsigned d=0;d<TRACK_DRUM_COUNT;d++)track_drum_component_default(&project.drum[d],d);
  uint32_t used=0;
  assert(track_store_encode(&project,data,sizeof data,&used)==0);
- assert(data[4]==9u);
+ assert(data[4]==TRACK_STORE_VERSION);
  assert(track_store_decode(&decoded,data,used)==0);
  assert(decoded.song.clips[0].count==4u);
  assert(decoded.song.clips[0].data[1].down==2u);
@@ -48,7 +48,12 @@ static void test_punch(void){
  /* Construct a valid V8 empty-pattern fixture, using CRC recomputation. */
  struct track_engine old;track_init(&old);track_song_init(&project.song,&old);
  assert(track_store_encode(&project,data,sizeof data,&used)==0);
- data[4]=8u;
+ /* Current format extends legacy V8 by two tail bytes. Drop those bytes
+  * and repair size + CRC before validating old-project migration. */
+ used-=2u;data[4]=8u;
+ for(unsigned k=0;k<4u;k++)data[8u+k]=(uint8_t)(used>>(k*8u));
+ uint32_t payload_crc=track_store_crc32(data+24u,used-24u);
+ for(unsigned k=0;k<4u;k++)data[12u+k]=(uint8_t)(payload_crc>>(k*8u));
  uint32_t crc=track_store_crc32(data,16u);
  for(unsigned k=0;k<4u;k++)data[16u+k]=(uint8_t)(crc>>(k*8u));
  assert(track_store_decode(&decoded,data,used)==0);
