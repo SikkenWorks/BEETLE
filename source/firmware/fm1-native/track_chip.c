@@ -135,19 +135,31 @@ void track_chip_set_mono(struct track_chip_engine *s,uint8_t mono){
   struct track_chip_voice keep=s->voices[recent];memset(s->voices,0,sizeof(s->voices));s->voices[0]=keep;s->voice_count=keep.active?1u:0u;
  }
 }
+static void track_chip_tune_voice(struct track_chip_voice *v,const struct track_chip_engine *s){
+ const struct track_va_patch *p=&s->patches[v->instrument];
+ int32_t pitch=0;
+ if(s->fx_type[v->channel]==11u)pitch=(int32_t)((uint32_t)s->fx_value[v->channel]*24u/100u)-12;
+ int32_t a=(int32_t)v->note+(int32_t)p->coarse+pitch;
+ int32_t b=(int32_t)v->note+(int32_t)p->coarse_b+pitch;
+ if(a<0)a=0;if(a>127)a=127;
+ if(b<0)b=0;if(b>127)b=127;
+ v->step=tune_step(note_steps[a],p->fine);
+ v->step2=tune_step(note_steps[b],(int32_t)p->fine_b+(int32_t)p->detune);
+}
+void track_chip_repitch_channel(struct track_chip_engine *s,uint8_t channel){
+ if(!s||channel>=TRACK_SYNTH_CHANNELS)return;
+ for(uint8_t i=0u;i<s->voice_count;i++){
+  struct track_chip_voice *v=&s->voices[i];
+  if(v->active&&v->channel==channel)track_chip_tune_voice(v,s);
+ }
+}
 void track_chip_refresh_instrument(struct track_chip_engine *s,uint8_t instrument){
  if(!s||instrument>=4u)return;
- const struct track_va_patch *p=&s->patches[instrument];
  for(uint8_t i=0u;i<s->voice_count;i++){
   struct track_chip_voice *v=&s->voices[i];
   if(!v->active||v->instrument!=instrument)continue;
   v->type=s->osc_type[instrument]<TRACK_CHIP_TYPES?s->osc_type[instrument]:TRACK_CHIP_RETRO_PULSE;
-  int note_a=(int)v->note+p->coarse;
-  int note_b=(int)v->note+p->coarse_b;
-  if(note_a<0)note_a=0;if(note_a>127)note_a=127;
-  if(note_b<0)note_b=0;if(note_b>127)note_b=127;
-  v->step=tune_step(note_steps[note_a],p->fine);
-  v->step2=tune_step(note_steps[note_b],(int)p->fine_b+(int)p->detune);
+  track_chip_tune_voice(v,s);
   v->envelope_sustain=(1048576u*s->env_sustain[instrument])/100u;
   uint32_t a=(uint32_t)s->env_attack[instrument]*441u;
   uint32_t d=(uint32_t)s->env_decay[instrument]*441u;
@@ -211,11 +223,7 @@ int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrume
  struct track_chip_voice *v=&s->voices[index];
  memset(v,0,sizeof(*v));v->active=1u;v->channel=channel;
  v->type=s->osc_type[instrument]<TRACK_CHIP_TYPES?s->osc_type[instrument]:TRACK_CHIP_RETRO_PULSE;v->note=note;v->instrument=instrument;
- const struct track_va_patch *p=&s->patches[instrument];
- int tuned=(int)note+p->coarse;if(tuned<0)tuned=0;if(tuned>127)tuned=127;
- v->step=tune_step(note_steps[tuned],p->fine);
- int tuned_b=(int)note+p->coarse_b;if(tuned_b<0)tuned_b=0;if(tuned_b>127)tuned_b=127;
- v->step2=tune_step(note_steps[tuned_b],(int)p->fine_b+(int)p->detune);
+ track_chip_tune_voice(v,s);
  v->velocity=velocity;v->birth=++s->alloc_serial;
  v->phase2=0x80000000u;
  /* Envelope rates are computed once on note-on, never divided in the DMA loop. */
@@ -337,7 +345,7 @@ static int32_t beetle_step_fx_voice(int32_t mono,const struct track_chip_engine 
  }else if(fx==6u){ /* Pitch modulation was applied inside sample_one. */
  }else if(fx==7u){ /* Arpeggio: alternating rhythmic gate, not a no-op. */
   uint32_t segment=200u+(100u-v)*60u;
-  if(((s->step_samples/segment)&3u)==3u)mono=0;
+  if(((s->fx_samples[channel]/segment)&3u)==3u)mono=0;
  }else if(fx==3u||fx==4u||fx==5u){
   /* DELAY/REVERB/CHORUS: independent bounded wet memory per synth lane. */
   uint16_t write=beetle_step_write[channel];
@@ -358,11 +366,12 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
  if(!track_chip_health(s))track_chip_recover(s);
  for(uint32_t f=0;f<frames;f++){
   int64_t left=0,right=0;
+  uint8_t foreground=0u; /* count sounding unreleased voices, not historical pool size */
   for(uint8_t i=0;i<s->voice_count;i++){
    struct track_chip_voice *v=&s->voices[i];
    if(!v->active)continue;
    int32_t mono=sample_one(v,s,beetle_step_phase[v->channel]);
-   if(s->step_samples>=s->cut_after[v->channel])continue;
+   if(s->fx_samples[v->channel]>=s->cut_after[v->channel])continue;
    mono=beetle_step_fx_voice(mono,s,v->channel);
    if(s->drive[v->channel]){
     int32_t gain=100+(int32_t)s->drive[v->channel]*4;
@@ -375,6 +384,7 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
     if(m->mute||(solo&&!m->solo))continue;
     vol=m->volume;pan=m->pan;}
    mono=(int32_t)(((int64_t)mono*vol*s->step_gain[v->channel])/10000);
+   if(!v->released && vol && s->step_gain[v->channel])foreground++;
    /* Meter is tapped after lane mute/solo, gain, and step FX. */
    uint32_t peak=(uint32_t)(mono<0?-(int64_t)mono:mono);
    if(peak>32767u)peak=32767u;
@@ -382,9 +392,10 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
    left+=((int64_t)mono*(100-pan))/100;
    right+=((int64_t)mono*(100+pan))/100;
   }
-  /* Bounded gain compensation: single-note lines remain audible, while
-   * denser chords are divided before the final signed-16 saturation. */
-  uint32_t divisor=1u+(uint32_t)s->voice_count/2u;
+  /* Live voice headroom, never the high-water voice_count slot count.
+   * A note at step 0 must be equally loud on loop 1, loop 2 and loop 20.
+   * Exclude short crossfading note-off voices from the denominator. */
+  uint32_t divisor=1u+(uint32_t)foreground/2u;
   /* The mixer output is bounded by eight voices and stays well below signed
    * 32-bit range. Use 32-bit division to avoid pulling the unavailable
    * __divdi3 runtime helper into the FM1 image. */
@@ -399,6 +410,8 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
   int32_t r=bound((int32_t)right,-32767,32767);
   stereo[f*2u]=(int16_t)l;stereo[f*2u+1u]=(int16_t)r;
   s->prev_left=l;s->prev_right=r;s->step_samples++;
+  for(uint8_t ch=0u;ch<TRACK_SYNTH_CHANNELS;ch++)
+   if(s->fx_samples[ch]!=0xFFFFFFFFu)s->fx_samples[ch]++;
   /* One LFO clock per sample regardless of synth voice count. */
   for(uint8_t ch=0;ch<TRACK_SYNTH_CHANNELS;ch++){
    uint8_t kind=s->fx_type[ch];

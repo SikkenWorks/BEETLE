@@ -8,6 +8,7 @@
 #ifndef TRACK_NATIVE_RUNTIME_H
 #define TRACK_NATIVE_RUNTIME_H
 #include "track_core.h"
+#include "track_sustain_fx.h"
 #include "track_name.h"
 #include "track_navigation.h"
 #include "track_lane_clipboard.h"
@@ -54,6 +55,7 @@ static struct track_name_editor track_editor;
 static char track_title[TRACK_NAME_MAX+1u];
 static uint8_t track_named,track_page,track_menu_index,track_fx_cursor,track_osc_cursor,track_osc_bank;
 static uint8_t track_audio_started,track_prev_notes[TRACK_CHANNELS][5];
+static uint8_t track_lane_instrument[TRACK_SYNTH_CHANNELS];
 static uint8_t track_prev_note_count[TRACK_CHANNELS];
 static uint32_t track_audio_clock,track_last_poll,track_last_paint,track_home_since;
 static uint8_t track_swing_pending_mask;
@@ -134,6 +136,7 @@ static void beetle_project_apply(void){
  track_state.pattern_slot=0u;track_state.active=track_song.patterns[0];
  track_state.project_slot=beetle_staged.slot;
  track_chip_silence(&track_chip);track_drum_stop(&track_drum);
+ for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++)track_lane_instrument[c]=(uint8_t)(c&3u);
  for(uint8_t i=0u;i<4u;i++){
   const struct track_store_instrument *v=&beetle_staged.instruments[i];
   track_chip.osc_type[i]=v->type;track_chip.patches[i]=v->va;
@@ -148,6 +151,16 @@ static void beetle_project_apply(void){
   track_chip.duty[i]=(uint8_t)(v->duty<19u?0u:v->duty<38u?1u:v->duty<63u?2u:3u);
   track_chip.cutoff[i]=(uint8_t)(v->cutoff/75u>250u?250u:v->cutoff/75u);
  }
+ for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++){
+  uint8_t instrument=track_lane_instrument[c];
+  const struct track_instrument_ui_values *ins=&track_ui_inst[instrument];
+  track_chip.duty[c]=(uint8_t)(ins->duty<19u?0u:ins->duty<38u?1u:ins->duty<63u?2u:3u);
+  track_chip.cutoff[c]=(uint8_t)(ins->cutoff/75u>250u?250u:ins->cutoff/75u);
+  track_chip.fx_type[c]=0u;track_chip.fx_value[c]=50u;
+  track_chip.drive[c]=0u;track_chip.step_gain[c]=100u;
+  track_chip.cut_after[c]=0xFFFFFFFFu;track_chip.fx_samples[c]=0u;
+ }
+ track_drum.step_gain=100u;
  for(uint8_t i=0u;i<TRACK_NAME_MAX;i++)track_title[i]=beetle_staged.title[i];
  track_title[TRACK_NAME_MAX]=0;track_named=1u;track_slot_seen[track_state.project_slot]=1u;
  track_state.dirty=0u;
@@ -287,6 +300,7 @@ static void track_fm1_boot(void){
 #endif
  for(uint8_t k=0u;k<27u;k++){track_edit_voice_key[k]=255u;track_edit_order[k]=0u;}
  for(uint8_t c=0;c<TRACK_CHANNELS;c++)track_prev_note_count[c]=0u;
+ for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++)track_lane_instrument[c]=(uint8_t)(c&3u);
  for(uint8_t i=0;i<TRACK_NAME_MAX+1u;i++)track_title[i]=0;
  /* Disable ETCH's built-in ARP/sequence; TRACK drives its notes in ALNK0. */
  native_controls.arp_mode=0u;
@@ -298,6 +312,16 @@ static void track_fm1_boot(void){
 static void track_audio_all_off(struct etch_native_audio *audio){
  (void)audio;
  track_chip_silence(&track_chip);track_drum_stop(&track_drum);
+ /* A stopped transport is a fresh musical session. Clear automation,
+  * but do not change the saved tracker pattern or instrument patches. */
+ for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++){
+  const struct track_instrument_ui_values *ins=&track_ui_inst[track_lane_instrument[c]];
+  struct track_step stop={TRACK_NOTE_STOP,0u,0u,0u,50u};
+  uint8_t duty=(uint8_t)(ins->duty<19u?0u:ins->duty<38u?1u:ins->duty<63u?2u:3u);
+  uint8_t cutoff=(uint8_t)(ins->cutoff/75u>250u?250u:ins->cutoff/75u);
+  beetle_step_fx_event(&track_chip,c,&stop,duty,cutoff,track_state.transport.bpm);
+ }
+ track_drum.step_gain=100u;
  for(uint8_t c=0;c<TRACK_CHANNELS;c++)track_prev_note_count[c]=0u;
 }
 static void track_audio_fire(struct etch_native_audio *audio,uint8_t lane_mask){
@@ -320,30 +344,22 @@ static void track_audio_fire(struct etch_native_audio *audio,uint8_t lane_mask){
  for(uint8_t c=0;c<TRACK_DRUM_CHANNEL;c++){
   if(!(lane_mask&(1u<<c)))continue;
   const struct track_step *s=&track_state.active.ch[c][position];
-  instruments[c]=s->instrument;
-  /* V0.38: all displayed step effects routed to their DSP slot. */
-  /* Restore instrument base controls on every lane, including CH5.
-   * The extra lane shares the four available preset instruments, not a
-   * fifth oscillator patch. Per-step filter FX overrides this baseline. */
+  /* The current note's instrument stays selected throughout its sustain.
+   * Empty steps must not reset EQ, volume, or step FX. */
+  if(s->note<=127u)track_lane_instrument[c]=s->instrument;
+  instruments[c]=track_lane_instrument[c];
   const struct track_instrument_ui_values *ins=&track_ui_inst[instruments[c]];
-  track_chip.duty[c]=(uint8_t)(ins->duty<19u?0u:ins->duty<38u?1u:ins->duty<63u?2u:3u);
-  track_chip.cutoff[c]=(uint8_t)(ins->cutoff/75u>250u?250u:ins->cutoff/75u);
-  track_chip.fx_type[c]=s->effect;
-  track_chip.fx_value[c]=s->value;
-  track_chip.drive[c]=(s->effect==2u)?s->value:0u;
-  track_chip.cut_after[c]=(s->effect==8u)?
-   (uint32_t)(((uint64_t)(661500u/(track_state.transport.bpm?track_state.transport.bpm:120u))*s->value)/100u):0xFFFFFFFFu;
-  /* Per-step filter value: V0.5 native one-pole cutoff only. */
-  if(s->effect==1u)track_chip.cutoff[c]=(uint8_t)(4u+(uint32_t)s->value*2u);
-
-  if(s->effect==TRACK_FX_VOLUME)track_chip.step_gain[c]=s->value;
+  uint8_t duty=(uint8_t)(ins->duty<19u?0u:ins->duty<38u?1u:ins->duty<63u?2u:3u);
+  uint8_t cutoff=(uint8_t)(ins->cutoff/75u>250u?250u:ins->cutoff/75u);
+  beetle_step_fx_event(&track_chip,c,s,duty,cutoff,track_state.transport.bpm);
   if(s->note==TRACK_NOTE_STOP){track_chip_release_channel(&track_chip,c);continue;}
   velocity[c]=track_mixer_velocity(&track_mix,c,94u)?94u:0u;
   if(s->note==TRACK_NOTE_EMPTY || (track_state.punch_mask&(1u<<7)) || velocity[c]==0u)continue;
   int32_t note=(int32_t)s->note;
   if(track_state.punch_mask&(1u<<5))note+=12;
   if(track_state.punch_mask&(1u<<6))note-=12;
-  if(s->effect==11u)note+=(int32_t)((uint32_t)s->value*24u/100u)-12; /* PITCH */
+  /* PITCH is applied in DSP to the original note, including on sustained
+   * notes. Do not pre-transpose as that would double the effect. */
   if(note<0)note=0;if(note>127)note=127;
   /* EMPTY sustains; STP stops; a NEW note fades out earlier pitches of
    * this SAME lane, avoiding stuck chords across repeated patterns. */
@@ -712,7 +728,7 @@ static void track_fm1_paint(void){
   track_pix_center(slot,120u,77u,TRACK_PINK);
   track_pix_center("SELECT = YES",120u,112u,TRACK_WHITE);
   track_pix_center("HOME = NO",120u,134u,TRACK_WHITE);
-  track_pix_center("CONFIRM OVERWRITE",120u,192u,TRACK_BRIGHT);
+  track_pix_center("ONLY THIS SLOT CHANGES",120u,192u,TRACK_BRIGHT);
   return;
  }
  if(track_page==10u){
@@ -911,7 +927,7 @@ static void track_fm1_paint(void){
  }
  if(track_page==12u){
   track_page_header("BEETLE STORAGE",43u);
-  track_pix_center("ERASES OLD USER DATA",120u,70u,TRACK_PINK);
+  track_pix_center("ERASE ALL 12 SLOTS?",120u,70u,TRACK_PINK);
   track_pix_center("ETCH/FELUCCA INCLUDED",120u,98u,TRACK_WHITE);
   track_pix_center("FULL FLASH BACKUP FIRST",120u,120u,TRACK_BRIGHT);
   track_pix_center("HOLD SELECT + SAVE",120u,154u,TRACK_PINK);
@@ -974,8 +990,15 @@ static void track_complete_save(void){
  }
  beetle_project_capture(track_state.project_slot);
  if(beetle_storage_last_audit!=BEETLE_CLAIM_EXISTING){
+  /* First-use blank flash can be explicitly provisioned, erasing ALL slots.
+   * An overwrite of a previously initialized volume NEVER offers this
+   * destructive route. Foreign/corrupt ownership requires recovery. */
+  if(beetle_storage_last_audit==BEETLE_CLAIM_BLANK && !track_overwrite_wait){
+   track_storage_result=TRACK_JOURNAL_NO_PROJECT;
+   track_page=12u;track_storage_confirm_since=0u;native_start();return;
+  }
   track_storage_result=TRACK_JOURNAL_FOREIGN;
-  track_page=12u;track_storage_confirm_since=0u;native_start();return;
+  track_page=8u;native_start();return;
  }
  track_storage_result=beetle_project_save_staged();
  if(track_storage_result==TRACK_JOURNAL_OK){track_named=1u;track_slot_seen[track_state.project_slot]=1u;track_state.dirty=0u;}
@@ -994,6 +1017,7 @@ static void beetle_project_new_session(void){
  track_mixer_init(&track_mix);track_drum_init(&track_drum);
  track_chip_init(&track_chip);track_punch_clear(&track_rec_events);
  track_ui_inst_reset();
+ for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++)track_lane_instrument[c]=(uint8_t)(c&3u);
  track_state.project_slot=selected;track_state.dirty=0u;
  track_live_punch_mask=0u;track_replay_punch_mask=0u;
  track_swing_pending_mask=0u;track_preview_mask=0u;

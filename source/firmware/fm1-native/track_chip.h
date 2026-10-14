@@ -50,6 +50,7 @@ struct track_chip_engine {
  uint8_t mono; /* 1: held last note priority; 0: up to 8 voices */
  uint32_t alloc_serial,steal_count,restart_count,health_cookie;
  uint32_t step_samples,cut_after[TRACK_CHANNELS];
+ uint32_t fx_samples[TRACK_SYNTH_CHANNELS]; /* FX age survives empty tracker steps */
  uint16_t release_left;
  int32_t prev_left,prev_right,tail_left,tail_right;
  /* Bounded, zero-allocation punch history; 512 stereo samples = 2 KiB. */
@@ -66,6 +67,8 @@ struct track_mixer;
 void track_chip_init(struct track_chip_engine *s);
 void track_chip_fx_reset(void);
 void track_chip_begin_step(struct track_chip_engine *s);
+/* Apply FX to already-held voices without re-triggering the ADSR. */
+void track_chip_repitch_channel(struct track_chip_engine *s,uint8_t channel);
 /* Returns 1 when voice accepted, 0 when pool is at capacity. */
 int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrument,uint8_t note,uint8_t velocity);
 void track_chip_silence(struct track_chip_engine *s);

@@ -1,3 +1,19 @@
+# BEETLE V0.45 — Isolated Overwrite, Persistent Step FX & Stable Loop Loudness
+
+This version fixes three concrete regressions in BEETLE V0.44:
+
+1. **SAVE / OVERWRITE is slot-local.** The UI now states "ONLY THIS SLOT CHANGES". A journal commit addresses only the selected slot and its two A/B banks; the other eleven slots are untouched. On an already-provisioned volume, a failure to recognize flash ownership causes a **non-destructive error**, never a prompt to format everything. A genuinely blank, first-use volume can still be initialized separately with an explicit five-second SELECT+SAVE confirmation; **that initial format erases all twelve slots** and may destroy pre-existing ETCH/Felucca data. There is no automatic erase at boot.
+2. **Synth step effects sustain over empty steps** until `[STP]`, a new note, or another step effect on the same lane. The latter replaces the current effect on an already sounding voice. An effect-only PITCH row retunes active oscillator(s) without retriggering ADSR. Each lane has an independent effect-age counter that does not restart at every step boundary. Stop and project load clear stale automation.
+3. **Loop loudness no longer falls because the voice-pool high-water count increases.** Headroom normalization uses currently sounding *unreleased* synth voices, not previously allocated voice slots. The regression renders fourteen consecutive note retriggers and asserts a stable late-window energy.
+
+The existing **V8 project serialization is unchanged**. V0.37/V0.40 migration fixtures remain in the regression suite. The V0.44 ROM digital drum kit and stock-V15 installer identification remain included and unchanged.
+
+**Software validation only.** The three JieLi builds and host/OTA integrity checks pass, but the FM1 hardware, physical flash map, and real stock-flashing/restore path have **not** been proven safe. The storage-enabled build can erase data when the user deliberately provisions the volume. Make a complete verified backup and establish independent recovery before hardware flashing.
+
+Run `bash tests/track/run_v045.sh` from `source/` and `node tests/ota/test_stock_install_v045.cjs` for the new tests.
+
+---
+
 # BEETLE Firmware
 
 ## V0.44 — A sample-ROM digital drum kit (14 instruments / 16 one-shots)
