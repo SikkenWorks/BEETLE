@@ -13,7 +13,8 @@
 #define TRACK_CHIP_RETRO_WAVE 1u
 #define TRACK_CHIP_VA_OSC 2u
 #define TRACK_CHIP_VA_OSC2 3u
-#define TRACK_CHIP_TYPES 4u
+#define TRACK_CHIP_RESID_LITE 4u
+#define TRACK_CHIP_TYPES 5u
 /* VA shapes: harmonic-limited saw, triangle, square, sine, variable-width pulse. */
 #define TRACK_VA_SHAPES 5u
 struct track_va_patch {
@@ -34,7 +35,7 @@ int track_va_patch_valid(const struct track_va_patch *p);
 #define TRACK_CHIP_NOISE TRACK_CHIP_VA_OSC2
 struct track_chip_voice {
  uint32_t phase,phase2,step,step2,lfsr,noise_clock,birth;
- int32_t lowpass,last_level;
+ int32_t lowpass,last_level,sid_bandpass;
  uint16_t release_left;
  uint32_t envelope,attack_rate,decay_rate,release_rate,envelope_sustain;
  uint8_t env_stage; /* 0 A, 1 D, 2 S, 3 R */

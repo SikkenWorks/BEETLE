@@ -1,5 +1,6 @@
 /* TRACK 0.5 native chip-inspired oscillator DSP, GPL-3.0-only. */
 #include "track_chip.h"
+#include "beetle_sid_lite.h"
 #include "track_mixer.h"
 #include <string.h>
 /* Exact note-to-Q32 increments generated offline; no libm in firmware. */
@@ -226,6 +227,7 @@ int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrume
  track_chip_tune_voice(v,s);
  v->velocity=velocity;v->birth=++s->alloc_serial;
  v->phase2=0x80000000u;
+ v->lfsr=0x7ffff8u;
  /* Envelope rates are computed once on note-on, never divided in the DMA loop. */
  const uint32_t unit=1048576u;
  uint32_t a=(uint32_t)s->env_attack[instrument]*441u;
@@ -257,6 +259,12 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   level=v->phase<ratios[s->duty[v->channel]&3u]?11000:-11000;
  }break;
  case TRACK_CHIP_RETRO_WAVE:level=((int32_t)retro_wave[v->phase>>27u]-8)*1800;break;
+ case TRACK_CHIP_RESID_LITE:{
+  const struct track_va_patch *p=&s->patches[v->instrument];
+  level=beetle_sid_sample(v->phase,step,&v->lfsr,&v->lowpass,&v->sid_bandpass,
+   p->wave_a,p->wave_b,p->pulse_width,p->pulse_width_b,p->mix,
+   s->cutoff[v->channel],p->drive,p->morph);
+ }break;
  case TRACK_CHIP_VA_OSC:{
   /* Morph between independently tuned and shaped bandlimited oscillators. */
   const struct track_va_patch *p=&s->patches[v->instrument];

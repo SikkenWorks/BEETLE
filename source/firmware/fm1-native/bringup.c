@@ -172,7 +172,7 @@ static volatile uint32_t native_nested_ticks, native_nested_count;
 #define ETCH_NATIVE_OTA 0
 #endif
 #define FELUCCA_OTA ETCH_NATIVE_OTA
-#define FELUCCA_ID "FM-1_2047"
+#define FELUCCA_ID "FM-1_2051"
 #define ETCH_UI_VERSION "V043"
 #define FELUCCA_OTA_DRYRUN 0
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
@@ -274,12 +274,26 @@ static void label_large(const char *text,uint32_t x,uint32_t y,uint16_t color){
 /* Boot branding is intentionally shown before the audio IRQ begins.
  * No waiting in the realtime audio thread or application main loop. */
 /* Original 240 x 240 animated splash, no scaling or extra UI. */
+#ifdef TRACK_FIRMWARE
+static uint32_t beetle_boot_next_ms;
+static uint8_t beetle_boot_frame;
+static uint8_t beetle_boot_active;
+/* Keep compositing bounded to the main/UI thread. No sleeps or drawing in ISR. */
+static void beetle_boot_advance(void){
+ if(!beetle_boot_active || native_safe || native_tripped)return;
+ if((int32_t)(etch_ms-beetle_boot_next_ms)<0)return;
+ beetle_boot_frame^=1u;
+ beetle_boot_art(beetle_boot_frame);lcd_sync();fm1_wdt_feed();
+ /* Use a fresh deadline: a slow LCD frame never creates a backlog. */
+ beetle_boot_next_ms=etch_ms+100u;
+}
+#endif
 static void etch_boot_splash(void){
 #ifdef TRACK_FIRMWARE
- for(uint8_t f=0u;f<2u;f++){
-  beetle_boot_art(f);lcd_sync();fm1_wdt_feed();
-  fm1_delay_ms(100u);fm1_wdt_feed();
- }
+ beetle_boot_frame=0u;
+ beetle_boot_active=1u;
+ beetle_boot_art(0u);lcd_sync();fm1_wdt_feed();
+ beetle_boot_next_ms=etch_ms+100u;
 #else
  lcd_fill(0,0,240,240,0x0000);
  label_large("SIKKENWORKS",32,95,0xffff);
@@ -2136,6 +2150,9 @@ void fm1_cstart(void){
  uint8_t muted=safe;native_boot_muted=muted;
  if(!safe)etch_boot_splash();
  usb_start();
+#ifdef TRACK_FIRMWARE
+ beetle_boot_advance();
+#endif
  etch_editor_init(&native_editor);
  etch_fx_defaults(&native_fx_settings);
  etch_factory_seed(&native_library);
@@ -2190,6 +2207,7 @@ void fm1_cstart(void){
 /* Initialise BEETLE state BEFORE audio ISR starts reading it. */
 #ifdef TRACK_FIRMWARE
  track_fm1_boot();
+ beetle_boot_advance();
 #endif
  if(!muted&&etch_recovery_may_run_audio(native_recovery_reason)){fm1_irq_off();native_start();fm1_irq_enable_all();}
  uint32_t last=0,held=0,previous_buttons=fm1_in.buttons,last_seq_notes=fm1_in.notes,last_ui_paint_ms=0;
@@ -2208,6 +2226,12 @@ void fm1_cstart(void){
      native_output_analog_ready);
   }
   fm1_wdt_feed();
+#ifdef TRACK_FIRMWARE
+  /* The splash is retained until the tracker can be painted. */
+  if(!safe && !native_updating && !native_tripped && !native_screen_gate.ready)
+   beetle_boot_advance();
+  else if(native_screen_gate.ready)beetle_boot_active=0u;
+#endif
   usb_retry(etch_ms);
   /* MASTER is a performance control, not an LCD refresh event.
    * Its ADC gets polled five times as often as the legacy UI tick;
