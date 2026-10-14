@@ -1,5 +1,7 @@
 # BEETLE
-
+<p align="center">
+  <img src="BEETLE.png" alt="BEETLE" width="400">
+</p>
 **An open-source, six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks — Born out of passion.**
 
