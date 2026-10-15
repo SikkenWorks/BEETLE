@@ -126,7 +126,7 @@ In the tracker while transport is stopped, hold **SEQ** and press the physical b
 | Tracker | **SEQ + OP2** | Paste that lane, including notes, instruments and step FX, into the current lane/pattern. The clipboard survives changing lanes/patterns. |
 | Mixer | **GLO** | Open/close the mixer. Six black OP keys can mute CH1–CH6; their LEDs indicate mute. |
 | Instrument Edit | **EDIT** | Open instrument parameters; on the next EDIT page access the drum component editor. |
-| Song | **ARP** | Open Song Mode (not GLO double-click). |
+| Song | **ARP** | Open Song Mode. |
 | Master | **LFO** | Open the master EQ/compressor/reverb chain. |
 | Punch-In | **REC / Punch-In screen** | Hold a Punch-In key for an effect; ALGORITHM adjusts that effect's stored setting. |
 | Projects | **SAVE / LOAD menus** | Work with 12 slots. A project stores patterns, instruments, mixer, drums, MASTER settings, song data and five Punch-In ALGORITHM parameters. |
