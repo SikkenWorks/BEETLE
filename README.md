@@ -4,6 +4,30 @@
 
 # BEETLE
 
+
+<div align="center">
+
+  <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html">
+    <img
+      src="https://img.shields.io/badge/▲_INSTALL_BEETLE_(CHROME%2FEDGE)-000000?style=for-the-badge&logoColor=white"
+      alt="Install BEETLE (Chrome/Edge)"
+      width="450"
+    />
+  </a>
+
+  <br><br>
+
+  <a href="https://sikkenworks.github.io/BEETLE/simulator.html">
+    <img
+      src="https://img.shields.io/badge/▶_WEB_SIMULATOR-000000?style=for-the-badge&logoColor=white"
+      alt="Launch BEETLE Web Simulator"
+      width="450"
+    />
+  </a>
+
+</div>
+
+
 **An open-source, six-lane tracker for the M-VAVE FM1.**  
 **SikkenWorks — Born out of passion.**
 
