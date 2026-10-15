@@ -20,7 +20,9 @@ CH6 ENV now updates only the focused drum note (NOTE1 or NOTE2). The WebSimulato
   </a>
 </div>
 
-# BEETLE
+<p align="center">
+  <img src="BEETLE.png" alt="BEETLE" width="400">
+</p>
 
 **Open-source six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks · Joppe Sikken · Born out of passion.**
