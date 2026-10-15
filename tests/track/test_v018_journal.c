@@ -1,8 +1,10 @@
-/* Host-only fault-injection tests for TRACK V0.18 A/B journal. */
+/* Host-only TRACK V0.18 A/B tests, adapted to V0.71 current V16 project defaults. */
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include "track_journal.h"
+#include "track_master_fx.h"
+#include "beetle_instrument_library.h"
 static uint8_t disk[4][2][TRACK_JOURNAL_BANK_BYTES];
 static int errors=0, operations=0, fail_operation=-1, erases=0;
 #define REQUIRE(X) do { if(!(X)){fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#X);errors++;} } while(0)
@@ -25,7 +27,13 @@ static struct track_store_project project,readback;
 static uint8_t scratch[TRACK_STORE_MAX];
 static void init_project(uint8_t slot){
  struct track_engine e;track_init(&e); memset(&project,0,sizeof(project));
- track_song_init(&project.song,&e);track_mixer_init(&project.mixer);
+ track_song_init(&project.song,&e);track_mixer_init(&project.mixer);track_master_default(&project.master);
+ project.mixer.quantize_mutes=1;
+ for(uint8_t k=0;k<4;k++){project.instruments[k].volume=65;project.instruments[k].duty=50;
+  project.instruments[k].cutoff=7000;project.instruments[k].type=k;
+  track_va_patch_default(&project.instruments[k].va);}
+ for(uint8_t k=0;k<TRACK_DRUM_COUNT;k++)track_drum_timbre_default(&project.drum[k]);
+ beetle_library_init(&project.library);
  project.slot=slot;project.bpm=120;memcpy(project.title,"TRACK JOURNAL",12);
 }
 int main(void){
@@ -40,7 +48,7 @@ int main(void){
   struct track_journal_status st={0};
   REQUIRE(track_journal_load(&io,slot,&readback,scratch,sizeof(scratch),&st)==TRACK_JOURNAL_NO_PROJECT);
   REQUIRE(track_journal_save(&io,slot,&project,scratch,sizeof(scratch),&st)==TRACK_JOURNAL_OK);
-  REQUIRE(st.generation==1u&&st.active_bank==0u&&st.payload_bytes>15000u);
+  REQUIRE(st.generation==1u&&st.active_bank==0u&&st.payload_bytes<TRACK_JOURNAL_BANK_BYTES);
   REQUIRE(track_journal_load(&io,slot,&readback,scratch,sizeof(scratch),&st)==TRACK_JOURNAL_OK);
   REQUIRE(readback.slot==slot&&readback.song.patterns[47].ch[3][15].note==2u);
   REQUIRE(readback.song.patterns[47].ch[0][0].note==(uint8_t)(61u+slot));

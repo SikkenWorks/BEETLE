@@ -7,19 +7,27 @@
 #include "track_song.h"
 #define BEETLE_UNDO_CAP 6u
 #define BEETLE_BLOCK_ACTIONS 7u
+/* One chronological six-entry history for all edit contexts. Non-pattern
+ * snapshots reuse the existing pattern-image bytes; no second history pool. */
+#define BEETLE_EDIT_PATTERN 0u
+#define BEETLE_EDIT_MIXER 1u
+#define BEETLE_EDIT_INSTRUMENT 2u
+#define BEETLE_EDIT_SONG 3u
+#define BEETLE_EDIT_MASTER 4u
+#define BEETLE_EDIT_LIBRARY 5u
 struct beetle_pattern_image {
  struct track_pattern pattern;
  struct track_song_clip punch;
 };
 struct beetle_history_entry {
  struct beetle_pattern_image state;
- uint8_t pattern_index;
+ uint8_t pattern_index,kind;
 };
 struct beetle_pattern_editor {
  struct beetle_history_entry history[BEETLE_UNDO_CAP];
  struct beetle_pattern_image *pending,*whole_clip;
  struct track_step *block;
- uint8_t cursor,count,pending_valid,pending_index,whole_valid,block_valid,block_count;
+ uint8_t cursor,count,pending_valid,pending_index,pending_kind,whole_valid,block_valid,block_count;
  uint8_t first,last,action;
  int8_t amount;
  uint8_t status;
@@ -40,10 +48,47 @@ static inline void beetle_edit_capture(struct beetle_pattern_image *img,const st
 static inline void beetle_edit_begin(struct beetle_pattern_editor *ed,const struct track_song_bank *bank,const struct track_engine *eng){
  if(!ed||!bank||!eng||ed->pending_valid)return;
  beetle_edit_capture(ed->pending,bank,eng);
- ed->pending_index=eng->pattern_slot;ed->pending_valid=1u;
+ ed->pending_index=eng->pattern_slot;ed->pending_kind=BEETLE_EDIT_PATTERN;ed->pending_valid=1u;
+}
+static inline void beetle_edit_push(struct beetle_pattern_editor *ed){
+ if(ed->cursor<ed->count)ed->count=ed->cursor;
+ if(ed->count==BEETLE_UNDO_CAP){
+  for(uint8_t i=1u;i<BEETLE_UNDO_CAP;i++)ed->history[i-1u]=ed->history[i];
+  ed->count--;if(ed->cursor)ed->cursor--;
+ }
+ struct beetle_history_entry *entry=&ed->history[ed->count++];
+ entry->state=*ed->pending;entry->pattern_index=ed->pending_index;
+ entry->kind=ed->pending_kind;ed->cursor=ed->count;
+}
+/* Generic state history is always captured outside the audio ISR; size must
+ * fit in the existing (larger) pattern snapshot allocation. */
+static inline uint8_t beetle_edit_begin_bytes(struct beetle_pattern_editor *ed,
+ uint8_t kind,uint8_t index,const void *current,uint32_t size){
+ if(!ed||!current||ed->pending_valid||size>sizeof(struct beetle_pattern_image)||
+    !size||kind==BEETLE_EDIT_PATTERN)return 0u;
+ const uint8_t *src=(const uint8_t*)current;uint8_t *dst=(uint8_t*)ed->pending;
+ for(uint32_t i=0;i<size;i++)dst[i]=src[i];
+ ed->pending_index=index;ed->pending_kind=kind;ed->pending_valid=1u;return 1u;
+}
+static inline uint8_t beetle_edit_commit_bytes(struct beetle_pattern_editor *ed,
+ uint8_t kind,uint8_t index,const void *current,uint32_t size){
+ if(!ed||!ed->pending_valid||!current||size>sizeof(struct beetle_pattern_image)||
+    ed->pending_kind!=kind||ed->pending_index!=index){
+  if(ed)ed->pending_valid=0u;return 0u;
+ }
+ const uint8_t *before=(const uint8_t*)ed->pending,*after=(const uint8_t*)current;
+ uint8_t diff=0u;for(uint32_t i=0;i<size;i++)if(before[i]!=after[i]){diff=1u;break;}
+ ed->pending_valid=0u;if(diff)beetle_edit_push(ed);return diff;
+}
+static inline uint8_t beetle_edit_swap_bytes(struct beetle_pattern_editor *ed,
+ uint8_t at,void *current,uint32_t size){
+ if(!ed||!current||at>=ed->count||size>sizeof(struct beetle_pattern_image))return 0u;
+ uint8_t *a=(uint8_t*)current,*b=(uint8_t*)&ed->history[at].state;
+ for(uint32_t i=0;i<size;i++){uint8_t tmp=a[i];a[i]=b[i];b[i]=tmp;}
+ return 1u;
 }
 static inline int beetle_edit_commit(struct beetle_pattern_editor *ed,const struct track_song_bank *bank,const struct track_engine *eng){
- if(!ed||!ed->pending_valid)return 0;
+ if(!ed||!ed->pending_valid||ed->pending_kind!=BEETLE_EDIT_PATTERN)return 0;
  if(ed->pending_index!=eng->pattern_slot){ed->pending_valid=0u;return 0;}
  ed->pending_valid=0u;
  uint8_t changed=0u;
@@ -55,14 +100,7 @@ static inline int beetle_edit_commit(struct beetle_pattern_editor *ed,const stru
   for(uint32_t i=0u;i<sizeof(ed->pending->punch);i++)if(before[i]!=after[i]){changed=1u;break;}
  }
  if(!changed)return 0;
- if(ed->cursor<ed->count)ed->count=ed->cursor; /* invalidate redo branch */
- if(ed->count==BEETLE_UNDO_CAP){
-  for(uint8_t i=1u;i<BEETLE_UNDO_CAP;i++)ed->history[i-1u]=ed->history[i];
-  ed->count--;if(ed->cursor)ed->cursor--;
- }
- struct beetle_history_entry *entry=&ed->history[ed->count++];
- entry->state=*ed->pending;entry->pattern_index=eng->pattern_slot;
- ed->cursor=ed->count;return 1;
+ beetle_edit_push(ed);return 1;
 }
 static inline int beetle_edit_apply_image(struct track_song_bank *bank,struct track_engine *eng,uint8_t pat,const struct beetle_pattern_image *img){
  if(!bank||!eng||!img||pat>=TRACK_PATTERNS)return 0;
@@ -76,6 +114,7 @@ static inline int beetle_edit_apply_image(struct track_song_bank *bank,struct tr
  * image against the pattern currently in RAM. Only one history image/action. */
 static inline int beetle_edit_swap(struct beetle_pattern_editor *ed,struct track_song_bank *bank,struct track_engine *eng,uint8_t index){
  struct beetle_history_entry *entry=&ed->history[index];
+ if(entry->kind!=BEETLE_EDIT_PATTERN)return 0;
  if(entry->pattern_index!=eng->pattern_slot)(void)track_song_switch(bank,eng,entry->pattern_index);
  beetle_edit_capture(ed->pending,bank,eng);
  (void)beetle_edit_apply_image(bank,eng,entry->pattern_index,&entry->state);
@@ -83,11 +122,11 @@ static inline int beetle_edit_swap(struct beetle_pattern_editor *ed,struct track
  return 1;
 }
 static inline int beetle_edit_undo(struct beetle_pattern_editor *ed,struct track_song_bank *bank,struct track_engine *eng){
- if(!ed||!ed->cursor||ed->pending_valid)return 0;
+ if(!ed||!ed->cursor||ed->pending_valid||ed->history[ed->cursor-1u].kind!=BEETLE_EDIT_PATTERN)return 0;
  return beetle_edit_swap(ed,bank,eng,--ed->cursor);
 }
 static inline int beetle_edit_redo(struct beetle_pattern_editor *ed,struct track_song_bank *bank,struct track_engine *eng){
- if(!ed||ed->cursor>=ed->count||ed->pending_valid)return 0;
+ if(!ed||ed->cursor>=ed->count||ed->pending_valid||ed->history[ed->cursor].kind!=BEETLE_EDIT_PATTERN)return 0;
  return beetle_edit_swap(ed,bank,eng,ed->cursor++);
 }
 static inline void beetle_edit_copy_pattern(struct beetle_pattern_editor *ed,const struct track_song_bank *bank,const struct track_engine *eng){

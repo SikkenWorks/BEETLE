@@ -148,7 +148,7 @@ static void etch_scope_stroke(uint32_t x,uint32_t prior,uint32_t current,uint16_
  if(hi>=upper)hi=upper-1u;
  if(lo<=hi)etch_ui_fill(x,lo,1u,hi-lo+1u,color);
 }
-extern uint32_t _bss_start[],_bss_end[],_pool_start[],_pool_end[];
+extern uint32_t _bss_start[],_bss_end[],_pool_start[],_pool_end[],_usb_audio_start[],_usb_audio_end[];
 extern uint32_t _data_load[],_data_start[],_data_end[],_rt_load[];
 extern void isr_timer5(void);
 volatile uint32_t etch_ms;
@@ -172,7 +172,7 @@ static volatile uint32_t native_nested_ticks, native_nested_count;
 #define ETCH_NATIVE_OTA 0
 #endif
 #define FELUCCA_OTA ETCH_NATIVE_OTA
-#define FELUCCA_ID "FM-1_2063"
+#define FELUCCA_ID "FM-1_2101"
 #define ETCH_UI_VERSION "V043"
 #define FELUCCA_OTA_DRYRUN 0
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
@@ -1187,7 +1187,7 @@ static uint8_t first_frame=1;
  * Keep the graph in the RAM DMA canvas; no full-screen clear on note changes. */
 static uint8_t web_last_page=255u,web_last_draw=255u,web_last_fault=255u;
 static uint32_t web_last_controls=0xffffffffu;
-static int16_t web_scope_frame[1024] __attribute__((section(".pool"))); /* zero-initialized scope staging */
+static int16_t web_scope_frame[1024] __attribute__((section(".usb_audio_ram"))); /* zero-initialized scope staging */
 static uint8_t web_scope_sweep;
 static uint8_t web_last_signal=255u;
 /* PLAY display-only note release state. Never changes the audio path. */
@@ -2132,6 +2132,7 @@ void fm1_cstart(void){
  fm1_irq_init();
  for(d=_bss_start;d<_bss_end;d++)*d=0;
  for(d=_pool_start;d<_pool_end;d++)*d=0;
+ for(d=_usb_audio_start;d<_usb_audio_end;d++)*d=0;
  beetle_lcd_guard_init();
  for(s=_data_load,d=_data_start;d<_data_end;s++,d++)*d=*s;
  for(s=_rt_load,d=_rt_start;d<_rt_end;s++,d++)*d=*s;

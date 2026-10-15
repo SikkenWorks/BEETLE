@@ -5,11 +5,11 @@
 #include "track_punch_events.h"
 int main(void){
  struct track_mixer m;track_mixer_init(&m);
- assert(m.row==0&&m.col==0&&m.ch[0].volume==80);
+ assert(m.row==0&&m.col==0&&m.ch[0].volume==50);
  track_mixer_move(&m,1,1);assert(m.row==1&&m.col==1);
  track_mixer_change(&m,-40);assert(m.ch[1].pan==-40);
  track_mixer_move(&m,-8,-8);assert(m.row==0&&m.col==0);
- track_mixer_change(&m,10000);assert(m.ch[0].volume==100);
+ track_mixer_change(&m,10000);assert(m.ch[0].volume==120);
  track_mixer_change(&m,-10000);assert(m.ch[0].volume==0);
  track_mixer_change(&m,80);assert(track_mixer_velocity(&m,0,100)==80);
  track_mixer_move(&m,0,2);track_mixer_change(&m,1);

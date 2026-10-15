@@ -33,10 +33,49 @@ static void pack_bits(uint8_t *p,uint32_t *bit,uint32_t value,uint8_t count){
 static uint32_t unpack_bits(const uint8_t *p,uint32_t *bit,uint8_t count){
  uint32_t v=0u;for(uint8_t k=0;k<count;k++){uint32_t at=(*bit)++;v|=((uint32_t)((p[at>>3]>>(at&7u))&1u))<<k;}return v;
 }
+/* V0.74 fail-closed preflight: the prior encoder checked only capacity and
+ * selected fields, so it could commit a CRC-correct project that the decoder
+ * would subsequently reject (e.g. BPM 0, an invalid song chain, or an invalid
+ * master FX order). Validate the actual current V17 on-flash contract BEFORE asking
+ * the journal backend to erase a bank. No schema or flash layout changes. */
+static uint8_t track_store_preflight(const struct track_store_project *p){
+ if(p->slot>=TRACK_PROJECTS || p->bpm<30u || p->bpm>300u ||
+    p->harmony.root>=12u || p->harmony.mode>=9u || p->harmony.keylock>2u ||
+    p->song.count<1u || p->song.count>TRACK_SONG_ENTRIES ||
+    p->song.loop>1u || p->song.enabled>1u || p->mixer.quantize_mutes>1u)return 0u;
+ for(uint8_t k=0u;k<p->song.count;k++)
+  if(p->song.chain[k].pattern>=TRACK_PATTERNS ||
+     p->song.chain[k].repeats<1u || p->song.chain[k].repeats>16u)return 0u;
+ for(uint8_t k=0u;k<TRACK_CHANNELS;k++){
+  const struct track_mixer_channel *m=&p->mixer.ch[k];
+  if(m->volume>120u || m->pan< -100 || m->pan>100 || m->mute>1u ||
+     m->solo>1u || m->swing>100u)return 0u;
+ }
+ for(uint8_t k=0u;k<TRACK_PATTERNS;k++)
+  if(p->song.patterns[k].length<1u || p->song.patterns[k].length>TRACK_STEPS)return 0u;
+ for(uint8_t k=0u;k<TRACK_DRUM_COUNT;k++){
+  const struct track_drum_timbre *d=&p->drum[k];
+  if(d->attack>100u || d->decay>100u || d->sustain>100u || d->release>100u ||
+     d->eq_low>100u || d->eq_mid>100u || d->eq_high>100u ||
+     d->gain>100u || d->pitch< -36 || d->pitch>36)return 0u;
+ }
+ const struct track_master_settings *m=&p->master;
+ for(uint8_t k=0u;k<4u;k++)
+  if(m->eq[k]>100u || m->eq_freq[k]>100u || m->eq_width[k]>100u)return 0u;
+ if(m->comp_threshold>100u || m->comp_ratio>100u || m->comp_gain>100u ||
+    m->comp_attack>100u || m->reverb_wet>100u || m->reverb_feedback>100u ||
+    m->reverb_tone>100u || m->reverb_spread>100u)return 0u;
+ uint8_t order_seen=0u;
+ for(uint8_t k=0u;k<3u;k++){
+  if(m->enabled[k]>1u || m->order[k]>2u || (order_seen&(1u<<m->order[k])))return 0u;
+  order_seen|=(uint8_t)(1u<<m->order[k]);
+ }
+ return 1u;
+}
 #define PUT1(V) do{if(i>=cap)return -2;out[i++]=(uint8_t)(V);}while(0)
 #define GET1(V) do{if(i>=n)return -2;(V)=data[i++];}while(0)
 int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t cap,uint32_t *used){
- if(!p||!out||!used||cap>TRACK_STORE_MAX||cap<40u||p->slot>=TRACK_PROJECTS||p->song.count<1u||p->song.count>TRACK_SONG_ENTRIES)return -1;
+ if(!p||!out||!used||cap>TRACK_STORE_MAX||cap<40u||!track_store_preflight(p))return -1;
  uint32_t i=24u;uint8_t c,r,s;
  for(c=0;c<12u;c++)PUT1(p->title[c]);
  PUT1(p->slot);PUT1(p->harmony.root);PUT1(p->harmony.mode);PUT1(p->harmony.keylock);
@@ -101,7 +140,8 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
   }
   if(v->type>=TRACK_CHIP_TYPES||v->duty>100u||v->volume>100u)return -1;
   PUT1(v->type);PUT1(v->attack);PUT1(v->decay);PUT1(v->sustain);PUT1(v->release);
-  PUT1(v->duty);PUT1(v->volume);if(i+2u>cap)return -2;wr16(out+i,v->cutoff);i+=2;
+  PUT1(v->duty);PUT1(v->volume);if(i+2u>cap)return -2;
+  wr16(out+i,v->cutoff);i+=2;
   PUT1(vp->wave_a);PUT1(vp->wave_b);PUT1((uint8_t)vp->coarse);PUT1((uint8_t)vp->fine);
   PUT1(vp->detune);PUT1(vp->mix);PUT1(vp->pulse_width);PUT1(vp->morph);
   PUT1((uint8_t)vp->coarse_b);PUT1((uint8_t)vp->fine_b);PUT1(vp->pulse_width_b);
@@ -122,6 +162,62 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
  for(c=0u;c<5u;c++){if(p->punch_param[c]>100u)return -1;PUT1(p->punch_param[c]);}
  if(p->master.comp_attack>100u||p->master.reverb_spread>100u)return -1;
  PUT1(p->master.comp_attack);PUT1(p->master.reverb_spread);
+ if(p->mixer.quantize_mutes>1u)return -1;PUT1(p->mixer.quantize_mutes);
+ if(p->snapshots.valid & (uint8_t)~0x0Fu)return -1;
+ PUT1(p->snapshots.valid);
+ for(c=0u;c<BEETLE_SNAPSHOT_SLOTS;c++){
+  if(p->snapshots.masks[c] & (uint8_t)~BEETLE_SNAPSHOT_MASK)return -1;
+  PUT1(p->snapshots.masks[c]);
+ }
+ for(c=0u;c<BEETLE_GROUP_SLOTS;c++){
+  if(p->groups.masks[c] & (uint8_t)~BEETLE_GROUP_MASK)return -1;
+  PUT1(p->groups.masks[c]);
+ }
+
+ /* V16: eight project-local named instrument slots, encoded only when valid.
+  * Adding a library never claims another flash sector or changes the A/B layout. */
+ PUT1(p->library.valid);
+ for(c=0u;c<BEETLE_LIBRARY_SLOTS;c++){
+  if(!(p->library.valid&(1u<<c)))continue;
+  const struct track_store_instrument *v=&p->library.patch[c];
+  if(v->type>=TRACK_CHIP_TYPES||v->duty>100u||v->volume>100u||!track_va_patch_valid(&v->va))return -1;
+  for(uint8_t j=0u;j<BEETLE_LIBRARY_NAME;j++){
+   char ch=p->library.name[c][j];
+   if(!((ch>='A'&&ch<='Z')||(ch>='0'&&ch<='9')||ch==' '||ch=='-'||ch=='_'))return -1;
+   PUT1(ch);
+  }
+  PUT1(v->type);PUT1(v->attack);PUT1(v->decay);PUT1(v->sustain);PUT1(v->release);
+  PUT1(v->duty);PUT1(v->volume);
+  if(i+2u>cap)return -2;
+  wr16(out+i,v->cutoff);i+=2;
+  const struct track_va_patch *vp=&v->va;
+  PUT1(vp->wave_a);PUT1(vp->wave_b);PUT1((uint8_t)vp->coarse);PUT1((uint8_t)vp->fine);
+  PUT1(vp->detune);PUT1(vp->mix);PUT1(vp->pulse_width);PUT1(vp->morph);
+  PUT1((uint8_t)vp->coarse_b);PUT1((uint8_t)vp->fine_b);PUT1(vp->pulse_width_b);
+  PUT1(vp->drive);PUT1(vp->sub);PUT1(vp->noise);PUT1(vp->fm_depth);
+ }
+ /* V17: a type can have its own ADSR, oscillator, cutoff and tuning.
+  * Valid mask avoids wasting project space for unused waveform types. */
+ for(c=0u;c<4u;c++){
+  if(p->type_valid[c] & (uint16_t)~((1u<<TRACK_CHIP_TYPES)-1u))return -1;
+  if(i+2u>cap)return -2;
+  wr16(out+i,p->type_valid[c]);i+=2;
+  for(uint8_t t=0;t<TRACK_CHIP_TYPES;t++)if(p->type_valid[c]&(1u<<t)){
+   const struct track_store_instrument *v=&p->type_presets[c][t];
+   if(v->type!=t||v->duty>100u||v->volume>100u||
+      v->attack>100u||v->decay>100u||v->sustain>100u||v->release>100u||
+      !track_va_patch_valid(&v->va))return -1;
+   PUT1(v->type);PUT1(v->attack);PUT1(v->decay);PUT1(v->sustain);PUT1(v->release);
+   PUT1(v->duty);PUT1(v->volume);
+   if(i+2u>cap)return -2;
+  wr16(out+i,v->cutoff);i+=2;
+   const struct track_va_patch *vp=&v->va;
+   PUT1(vp->wave_a);PUT1(vp->wave_b);PUT1((uint8_t)vp->coarse);PUT1((uint8_t)vp->fine);
+   PUT1(vp->detune);PUT1(vp->mix);PUT1(vp->pulse_width);PUT1(vp->morph);
+   PUT1((uint8_t)vp->coarse_b);PUT1((uint8_t)vp->fine_b);PUT1(vp->pulse_width_b);
+   PUT1(vp->drive);PUT1(vp->sub);PUT1(vp->noise);PUT1(vp->fm_depth);
+  }
+ }
  wr32(out,TRACK_STORE_MAGIC);wr16(out+4,TRACK_STORE_VERSION);
  wr16(out+6,(uint16_t)p->slot);wr32(out+8,i);wr32(out+12,track_store_crc32(out+24u,i-24u));
  wr32(out+16,track_store_crc32(out,16u));wr32(out+20,0u);
@@ -129,7 +225,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -139,12 +235,12 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
  if(i+2u>n)return -2;
  p->bpm=rd16(data+i);i+=2;
  GET1(p->song.count);GET1(p->song.loop);GET1(p->song.enabled);
- if(p->slot>=TRACK_PROJECTS||p->harmony.root>=12u||p->harmony.mode>=9u||p->harmony.keylock>2u||p->bpm<30u||p->bpm>300u||p->song.count<1u||p->song.count>TRACK_SONG_ENTRIES)return -3;
+ if(p->slot>=TRACK_PROJECTS||p->harmony.root>=12u||p->harmony.mode>=9u||p->harmony.keylock>2u||p->bpm<30u||p->bpm>300u||p->song.count<1u||p->song.count>TRACK_SONG_ENTRIES||p->song.loop>1u||p->song.enabled>1u)return -3;
  for(c=0;c<p->song.count;c++){
   GET1(p->song.chain[c].pattern);GET1(p->song.chain[c].repeats);
   if(p->song.chain[c].pattern>=TRACK_PATTERNS||p->song.chain[c].repeats<1u||p->song.chain[c].repeats>16u)return -3;
  }
- for(c=0;c<TRACK_CHANNELS;c++){p->mixer.ch[c].volume=80u;p->mixer.ch[c].pan=0u;}
+ for(c=0;c<TRACK_CHANNELS;c++){p->mixer.ch[c].volume=c==TRACK_DRUM_CHANNEL?80u:50u;p->mixer.ch[c].pan=0u;}
  uint8_t v5=(uint8_t)(rd16(data+4u)>=5u);
  for(c=0;c<(v5?TRACK_CHANNELS:4u);c++){
   uint8_t lane=(uint8_t)((!v5&&c==3u)?TRACK_DRUM_CHANNEL:c);
@@ -152,7 +248,7 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   GET1(m->volume);GET1(s);m->pan=(int8_t)s;
   GET1(m->mute);GET1(m->solo);
   if(rd16(data+4u)>=3u){GET1(m->swing);if(rd16(data+4u)<7u)m->swing=m->swing?50u:0u;}else m->swing=0u;
-  if(m->volume>100u||m->pan< -100||m->pan>100||
+  if(m->volume>120u||m->pan< -100||m->pan>100||
      m->mute>1u||m->solo>1u||m->swing>100u)return -3;
   /* V0.45 initialized the drum fader at 100 to compensate for quiet PCM.
    * Migrate that specific old factory default to 80; V0.46 stores the
@@ -214,7 +310,8 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   for(c=0;c<4u;c++){
    struct track_store_instrument *v=&p->instruments[c];
    GET1(v->type);GET1(v->attack);GET1(v->decay);GET1(v->sustain);GET1(v->release);
-   GET1(v->duty);GET1(v->volume);if(i+2u>n)return -2;v->cutoff=rd16(data+i);i+=2;
+   GET1(v->duty);GET1(v->volume);if(i+2u>n)return -2;
+  v->cutoff=rd16(data+i);i+=2;
    GET1(v->va.wave_a);GET1(v->va.wave_b);GET1(s);v->va.coarse=(int8_t)s;
    GET1(s);v->va.fine=(int8_t)s;GET1(v->va.detune);GET1(v->va.mix);
    GET1(v->va.pulse_width);GET1(v->va.morph);
@@ -261,12 +358,81 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   for(c=0u;c<5u;c++){GET1(p->punch_param[c]);if(p->punch_param[c]>100u)return -3;}
  }else{
   for(c=0u;c<5u;c++)p->punch_param[c]=50u;
-  p->punch_param[2]=0u;
+  p->punch_param[1]=20u;p->punch_param[2]=0u;p->punch_param[4]=50u;
  }
  if(rd16(data+4u)>=10u){
   GET1(p->master.comp_attack);GET1(p->master.reverb_spread);
   if(p->master.comp_attack>100u||p->master.reverb_spread>100u)return -3;
  }else{p->master.comp_attack=28u;p->master.reverb_spread=50u;}
+ if(rd16(data+4u)>=13u){GET1(p->mixer.quantize_mutes);if(p->mixer.quantize_mutes>1u)return -3;}
+ else p->mixer.quantize_mutes=0u; /* Older projects had no quantized-mute preference; default immediate */
+ if(rd16(data+4u)>=14u){
+  GET1(p->snapshots.valid);
+  if(p->snapshots.valid & (uint8_t)~0x0Fu)return -3;
+  for(c=0u;c<BEETLE_SNAPSHOT_SLOTS;c++){
+   GET1(p->snapshots.masks[c]);
+   if(p->snapshots.masks[c] & (uint8_t)~BEETLE_SNAPSHOT_MASK)return -3;
+  }
+ }else beetle_snapshots_init(&p->snapshots);
+ if(rd16(data+4u)>=15u){
+  for(c=0u;c<BEETLE_GROUP_SLOTS;c++){
+   GET1(p->groups.masks[c]);
+   if(p->groups.masks[c] & (uint8_t)~BEETLE_GROUP_MASK)return -3;
+  }
+ }else beetle_groups_init(&p->groups);
+
+ if(rd16(data+4u)>=16u){
+  GET1(p->library.valid);
+  for(c=0u;c<BEETLE_LIBRARY_SLOTS;c++){
+   if(!(p->library.valid&(1u<<c)))continue;
+   for(uint8_t j=0u;j<BEETLE_LIBRARY_NAME;j++){
+    uint8_t ch;GET1(ch);
+    if(!((ch>='A'&&ch<='Z')||(ch>='0'&&ch<='9')||ch==' '||ch=='-'||ch=='_'))return -3;
+    p->library.name[c][j]=(char)ch;
+   }
+   struct track_store_instrument *v=&p->library.patch[c];
+   GET1(v->type);GET1(v->attack);GET1(v->decay);GET1(v->sustain);GET1(v->release);
+   GET1(v->duty);GET1(v->volume);
+   if(i+2u>n)return -2;
+  v->cutoff=rd16(data+i);i+=2;
+   GET1(v->va.wave_a);GET1(v->va.wave_b);GET1(s);v->va.coarse=(int8_t)s;
+   GET1(s);v->va.fine=(int8_t)s;GET1(v->va.detune);GET1(v->va.mix);
+   GET1(v->va.pulse_width);GET1(v->va.morph);
+   GET1(s);v->va.coarse_b=(int8_t)s;GET1(s);v->va.fine_b=(int8_t)s;
+   GET1(v->va.pulse_width_b);GET1(v->va.drive);GET1(v->va.sub);
+   GET1(v->va.noise);GET1(v->va.fm_depth);
+   if(v->type>=TRACK_CHIP_TYPES||v->duty>100u||v->volume>100u||!track_va_patch_valid(&v->va))return -3;
+  }
+ }
+ /* V16 and earlier migrate by seeding each active waveform. */
+ if(rd16(data+4u)>=17u){
+  for(c=0u;c<4u;c++){
+   if(i+2u>n)return -2;
+  p->type_valid[c]=rd16(data+i);i+=2;
+   if(p->type_valid[c] & (uint16_t)~((1u<<TRACK_CHIP_TYPES)-1u))return -3;
+   for(uint8_t t=0u;t<TRACK_CHIP_TYPES;t++)if(p->type_valid[c]&(1u<<t)){
+    struct track_store_instrument *v=&p->type_presets[c][t];
+    GET1(v->type);GET1(v->attack);GET1(v->decay);GET1(v->sustain);GET1(v->release);
+    GET1(v->duty);GET1(v->volume);
+    if(i+2u>n)return -2;
+  v->cutoff=rd16(data+i);i+=2;
+    GET1(v->va.wave_a);GET1(v->va.wave_b);GET1(s);v->va.coarse=(int8_t)s;
+    GET1(s);v->va.fine=(int8_t)s;GET1(v->va.detune);GET1(v->va.mix);
+    GET1(v->va.pulse_width);GET1(v->va.morph);
+    GET1(s);v->va.coarse_b=(int8_t)s;GET1(s);v->va.fine_b=(int8_t)s;
+    GET1(v->va.pulse_width_b);GET1(v->va.drive);GET1(v->va.sub);
+    GET1(v->va.noise);GET1(v->va.fm_depth);
+    if(v->type!=t || v->duty>100u||v->volume>100u||
+       v->attack>100u||v->decay>100u||v->sustain>100u||v->release>100u||
+       !track_va_patch_valid(&v->va))return -3;
+   }
+  }
+ }else{
+  for(c=0u;c<4u;c++){
+   uint8_t t=p->instruments[c].type;
+   if(t<TRACK_CHIP_TYPES){p->type_valid[c]=(uint16_t)(1u<<t);p->type_presets[c][t]=p->instruments[c];}
+  }
+ }
  if(i!=n)return -3;
  return 0;
 }

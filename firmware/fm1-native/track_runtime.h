@@ -17,11 +17,18 @@
 #include "track_mixer.h"
 #include "track_swing.h"
 #include "beetle_step_groove.h"
+#include "beetle_groove_tools.h"
+#include "beetle_quantized_mute.h"
+#include "beetle_live_mixer.h"
+#include "beetle_drum_step_stop.h"
+#include "beetle_performance_snapshots.h"
+#include "beetle_mute_groups.h"
 #include "track_punch_events.h"
 #include "track_song.h"
 #include "track_drum.h"
 #include "track_master_fx.h"
 #include "track_project_store.h"
+#include "beetle_instrument_library.h"
 #include "track_journal.h"
 #define TRACK_PINK 0xF81Au
 #define TRACK_DATA_PINK 0xF81Au
@@ -33,7 +40,11 @@
 #include "beetle_help.h"
 #include "beetle_pattern_length_shortcut.h"
 #include "beetle_input_safety.h"
-static struct track_engine track_state;
+#include "beetle_punch_timing.h"
+/* RC: relocate only the always-initialized sequencer state from the
+ * near-full 96KiB BSS to the established separately guarded RAM pool.
+ * track_init() initializes every field before the audio ISR is started. */
+static struct track_engine track_state __attribute__((section(".pool"),aligned(4)));
 static struct track_drum_engine track_drum __attribute__((section(".beetle_song"),aligned(16)));
 static struct track_master_settings track_master_cfg;
 static struct track_master_fx_state track_master_dsp __attribute__((section(".beetle_song"),aligned(64)));
@@ -51,6 +62,8 @@ static struct track_song_bank track_song __attribute__((section(".beetle_song"),
 static uint8_t track_live_punch_mask,track_replay_punch_mask;
 /* Saved mixer-style Punch preset is separate from temporary playback automation. */
 static uint8_t track_punch_base_param[5];
+/* PUNCH 2 now Ring Mod: persisted wet intensity 0..100, default 20. */
+static uint8_t track_sel_tracker_ready; /* only a fresh tracker-only SEL rising edge can delete */
 static void track_sync_punch_params(void);
 static uint8_t track_punch_focus=255u; /* most recently depressed FX key */
 static uint32_t track_seq_since;
@@ -70,17 +83,39 @@ static uint32_t track_old_note_mask;
 static struct track_name_editor track_editor;
 static char track_title[TRACK_NAME_MAX+1u];
 static uint8_t track_named,track_page,track_menu_index,track_fx_cursor,track_osc_cursor,track_osc_bank;
+/* V0.81: boot-only chooser, save origin, and non-destructive first-free allocation. */
+static uint8_t track_boot_menu_choice,track_save_return_page,track_new_project_full,track_load_from_boot;
+/* The original pitch belongs to the currently focused cell, not a global
+ * pitch borrowed from another step. Zero means no restorable note. */
+static uint8_t track_preset_focus_pattern,track_preset_focus_channel,track_preset_focus_step;
+static uint8_t track_preset_focus_column,track_preset_focus_original,track_preset_focus_valid;
+static uint8_t track_rc_tab; /* V0.73: read-only RC AUDIO/MIDI diagnostics */
 static uint8_t track_help_offset; /* V0.54: scroll state, not project data. */
-static struct beetle_load_input_gate track_load_input_guard; /* consume stale SEL while project loads */
+static struct beetle_load_input_gate track_load_input_guard; /* consume stale SEL during/after LOAD and SAVE */
 static uint8_t track_audio_started,track_prev_notes[TRACK_CHANNELS][5];
 static uint8_t track_lane_instrument[TRACK_SYNTH_CHANNELS];
+/* V0.83: EDIT focuses a patch for FUTURE notes, independently of the
+ * instrument already stored in any existing pattern/song step. */
+static uint8_t track_input_instrument[TRACK_CHANNELS];
+static uint8_t track_input_explicit[TRACK_CHANNELS]; /* default lane associations are not reserved patches */
+static uint8_t track_edit_patch_full; /* read-only status: all four patch slots referenced */
+
 static uint8_t track_prev_note_count[TRACK_CHANNELS];
 static uint32_t track_audio_clock,track_last_poll,track_last_paint,track_home_since;
 /* Sample-exact gates; no allocations, no callback from the UI task. */
 static uint32_t track_gate_remaining[TRACK_SYNTH_CHANNELS];
 static uint8_t track_groove_focus; /* 0 micro, 1 ratchets, 2 probability */
 static struct beetle_groove_clock track_groove_clock;
-static uint32_t track_drum_note2_serial;
+static struct beetle_mute_queue track_mute_queue;
+static struct beetle_live_switch track_live_mutes,track_live_solos;
+static uint8_t track_live_q_mute=1u,track_live_q_solo=1u;
+static void beetle_live_reset(void){beetle_live_clear(&track_live_mutes);beetle_live_clear(&track_live_solos);track_live_q_mute=track_live_q_solo=1u;}
+static struct beetle_performance_snapshots track_snapshots;
+static uint8_t track_snapshot_slot;
+static struct beetle_mute_groups track_groups;
+static uint8_t track_group_slot,track_group_lane;
+static struct beetle_groove_clip track_groove_clip; /* UI clipboard, not project data */
+static uint32_t track_drum_note1_serial, track_drum_note2_serial;
 static uint8_t track_preset_last_note2=1u; /* CH6 NOTE2 encoded 1..14 */
 static uint8_t track_dyn_focus; /* velocity=0, gate=1 */
 static uint8_t track_swing_pending_mask;
@@ -91,6 +126,7 @@ static int32_t track_last_encoder_delta;
 static uint32_t track_recovered_state_faults;
 static uint8_t track_home_fired;
 static uint8_t track_song_preplay_row,track_song_follow_active;
+/* V0.86: live song mixer is a transient performance screen, not a new saved preference. */
 /* V0.13: REC hold opens the current-pattern punch event editor. */
 static uint32_t track_rec_since;
 static uint8_t track_rec_long,track_punch_edit_row,track_punch_edit_index;
@@ -100,10 +136,58 @@ static int16_t track_type_queued;
  * TRACKER, never written into project notes unless a note is entered.
  * Using chord-aware key-up handling prevents OCT-+OCT+ from shifting pitch. */
 static struct etch_octave_chord track_key_oct_chord;
+/* Latches SEQ+OCT chord at button-down; consumes key release separately
+ * from the global keyboard-octave control. */
+static uint8_t track_step_oct_held;
 static uint8_t track_preset_last_note=60u;
 static uint32_t track_boot_splash_until;
 static uint8_t track_slot_seen[TRACK_PROJECTS],track_overwrite_wait;
 static int track_storage_result=TRACK_JOURNAL_HARDWARE_LOCKED;
+static void track_library_capture_active(uint8_t id,struct track_store_instrument *v);
+static void track_library_apply_active(uint8_t id,const struct track_store_instrument *v);
+/* A shared patch must never be edited while a pattern in this project
+ * references it. Copy-on-write allocates the lowest free 4-slot patch.
+ * If all four are in use, refuse rather than silently rewriting the song.
+ * This is deliberately non-destructive and does not alter project V16. */
+static void track_type_clone(uint8_t to,uint8_t from);
+static uint8_t track_patch_used_by_notes(uint8_t id){
+ for(uint8_t pat=0u;pat<TRACK_PATTERNS;pat++){
+  const struct track_pattern *p=pat==track_state.pattern_slot?&track_state.active:&track_song.patterns[pat];
+  for(uint8_t ch=0u;ch<TRACK_SYNTH_CHANNELS;ch++)
+   for(uint8_t row=0u;row<TRACK_STEPS;row++){
+    const struct track_step *st=&p->ch[ch][row];
+    if(st->note<=127u && st->instrument==id)return 1u;
+   }
+ }
+ return 0u;
+}
+static uint8_t track_edit_prepare_patch(uint8_t channel){
+ if(channel>=TRACK_CHANNELS)return 0u;
+ const uint8_t original=(uint8_t)(track_input_instrument[channel]&3u);
+ if(!track_patch_used_by_notes(original)){track_input_explicit[channel]=1u;track_edit_patch_full=0u;return 1u;}
+ for(uint8_t id=0u;id<4u;id++){
+  if(id==original || track_patch_used_by_notes(id))continue;
+  /* Do not overwrite the selected unsaved sound of another synth lane. */
+  uint8_t other_focus=0u;
+  for(uint8_t ch=0u;ch<TRACK_SYNTH_CHANNELS;ch++)
+   if(ch!=channel && track_input_explicit[ch] && track_input_instrument[ch]==id){other_focus=1u;break;}
+  if(other_focus)continue;
+  struct track_store_instrument copy;
+  track_library_capture_active(original,&copy);
+  track_library_apply_active(id,&copy);
+  track_type_clone(id,original);
+  /* Unedited lanes with a default focus must not inherit the new sound. */
+  for(uint8_t ch=0u;ch<TRACK_CHANNELS;ch++)
+   if(ch!=channel && !track_input_explicit[ch] && track_input_instrument[ch]==id)
+    track_input_instrument[ch]=original;
+  track_input_instrument[channel]=id;
+  track_input_explicit[channel]=1u;
+  track_edit_patch_full=0u;
+  return 1u;
+ }
+ track_edit_patch_full=1u;
+ return 0u;
+}
 static uint32_t track_storage_confirm_since;
 /* V0.34: defer LOAD/NEW until unsaved work has been explicitly confirmed. */
 /* 1 = open LOAD browser, 2 = NEW session, 3 = load browser-selected slot. */
@@ -137,16 +221,158 @@ struct track_instrument_ui_values {
  uint16_t cutoff;
 };
 static struct track_instrument_ui_values track_ui_inst[4];
+static struct beetle_instrument_library track_library __attribute__((section(".beetle_song"),aligned(4)));
+static uint8_t track_library_slot,track_library_action,track_library_target,track_library_copy_source;
+static struct track_store_instrument track_type_presets[4][TRACK_CHIP_TYPES]
+ __attribute__((section(".usb_audio_ram"),aligned(4)));
+static uint16_t track_type_valid[4];
+static uint8_t track_library_notice; /* 1 STORED, 2 LOADED, 3 COPIED, 4 EMPTY, 5 RENAMED */
+static struct track_name_editor track_library_name_editor __attribute__((section(".beetle_song"),aligned(4)));
+/* Capture and apply one complete instrument patch. Does not alter other presets. */
+static void track_library_capture_active(uint8_t id,struct track_store_instrument *v){
+ id&=3u;v->type=track_chip.osc_type[id];v->attack=track_ui_inst[id].attack;
+ v->decay=track_ui_inst[id].decay;v->sustain=track_ui_inst[id].sustain;
+ v->release=track_ui_inst[id].release;v->duty=track_ui_inst[id].duty;
+ v->volume=track_ui_inst[id].volume;v->cutoff=track_ui_inst[id].cutoff;
+ v->va=track_chip.patches[id];
+}
+static void track_library_apply_active(uint8_t id,const struct track_store_instrument *v){
+ id&=3u;track_chip.osc_type[id]=v->type;track_chip.patches[id]=v->va;
+ track_ui_inst[id].attack=v->attack;track_ui_inst[id].decay=v->decay;
+ track_ui_inst[id].sustain=v->sustain;track_ui_inst[id].release=v->release;
+ track_ui_inst[id].duty=v->duty;track_ui_inst[id].volume=v->volume;track_ui_inst[id].cutoff=v->cutoff;
+ track_chip.env_attack[id]=v->attack;track_chip.env_decay[id]=v->decay;
+ track_chip.env_sustain[id]=v->sustain;track_chip.env_release[id]=v->release;
+ track_chip.duty[id]=(uint8_t)(v->duty<19u?0u:v->duty<38u?1u:v->duty<63u?2u:3u);
+ track_chip.cutoff[id]=(uint8_t)(v->cutoff/75u>250u?250u:v->cutoff/75u);
+ track_chip_refresh_instrument(&track_chip,id);
+}
+
+static void track_type_clone(uint8_t to,uint8_t from){
+ track_type_valid[to]=track_type_valid[from];
+ for(uint8_t t=0u;t<TRACK_CHIP_TYPES;t++)if(track_type_valid[from]&(1u<<t))
+  track_type_presets[to][t]=track_type_presets[from][t];
+}
+/* Preserve every waveform TYPE independently; changes to TYPE never
+ * inherit destructive ADSR edits from the previously selected TYPE. */
+static void track_type_capture(uint8_t id){
+ struct track_store_instrument v;
+ id&=3u;track_library_capture_active(id,&v);
+ if(v.type<TRACK_CHIP_TYPES){
+  track_type_presets[id][v.type]=v;
+  track_type_valid[id]|=(uint16_t)(1u<<v.type);
+ }
+}
+static void track_type_switch(uint8_t id,uint8_t next){
+ struct track_store_instrument v;
+ id&=3u;next=(uint8_t)(next%TRACK_CHIP_TYPES);
+ track_type_capture(id);
+ if(track_type_valid[id]&(1u<<next)){
+  track_library_apply_active(id,&track_type_presets[id][next]);
+ }else{
+  track_library_capture_active(id,&v);
+  v.type=next;
+  /* A freshly encountered waveform starts with factory ADSR and controls. */
+  v.attack=1u;v.decay=14u;v.sustain=100u;v.release=16u;
+  v.duty=50u;v.cutoff=7000u;v.volume=65u;
+  track_library_apply_active(id,&v);
+  track_type_capture(id);
+ }
+}
+
+
+/* V0.70: heterogeneous, chronological Undo/Redo using V0.56 pattern snapshot
+ * allocations. Transient RAM only; history never enters a TRK1 project. */
+struct beetle_instrument_undo_state {struct track_store_instrument patch;uint8_t lane_volume;};
+struct beetle_library_undo_state {struct track_store_instrument patch;char name[BEETLE_LIBRARY_NAME];uint8_t valid;};
+#define BEETLE_SONG_EDIT_BYTES (sizeof(track_song.chain)+7u)
+static void track_history_library_capture(uint8_t slot,struct beetle_library_undo_state *state){
+ state->patch=track_library.patch[slot];
+ for(uint8_t i=0u;i<BEETLE_LIBRARY_NAME;i++)state->name[i]=track_library.name[slot][i];
+ state->valid=(uint8_t)((track_library.valid>>slot)&1u);
+}
+static void track_history_library_apply(uint8_t slot,const struct beetle_library_undo_state *state){
+ track_library.patch[slot]=state->patch;
+ for(uint8_t i=0u;i<BEETLE_LIBRARY_NAME;i++)track_library.name[slot][i]=state->name[i];
+ if(state->valid)track_library.valid|=(uint8_t)(1u<<slot);
+ else track_library.valid&=(uint8_t)~(1u<<slot);
+}
+static void track_history_instrument_capture(uint8_t id,uint8_t ch,struct beetle_instrument_undo_state *state){
+ track_library_capture_active(id,&state->patch);state->lane_volume=track_mix.ch[ch].volume;
+}
+static void track_history_instrument_apply(uint8_t id,uint8_t ch,const struct beetle_instrument_undo_state *state){
+ track_library_apply_active(id,&state->patch);track_mix.ch[ch].volume=state->lane_volume;
+}
+static void track_history_begin_instrument(uint8_t id,uint8_t ch){
+ if(track_state.transport.playing)return;
+ struct beetle_instrument_undo_state current;track_history_instrument_capture(id,ch,&current);
+ (void)beetle_edit_begin_bytes(&beetle_ed,BEETLE_EDIT_INSTRUMENT,
+   (uint8_t)((id&3u)|((ch&7u)<<2)),&current,sizeof(current));
+}
+static void track_history_commit_instrument(uint8_t id,uint8_t ch){
+ if(track_state.transport.playing)return;
+ struct beetle_instrument_undo_state current;track_history_instrument_capture(id,ch,&current);
+ (void)beetle_edit_commit_bytes(&beetle_ed,BEETLE_EDIT_INSTRUMENT,
+   (uint8_t)((id&3u)|((ch&7u)<<2)),&current,sizeof(current));
+}
+static void track_history_begin_library(uint8_t slot){
+ if(track_state.transport.playing||slot>=BEETLE_LIBRARY_SLOTS)return;
+ struct beetle_library_undo_state current;track_history_library_capture(slot,&current);
+ (void)beetle_edit_begin_bytes(&beetle_ed,BEETLE_EDIT_LIBRARY,slot,&current,sizeof(current));
+}
+static void track_history_commit_library(uint8_t slot){
+ if(track_state.transport.playing||slot>=BEETLE_LIBRARY_SLOTS)return;
+ struct beetle_library_undo_state current;track_history_library_capture(slot,&current);
+ (void)beetle_edit_commit_bytes(&beetle_ed,BEETLE_EDIT_LIBRARY,slot,&current,sizeof(current));
+}
+static uint8_t track_history_step(uint8_t redo){
+ if(track_state.transport.playing||beetle_ed.pending_valid)return 0u;
+ if(redo?beetle_ed.cursor>=beetle_ed.count:beetle_ed.cursor==0u)return 0u;
+ const uint8_t pos=(uint8_t)(redo?beetle_ed.cursor:beetle_ed.cursor-1u);
+ struct beetle_history_entry *entry=&beetle_ed.history[pos];
+ if(entry->kind==BEETLE_EDIT_PATTERN){
+  return (uint8_t)(redo?beetle_edit_redo(&beetle_ed,&track_song,&track_state):
+     beetle_edit_undo(&beetle_ed,&track_song,&track_state));
+ }
+ uint8_t ok=0u;
+ if(entry->kind==BEETLE_EDIT_MIXER){
+  beetle_mute_cancel(&track_mute_queue);
+  ok=beetle_edit_swap_bytes(&beetle_ed,pos,&track_mix,sizeof(track_mix));
+ }else if(entry->kind==BEETLE_EDIT_SONG){
+  ok=beetle_edit_swap_bytes(&beetle_ed,pos,&track_song.chain[0],BEETLE_SONG_EDIT_BYTES);
+  if(track_song.count && track_song.edit_row>=track_song.count)track_song.edit_row=(uint8_t)(track_song.count-1u);
+ }else if(entry->kind==BEETLE_EDIT_MASTER){
+  ok=beetle_edit_swap_bytes(&beetle_ed,pos,&track_master_cfg,sizeof(track_master_cfg));
+ }else if(entry->kind==BEETLE_EDIT_INSTRUMENT){
+  uint8_t id=(uint8_t)(entry->pattern_index&3u),ch=(uint8_t)((entry->pattern_index>>2u)&7u);
+  if(ch<TRACK_CHANNELS){
+   struct beetle_instrument_undo_state current;track_history_instrument_capture(id,ch,&current);
+   ok=beetle_edit_swap_bytes(&beetle_ed,pos,&current,sizeof(current));
+   if(ok)track_history_instrument_apply(id,ch,&current);
+  }
+ }else if(entry->kind==BEETLE_EDIT_LIBRARY && entry->pattern_index<BEETLE_LIBRARY_SLOTS){
+  struct beetle_library_undo_state current;
+  track_history_library_capture(entry->pattern_index,&current);
+  ok=beetle_edit_swap_bytes(&beetle_ed,pos,&current,sizeof(current));
+  if(ok)track_history_library_apply(entry->pattern_index,&current);
+ }
+ if(ok){beetle_ed.cursor=(uint8_t)(redo?pos+1u:pos);track_state.dirty=1u;}
+ return ok;
+}
+
 #if BEETLE_NATIVE_STORAGE
 /* Scratch and project staging MUST NOT be placed on the tiny firmware stack.
  * This memory is never touched from an audio ISR and is reused for loads. */
 static struct track_journal_status beetle_last_journal;
 static void beetle_project_capture(uint8_t slot){
  track_song_capture(&track_song,&track_state);
- beetle_staged.song=track_song;beetle_staged.mixer=track_mix;
+ beetle_staged.song=track_song;beetle_staged.mixer=track_mix;beetle_staged.snapshots=track_snapshots;beetle_staged.groups=track_groups;beetle_staged.library=track_library;
  for(uint8_t i=0u;i<TRACK_DRUM_COUNT;i++)beetle_staged.drum[i]=track_drum.components[i];
  beetle_staged.master=track_master_cfg;
  for(uint8_t i=0u;i<5u;i++)beetle_staged.punch_param[i]=track_punch_base_param[i];
+ for(uint8_t i=0u;i<4u;i++){track_type_capture(i);beetle_staged.type_valid[i]=track_type_valid[i];
+  for(uint8_t t=0u;t<TRACK_CHIP_TYPES;t++)if(track_type_valid[i]&(1u<<t))
+   beetle_staged.type_presets[i][t]=track_type_presets[i][t];}
  beetle_staged.harmony=track_state.harmony;beetle_staged.bpm=track_state.transport.bpm;
  beetle_staged.slot=slot;
  for(uint8_t i=0u;i<12u;i++)beetle_staged.title[i]=track_title[i]?track_title[i]:' ';
@@ -162,18 +388,25 @@ static void beetle_project_capture(uint8_t slot){
 }
 static void beetle_project_apply(void){
  /* Caller stopped playback, interrupted audio, and validated full TRK1 CRC. */
- track_song=beetle_staged.song;track_mix=beetle_staged.mixer;
+ track_song=beetle_staged.song;track_mix=beetle_staged.mixer;track_snapshots=beetle_staged.snapshots;track_snapshot_slot=0u;track_groups=beetle_staged.groups;track_group_slot=track_group_lane=0u;track_library=beetle_staged.library;track_library_slot=track_library_action=track_library_target=track_library_notice=0u;
  for(uint8_t i=0u;i<TRACK_DRUM_COUNT;i++)track_drum.components[i]=beetle_staged.drum[i];
  track_master_cfg=beetle_staged.master;
+ for(uint8_t i=0u;i<4u;i++){
+  track_type_valid[i]=beetle_staged.type_valid[i];
+  for(uint8_t t=0u;t<TRACK_CHIP_TYPES;t++)if(track_type_valid[i]&(1u<<t))
+    track_type_presets[i][t]=beetle_staged.type_presets[i][t];
+ }
  for(uint8_t i=0u;i<5u;i++)track_punch_base_param[i]=beetle_staged.punch_param[i];
- track_live_punch_mask=track_replay_punch_mask=0u;track_sync_punch_params();
+ /* Stored Ring Mod intensity is restored without transient overrides. */
+ track_live_punch_mask=track_replay_punch_mask=0u;beetle_live_reset();track_sync_punch_params();
  track_state.harmony=beetle_staged.harmony;
  track_state.transport.bpm=beetle_staged.bpm;
  track_state.transport.playing=0u;track_state.transport.play_step=0u;
  track_state.pattern_slot=0u;track_state.active=track_song.patterns[0];
  track_state.project_slot=beetle_staged.slot;
  track_chip_silence(&track_chip);track_drum_stop(&track_drum);
- for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++)track_lane_instrument[c]=(uint8_t)(c&3u);
+ for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++){track_lane_instrument[c]=(uint8_t)(c&3u);track_input_instrument[c]=(uint8_t)(c&3u);}
+ track_input_instrument[TRACK_DRUM_CHANNEL]=3u;for(uint8_t ch=0u;ch<TRACK_CHANNELS;ch++)track_input_explicit[ch]=0u;track_edit_patch_full=0u;
  for(uint8_t i=0u;i<4u;i++){
   const struct track_store_instrument *v=&beetle_staged.instruments[i];
   track_chip.osc_type[i]=v->type;track_chip.patches[i]=v->va;
@@ -197,10 +430,10 @@ static void beetle_project_apply(void){
   track_chip.drive[c]=0u;track_chip.step_gain[c]=100u;
   track_chip.cut_after[c]=0xFFFFFFFFu;track_chip.fx_samples[c]=0u;
  }
- track_drum.step_gain=100u;track_drum_note2_serial=0u;beetle_groove_reset(&track_groove_clock);
+ track_drum.step_gain=100u;track_drum_note1_serial=track_drum_note2_serial=0u;beetle_groove_reset(&track_groove_clock);beetle_mute_cancel(&track_mute_queue);track_groove_clip.valid=0u;
  for(uint8_t i=0u;i<TRACK_NAME_MAX;i++)track_title[i]=beetle_staged.title[i];
  track_title[TRACK_NAME_MAX]=0;track_named=1u;track_slot_seen[track_state.project_slot]=1u;track_session_saved_slot=track_state.project_slot;
- track_state.dirty=0u;
+ track_state.dirty=0u;track_groove_clip.valid=0u;
 }
 static int beetle_project_save_staged(void){
  /* HAL write permit is held only for this verified transaction. */
@@ -232,6 +465,7 @@ static void track_sync_punch_params(void){
  }
 }
 static void track_ui_inst_reset(void){
+ for(uint8_t i=0u;i<4u;i++)track_type_valid[i]=0u;
  for(uint8_t i=0u;i<4u;i++){
   track_ui_inst[i].attack=1u;track_ui_inst[i].decay=14u;
   track_ui_inst[i].sustain=100u;track_ui_inst[i].release=16u;
@@ -259,7 +493,12 @@ static void track_runtime_validate(void){
   }
   track_state.active.length=16u;faulty=1u;
  }
- if(track_page>22u){track_page=0u;faulty=1u;}
+ if(track_page>30u){track_page=0u;faulty=1u;}
+ /* Live Mixer is exclusively a Song Mode performance page. If a project
+  * transition disables SONG, return before processing any mixer key. */
+ if(!track_song.enabled){if(track_page==30u)track_page=9u;
+  /* Audio must never observe stale live solo/mute overrides once SONG is off. */
+  beetle_live_clear(&track_live_solos);beetle_live_clear(&track_live_mutes);}
  if(track_state.transport.edit_channel>=TRACK_CHANNELS){track_state.transport.edit_channel=0u;faulty=1u;}
  /* Hidden rows must never remain focusable after load/restore. Not a
   * storage fault: shortening a pattern legitimately leaves data in RAM. */
@@ -323,7 +562,7 @@ static void track_preview_release(uint32_t held){
  fm1_irq_enable_all();
 }
 static void track_fm1_boot(void){
- track_init(&track_state);track_mixer_init(&track_mix);track_drum_init(&track_drum);
+ track_init(&track_state);beetle_mute_cancel(&track_mute_queue);beetle_live_reset();beetle_snapshots_init(&track_snapshots);track_snapshot_slot=0u;beetle_groups_init(&track_groups);track_group_slot=track_group_lane=0u;track_mixer_init(&track_mix);track_drum_init(&track_drum);
  track_master_default(&track_master_cfg);track_drum_component=0u;track_drum_field=0u;
  track_master_focus=0u;track_master_chain_edit=0u;
  for(uint32_t z=0u;z<sizeof(track_master_dsp)/sizeof(uint32_t);z++)((uint32_t*)&track_master_dsp)[z]=0u;
@@ -332,7 +571,7 @@ static void track_fm1_boot(void){
  beetle_ed.pending=&beetle_edit_pending;beetle_ed.whole_clip=&beetle_edit_whole;
  beetle_ed.block=beetle_edit_block;beetle_edit_reset(&beetle_ed);
  for(uint8_t k=0u;k<5u;k++)track_punch_base_param[k]=track_chip.punch_param[k];
- track_chip_fx_reset();track_ui_inst_reset();track_drum_init(&track_drum);track_old_note_mask=0;track_page=0u;track_named=0u;
+ track_chip_fx_reset();track_ui_inst_reset();beetle_library_init(&track_library);track_library_slot=track_library_action=track_library_target=track_library_copy_source=track_library_notice=0u;track_drum_init(&track_drum);track_old_note_mask=0;track_page=29u;track_boot_menu_choice=0u;track_load_from_boot=0u;track_save_return_page=0u;track_new_project_full=0u;track_preset_focus_valid=0u;track_rc_tab=0u;track_named=0u;
  track_last_encoder_ms=0u;track_last_encoder_id=0u;track_last_encoder_delta=0;track_recovered_state_faults=0u;
  track_live_punch_mask=0u;track_replay_punch_mask=0u;track_punch_focus=255u;track_seq_since=0u;track_seq_fired=0u; /* lane clipboard persists after SEQ release */
  track_last_poll=0u;track_last_paint=0u;track_boot_input_unlock_ms=etch_ms+550u;track_home_since=0u;track_home_fired=0u;track_song_follow_active=0u;track_song_preplay_row=0u;
@@ -340,7 +579,7 @@ static void track_fm1_boot(void){
  track_audio_clock=0u;track_audio_started=0u;track_swing_pending_mask=0u;for(uint8_t ci=0;ci<TRACK_CHANNELS;ci++)track_swing_pending_at[ci]=0u;track_preview_mask=0u;
  for(uint8_t k=0u;k<27u;k++){track_preview_channel[k]=255u;track_preview_note[k]=255u;track_edit_last_onset_ms[k]=0u;}
  track_type_queued=0;track_rec_since=0u;track_rec_long=0u;track_punch_edit_row=0u;track_punch_edit_index=0u;
- track_preset_last_note=60u;track_preset_last_note2=1u;beetle_groove_reset(&track_groove_clock);track_drum_note2_serial=0u;track_boot_splash_until=etch_ms+900u;
+ track_preset_last_note=60u;track_preset_last_note2=1u;beetle_groove_reset(&track_groove_clock);track_drum_note1_serial=track_drum_note2_serial=0u;track_boot_splash_until=etch_ms+900u;
  track_fx_drum_lane=0u;track_edit_poly=0u;track_key_oct_chord.last=0u;track_key_oct_chord.combo_latched=0u;
  native_controls.octave=0;track_edit_prev_keys=0u;track_edit_serial=0u;track_overwrite_wait=0u;
  for(uint8_t i=0u;i<TRACK_PROJECTS;i++)track_slot_seen[i]=0u;
@@ -359,7 +598,8 @@ static void track_fm1_boot(void){
 #endif
  for(uint8_t k=0u;k<27u;k++){track_edit_voice_key[k]=255u;track_edit_voice_note[k]=255u;track_edit_order[k]=0u;}
  for(uint8_t c=0;c<TRACK_CHANNELS;c++)track_prev_note_count[c]=0u;
- for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++)track_lane_instrument[c]=(uint8_t)(c&3u);
+ for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++){track_lane_instrument[c]=(uint8_t)(c&3u);track_input_instrument[c]=(uint8_t)(c&3u);}
+ track_input_instrument[TRACK_DRUM_CHANNEL]=3u;for(uint8_t ch=0u;ch<TRACK_CHANNELS;ch++)track_input_explicit[ch]=0u;track_edit_patch_full=0u;
  for(uint8_t i=0;i<TRACK_NAME_MAX+1u;i++)track_title[i]=0;
  /* Disable ETCH's built-in ARP/sequence; TRACK drives its notes in ALNK0. */
  native_controls.arp_mode=0u;
@@ -385,6 +625,16 @@ static void track_audio_all_off(struct etch_native_audio *audio){
 }
 static void track_audio_fire(struct etch_native_audio *audio,uint8_t lane_mask){
  (void)audio;
+ struct track_mixer live_trigger_mix;
+ const struct track_mixer *trigger_mix=&track_mix;
+ if(track_song.enabled && (track_live_mutes.overridden || track_live_solos.overridden)){
+  live_trigger_mix=track_mix;
+  for(uint8_t c=0u;c<TRACK_CHANNELS;c++){
+   live_trigger_mix.ch[c].mute=beetle_live_value(&track_live_mutes,c,track_mix.ch[c].mute);
+   live_trigger_mix.ch[c].solo=beetle_live_value(&track_live_solos,c,track_mix.ch[c].solo);
+  }
+  trigger_mix=&live_trigger_mix;
+ }
  const uint8_t position=track_state.transport.play_step;
  /* Drum channel: two independent sample triggers on the same step. The
   * second hit reuses the former CHD byte (0=empty; 1..16=drum index+1).
@@ -392,21 +642,48 @@ static void track_audio_fire(struct etch_native_audio *audio,uint8_t lane_mask){
  const struct track_step *dr=&track_state.active.ch[TRACK_DRUM_CHANNEL][position];
  if((lane_mask&(1u<<TRACK_DRUM_CHANNEL))&&dr->effect==TRACK_FX_VOLUME)track_drum.step_gain=dr->value;
  if(!(lane_mask&(1u<<TRACK_DRUM_CHANNEL))){}
- else if(dr->note==TRACK_NOTE_STOP){track_drum_stop(&track_drum);}
  else if(!(track_state.punch_mask&(1u<<7))){
+  /* The two drum columns have independent STOP semantics. A STOP in NOTE1
+   * must not suppress or stop NOTE2; a STOP in NOTE2 must not stop NOTE1.
+   * Remember the individual triggered voice serials, including when the
+   * engine reduces a mutually exclusive hi-hat pair to one physical voice. */
+  if(dr->note==TRACK_NOTE_STOP && track_drum_note1_serial){
+   for(uint8_t i=0u;i<TRACK_DRUM_POLY;i++)if(track_drum.voices[i].active &&
+      track_drum.voices[i].sequence==track_drum_note1_serial)track_drum.voices[i].active=0u;
+   track_drum_note1_serial=0u;
+  }
   if(dr->chord==15u && track_drum_note2_serial){
-   for(uint8_t i=0;i<TRACK_DRUM_POLY;i++)if(track_drum.voices[i].active &&
+   for(uint8_t i=0u;i<TRACK_DRUM_POLY;i++)if(track_drum.voices[i].active &&
       track_drum.voices[i].sequence==track_drum_note2_serial)track_drum.voices[i].active=0u;
    track_drum_note2_serial=0u;
   }
   if(!track_groove_clock.lane[TRACK_DRUM_CHANNEL].skip_note &&
-     track_mixer_velocity(&track_mix,TRACK_DRUM_CHANNEL,94u)){
+     track_mixer_velocity(trigger_mix,TRACK_DRUM_CHANNEL,94u)){
+  uint8_t first=(dr->note<TRACK_DRUM_COUNT)?dr->note:TRACK_NOTE_EMPTY;
+  uint8_t second=(dr->chord>=1u&&dr->chord<=TRACK_DRUM_COUNT)?(uint8_t)(dr->chord-1u):TRACK_NOTE_EMPTY;
   uint32_t serial=track_drum.trigger_serial;
-  (void)track_drum_trigger_pair_tuned(&track_drum,dr->note,
-      (dr->chord>=1u&&dr->chord<=TRACK_DRUM_COUNT)?(uint8_t)(dr->chord-1u):TRACK_NOTE_EMPTY,
+  (void)track_drum_trigger_pair_tuned(&track_drum,first,second,
       (int8_t)(dr->effect==TRACK_FX_DRUM_PITCH?(int32_t)dr->value-12:0));
-  if(dr->chord>=1u&&dr->chord<=TRACK_DRUM_COUNT && track_drum.trigger_serial>serial)
-   track_drum_note2_serial=track_drum.trigger_serial;
+  /* Pair-trigger may deliberately suppress duplicate/mutually exclusive hats.
+   * In that case the second voice was not created and cannot be STOPped. */
+  if(track_drum.trigger_serial>serial){
+   for(uint8_t i=0u;i<TRACK_DRUM_POLY;i++){
+    const struct track_drum_voice *v=&track_drum.voices[i];
+    if(v->active&&(int32_t)(v->sequence-serial)>0){
+     if(first<TRACK_DRUM_COUNT && v->component==first &&
+        (!track_drum_note1_serial || v->sequence>track_drum_note1_serial))track_drum_note1_serial=v->sequence;
+     if(second<TRACK_DRUM_COUNT && v->component==second &&
+        (!track_drum_note2_serial || v->sequence>track_drum_note2_serial) &&
+        !(first==second && track_drum_note1_serial==v->sequence))track_drum_note2_serial=v->sequence;
+    }
+   }
+  }
+  if((track_state.punch_mask&(1u<<4)) && track_drum.trigger_serial>serial){
+   uint8_t synth_playing=0u;
+   for(uint8_t si=0u;si<track_chip.voice_count;si++)
+    if(track_chip.voices[si].active){synth_playing=1u;break;}
+   if(!synth_playing && beetle_stutter_index(track_chip.punch_param[4])>=5u)track_chip.punch_position=0u;
+  }
   /* Scale only the new drum voices; never change an older hit's tail. */
   uint8_t vel=track_step_velocity(dr),gate=track_step_gate(dr);
   uint32_t period=661500u/(track_state.transport.bpm?track_state.transport.bpm:120u);
@@ -435,13 +712,12 @@ static void track_audio_fire(struct etch_native_audio *audio,uint8_t lane_mask){
   uint8_t cutoff=(uint8_t)(ins->cutoff/75u>250u?250u:ins->cutoff/75u);
   beetle_step_fx_event(&track_chip,c,s,duty,cutoff,track_state.transport.bpm);
   if(s->note==TRACK_NOTE_STOP){track_chip_release_channel(&track_chip,c);track_gate_remaining[c]=0u;continue;}
-  velocity[c]=track_mixer_velocity(&track_mix,c,track_step_velocity(s));
+  velocity[c]=track_mixer_velocity(trigger_mix,c,track_step_velocity(s));
   if(s->note==TRACK_NOTE_EMPTY || track_groove_clock.lane[c].skip_note || (track_state.punch_mask&(1u<<7)) || velocity[c]==0u)continue;
   int32_t note=(int32_t)s->note;
-  if(track_state.punch_mask&(1u<<5))note+=12;
-  if(track_state.punch_mask&(1u<<6))note-=12;
-  /* PITCH is applied in DSP to the original note, including on sustained
-   * notes. Do not pre-transpose as that would double the effect. */
+  /* V0.83: octaves now apply centrally in chip DSP to all types,
+   * including sustained voices and NES NOISE; never double-transpose here.
+   * PITCH is also applied inside chip DSP to the original note. */
   if(note<0)note=0;if(note>127)note=127;
   /* EMPTY sustains; STP stops; a NEW note fades out earlier pitches of
    * this SAME lane, avoiding stuck chords across repeated patterns. */
@@ -481,12 +757,23 @@ static void track_groove_start_step(struct etch_native_audio *audio,uint32_t int
  * blocks. Timing uses integer sample counts; no allocations or UI in ALNK0. */
 static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t frames,int16_t *dst){
  if(!dst)return;
+ struct track_mixer live_audio_mix;
+ const struct track_mixer *render_mix=&track_mix;
+ if(track_song.enabled && (track_live_mutes.overridden || track_live_solos.overridden)){
+  live_audio_mix=track_mix;
+  for(uint8_t c=0u;c<TRACK_CHANNELS;c++){
+   live_audio_mix.ch[c].mute=beetle_live_value(&track_live_mutes,c,track_mix.ch[c].mute);
+   live_audio_mix.ch[c].solo=beetle_live_value(&track_live_solos,c,track_mix.ch[c].solo);
+  }
+  render_mix=&live_audio_mix;
+ }
  if(!track_state.transport.playing){
   if(track_audio_started){track_audio_all_off(audio);track_audio_started=0u;}
   track_audio_clock=0u;track_swing_pending_mask=0u;
   for(uint8_t ci=0u;ci<TRACK_SYNTH_CHANNELS;ci++)track_gate_remaining[ci]=0u;
-  track_chip_render(&track_chip,&track_mix,dst,frames);
-  track_drum_render(&track_drum,&track_mix,dst,frames);track_chip_process_punch(&track_chip,track_state.punch_mask,dst,frames);track_master_process(&track_master_dsp,&track_master_cfg,dst,frames);return;
+  track_chip_set_punch_octave(&track_chip,track_state.punch_mask);
+  track_chip_render(&track_chip,render_mix,dst,frames);
+  track_drum_render(&track_drum,render_mix,dst,frames);track_chip.punch_bpm=track_state.transport.bpm;track_chip_process_punch(&track_chip,track_state.punch_mask,dst,frames);track_master_process(&track_master_dsp,&track_master_cfg,dst,frames);return;
  }
  if(!track_audio_started){
   track_audio_started=1u;track_audio_clock=0u;
@@ -514,9 +801,9 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
   for(uint8_t ci=0u;ci<TRACK_SYNTH_CHANNELS;ci++)
    if(track_gate_remaining[ci]&&track_gate_remaining[ci]<until)until=track_gate_remaining[ci];
   uint32_t chunk=frames-offset<until?frames-offset:until;
-  track_chip_render(&track_chip,&track_mix,dst+offset*2u,chunk);
-  track_drum_render(&track_drum,&track_mix,dst+offset*2u,chunk);
-  track_chip_process_punch(&track_chip,track_state.punch_mask,dst+offset*2u,chunk);
+  track_chip_set_punch_octave(&track_chip,track_state.punch_mask);track_chip_render(&track_chip,render_mix,dst+offset*2u,chunk);
+  track_drum_render(&track_drum,render_mix,dst+offset*2u,chunk);
+  track_chip.punch_bpm=track_state.transport.bpm;track_chip_process_punch(&track_chip,track_state.punch_mask,dst+offset*2u,chunk);
   track_master_process(&track_master_dsp,&track_master_cfg,dst+offset*2u,chunk);
   offset+=chunk;track_audio_clock+=chunk;
   for(uint8_t ci=0u;ci<TRACK_SYNTH_CHANNELS;ci++)if(track_gate_remaining[ci]){
@@ -532,8 +819,8 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
      track_replay_punch_mask=0u;
      track_sync_punch_params();
      track_state.punch_mask=track_live_punch_mask;
-     track_audio_all_off(audio);track_audio_started=0u;
-     if(offset<frames){track_chip_render(&track_chip,&track_mix,dst+offset*2u,frames-offset);track_drum_render(&track_drum,&track_mix,dst+offset*2u,frames-offset);track_chip_process_punch(&track_chip,track_state.punch_mask,dst+offset*2u,frames-offset);track_master_process(&track_master_dsp,&track_master_cfg,dst+offset*2u,frames-offset);}
+     track_audio_all_off(audio);track_audio_started=0u;beetle_mute_cancel(&track_mute_queue);track_live_mutes.pending=track_live_solos.pending=0u;track_live_mutes.pending_values=track_live_solos.pending_values=0u;
+     if(offset<frames){track_chip_set_punch_octave(&track_chip,track_state.punch_mask);track_chip_render(&track_chip,render_mix,dst+offset*2u,frames-offset);track_drum_render(&track_drum,render_mix,dst+offset*2u,frames-offset);track_chip.punch_bpm=track_state.transport.bpm;track_chip_process_punch(&track_chip,track_state.punch_mask,dst+offset*2u,frames-offset);track_master_process(&track_master_dsp,&track_master_cfg,dst+offset*2u,frames-offset);}
      return;
     }
    }
@@ -542,6 +829,20 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
    track_state.punch_mask=(uint8_t)(track_replay_punch_mask|track_live_punch_mask);
    track_chip_begin_step(&track_chip);
    track_swing_pending_mask=0u;
+   /* Transport-facing live mutes commit exactly at the new pattern start.
+    * Playback can be stopped mid-step without activating queued changes. */
+   if(track_state.transport.play_step==0u){
+    beetle_mute_commit(&track_mute_queue,&track_mix);
+    if(track_song.enabled){
+     beetle_live_commit(&track_live_mutes);beetle_live_commit(&track_live_solos);
+     live_audio_mix=track_mix;
+     for(uint8_t c=0u;c<TRACK_CHANNELS;c++){
+      live_audio_mix.ch[c].mute=beetle_live_value(&track_live_mutes,c,track_mix.ch[c].mute);
+      live_audio_mix.ch[c].solo=beetle_live_value(&track_live_solos,c,track_mix.ch[c].solo);
+     }
+     render_mix=&live_audio_mix;
+    }
+   }
    track_groove_start_step(audio,interval);
   }
  }
@@ -554,14 +855,21 @@ static void track_fm1_leds(void){
  uint32_t locked=etch_led_keylock_targets(fm1_in.notes,native_controls.octave,&h);
  for(uint8_t k=0u;k<27u;k++){
   uint8_t active=(uint8_t)(((fm1_in.notes|guide|locked)>>k)&1u);
-  if(track_page==6u){
+  if(track_page==6u || track_page==30u){
    int8_t lane=beetle_black_mute_lane(k);
-   active=(uint8_t)(lane>=0?track_mix.ch[(uint8_t)lane].mute:0u);
+   int8_t solo_lane=beetle_white_solo_lane(k);
+   if(track_page==30u){
+    active=(uint8_t)(lane>=0?beetle_live_value(&track_live_mutes,(uint8_t)lane,track_mix.ch[(uint8_t)lane].mute):
+      solo_lane>=0?beetle_live_value(&track_live_solos,(uint8_t)solo_lane,track_mix.ch[(uint8_t)solo_lane].solo):0u);
+   }else active=(uint8_t)(lane>=0?beetle_mute_next(&track_mute_queue,&track_mix,(uint8_t)lane):
+       solo_lane>=0?track_mix.ch[(uint8_t)solo_lane].solo:0u);
   }
   fm1_led_key(14u+k,active);
  }
- fm1_led_key(0u,(fm1_in.buttons&1u)!=0u);
- fm1_led_key(1u,(fm1_in.buttons&2u)!=0u);
+ /* Persistent octave offset feedback: minus LED for negative values, plus
+  * LED for positive ones. Both dark at 0, unless physically held. */
+ fm1_led_key(0u,(uint8_t)(track_page==30u?track_live_q_mute:(native_controls.octave<0 || (fm1_in.buttons&1u))));
+ fm1_led_key(1u,(uint8_t)(track_page==30u?track_live_q_solo:(native_controls.octave>0 || (fm1_in.buttons&2u))));
  fm1_irq_enable_all();
 }
 /* TRACK display is native 240x240 RGB565. The supplied 1280px mockup is
@@ -727,15 +1035,82 @@ static void track_fm1_mixer_screen(void){
    else if(j==1u)track_fmt_int(val,track_mix.ch[c].volume);
    else if(j==2u){int v=track_mix.ch[c].pan;val[0]=v<0?'-':'+';if(v<0)v=-v;track_fmt_int(val+1u,(uint32_t)v);}
    else if(j==5u)track_fmt_int(val,track_mix.ch[c].swing);
-   else{uint8_t on=j==3u?track_mix.ch[c].mute:track_mix.ch[c].solo;
-    val[0]=on?'O':'-';val[1]=on?'N':'-';val[2]=0;}
+   else{uint8_t queued=(uint8_t)(j==3u && (track_mute_queue.pending&(1u<<c)));
+    uint8_t on=j==3u?beetle_mute_next(&track_mute_queue,&track_mix,c):track_mix.ch[c].solo;
+    if(queued){val[0]='Q';val[1]=on?'1':'0';val[2]=0;}else{val[0]=on?'O':'-';val[1]=on?'N':'-';val[2]=0;}}
    /* Purple CH index only while actual post-mixer PCM is being produced. */
    uint16_t ink=(j==0u&&track_state.transport.playing&&track_lane_pcm_peak[c]>=96u)?TRACK_PINK:TRACK_WHITE;
    track_pix_text(val,xs[j],y+4u,ink);
   }
  }
  track_pix_text("K1 LANE K2 FIELD K3 SET",10u,207u,TRACK_PINK);
- track_pix_text("BLACK KEYS 1-6: MUTE",12u,222u,TRACK_WHITE);
+ track_pix_text(track_mix.quantize_mutes?"SEL: Q MUTES ON":"SEL: Q MUTES OFF",10u,222u,track_mix.quantize_mutes?TRACK_PINK:TRACK_WHITE);
+}
+/* Mixer-adjacent performance screen; full 240x240 bounded layout. */
+static void beetle_snapshot_screen(void){
+ track_page_header("PERFORMANCE",43u);
+ track_pix_text("MUTE SNAPSHOTS  1-4",18u,51u,TRACK_PINK);
+ for(uint8_t slot=0u;slot<BEETLE_SNAPSHOT_SLOTS;slot++){
+  uint16_t y=(uint16_t)(79u+slot*31u);
+  if(track_snapshot_slot==slot)lcd_fill(9u,y-5u,220u,27u,0x4807u);
+  char label[12]="SLOT ";label[5]=(char)('1'+slot);label[6]=0;
+  track_pix_text(label,15u,y,track_snapshot_slot==slot?TRACK_BRIGHT:TRACK_WHITE);
+  if(!(track_snapshots.valid&(1u<<slot))){
+   track_pix_text("EMPTY",120u,y,TRACK_WHITE);continue;
+  }
+  for(uint8_t lane=0u;lane<TRACK_CHANNELS;lane++){
+   uint16_t x=(uint16_t)(107u+lane*20u);
+   uint16_t fill=(track_snapshots.masks[slot]&(1u<<lane))?TRACK_PINK:TRACK_WHITE;
+   lcd_fill(x,y-1u,13u,13u,fill);
+   /* Unmuted = white, muted = pink. Both are distinguishable. */
+  }
+ }
+ lcd_fill(10u,205u,219u,1u,0x4807u);
+ track_pix_text("K1 SLOT K2 SAVE K3 RECALL",9u,211u,TRACK_WHITE);
+ track_pix_text("FX GROUPS   HOME MIXER",9u,225u,TRACK_PINK);
+}
+static void beetle_group_screen(void){
+ track_page_header("MUTE GROUPS",43u);
+ track_pix_text("4 GROUPS / 6 LANES",18u,51u,TRACK_PINK);
+ for(uint8_t slot=0u;slot<BEETLE_GROUP_SLOTS;slot++){
+  uint16_t y=(uint16_t)(79u+slot*31u);
+  if(track_group_slot==slot)lcd_fill(9u,y-5u,220u,27u,0x4807u);
+  char label[10]="GROUP ";label[6]=(char)('1'+slot);label[7]=0;
+  track_pix_text(label,13u,y,track_group_slot==slot?TRACK_BRIGHT:TRACK_WHITE);
+  for(uint8_t lane=0u;lane<TRACK_CHANNELS;lane++){
+   uint16_t x=(uint16_t)(107u+lane*20u);
+   uint8_t member=(track_groups.masks[slot]&(1u<<lane))!=0u;
+   if(track_group_slot==slot&&track_group_lane==lane)
+    lcd_fill((uint16_t)(x-2u),(uint16_t)(y-3u),17u,17u,TRACK_PINK);
+   lcd_fill(x,(uint16_t)(y-1u),13u,13u,member?TRACK_PINK:TRACK_WHITE);
+   if(track_group_slot==slot&&track_group_lane==lane)
+    lcd_fill((uint16_t)(x+3u),(uint16_t)(y+2u),7u,7u,member?TRACK_DARK:0x4807u);
+  }
+ }
+ lcd_fill(10u,205u,219u,1u,0x4807u);
+ track_pix_text("K1 GRP K2 LANE SEL SET",9u,211u,TRACK_WHITE);
+ track_pix_text("K3 TOGGLE HOME: SNAPS",9u,225u,TRACK_PINK);
+}
+/* Live song mixer: white keys 1-6 correspond to CH1..CH6. Pending changes
+ * take effect on the NEXT pattern boundary while transport is running.
+ * No heap, no flash writes, and no change to the saved Q-mute preference. */
+static void track_fm1_live_mixer_screen(void){
+ lcd_fill(0u,0u,240u,240u,TRACK_DARK);
+ track_page_header("LIVE MIXER",43u);
+ track_pix_text("CH      MUTE        SOLO",10u,50u,TRACK_PINK);
+ for(uint8_t c=0u;c<TRACK_CHANNELS;c++){
+  const uint16_t y=(uint16_t)(72u+c*22u);
+  char lane[5]="CH";lane[2]=(char)('1'+c);lane[3]=0;
+  track_pix_text(lane,10u,y,TRACK_WHITE);
+  uint8_t mute=beetle_live_next(&track_live_mutes,c,track_mix.ch[c].mute);
+  uint8_t solo=beetle_live_next(&track_live_solos,c,track_mix.ch[c].solo);
+  uint8_t qm=(uint8_t)((track_live_mutes.pending&(1u<<c))!=0u);
+  uint8_t qs=(uint8_t)((track_live_solos.pending&(1u<<c))!=0u);
+  track_pix_text(qm?(mute?"[Q M]":"[Q -]"):(mute?"[X] M":"[ ] M"),67u,y,qm||mute?TRACK_PINK:TRACK_WHITE);
+  track_pix_text(qs?(solo?"[Q S]":"[Q -]"):(solo?"[X] S":"[ ] S"),153u,y,qs||solo?TRACK_PINK:TRACK_WHITE);
+ }
+ track_pix_text(track_live_q_mute?"OCT-: Q MUTE ON":"OCT-: Q MUTE OFF",8u,210u,track_live_q_mute?TRACK_PINK:TRACK_WHITE);
+ track_pix_text(track_live_q_solo?"OCT+: Q SOLO ON":"OCT+: Q SOLO OFF",8u,224u,track_live_q_solo?TRACK_PINK:TRACK_WHITE);
 }
 static void track_fm1_song_screen(void){
  lcd_fill(0u,0u,240u,240u,TRACK_DARK);
@@ -761,7 +1136,7 @@ static void track_fm1_song_screen(void){
  }
  track_pix_text(track_song.enabled?(track_song.loop?"[X] SONG ON  LOOP: ON":"[X] SONG ON  LOOP: OFF"):(track_song.loop?"[ ] SONG OFF  LOOP: ON":"[ ] SONG OFF  LOOP: OFF"),11u,193u,TRACK_PINK);
  track_pix_text("OCT+ ADD  OCT- DELETE",10u,208u,TRACK_BRIGHT);
- track_pix_text("K1 POS  K2 PAT/REP  K3 VAL",10u,219u,TRACK_BRIGHT);
+ track_pix_text("SEL \"TOGGLE ON/OFF\"",10u,219u,TRACK_BRIGHT);
 }
 static void track_fm1_overlay(const char *title){
  track_fm1_grid(); /* consistent background with the original tracker UI */
@@ -788,7 +1163,8 @@ static void track_fm1_drum_editor_screen(void){
   char num[12];int v=values[i];uint8_t prefix=0u;if(v<0){num[0]='-';v=-v;prefix=1u;}track_fmt_int(num+prefix,(uint32_t)v);
   track_pix_text(num,182u,y,TRACK_WHITE);
  }
- track_pix_text("SELECT DRUM  K1 FIELD  K3 VALUE",4u,219u,TRACK_PINK);
+ track_pix_text("ANY KEY: PREVIEW SELECTED DRUM",4u,211u,TRACK_PINK);
+ track_pix_text("SELECT DRUM  K1 FIELD K3 VALUE",4u,222u,TRACK_BRIGHT);
 }
 /* Pixel-perfect 4-knob MASTER FX UI, small enough for 240x240 OLED. */
 /* Fully circular, filled pixel knob. No floating-point calculations in UI.
@@ -824,8 +1200,8 @@ static void track_fm1_master_screen(void){
   uint8_t fx=track_master_cfg.order[i];if(fx>2u)continue;
   uint16_t y=(uint16_t)(54u+20u*i);
   if(track_master_focus==i)lcd_fill(10u,y-2u,220u,18u,0x4807u);
-  char name[23];name[0]=(char)('1'+i);name[1]=' ';name[2]=track_master_cfg.enabled[fx]?'[':'(';
-  name[3]=track_master_cfg.enabled[fx]?'X':' ';name[4]=track_master_cfg.enabled[fx]?']':')';name[5]=' ';
+  char name[23];name[0]=(char)('1'+i);name[1]=' ';name[2]='[';
+  name[3]=track_master_cfg.enabled[fx]?'X':' ';name[4]=']';name[5]=' ';
   uint8_t j=6u;const char *nm=labels[fx];while(*nm&&j<21u)name[j++]=*nm++;name[j]=0;
   track_pix_text(name,16u,y,track_master_focus==i?TRACK_PINK:TRACK_WHITE);
  }
@@ -854,7 +1230,7 @@ static void track_fm1_master_screen(void){
    lcd_fill((uint16_t)(17u+i*4u),(uint16_t)y,2u,1u,TRACK_BRIGHT);
   }
   track_pix_text("OCT- WIDTH OCT+ FREQ",10u,207u,TRACK_WHITE);
-  track_pix_text("K1-4 EQ SEQ+K4 ORDER",10u,219u,TRACK_PINK);
+  /* The shared footer below carries master navigation instructions. */
  }else{
   const uint8_t values[4]={
    fx==1u?track_master_cfg.comp_threshold:track_master_cfg.reverb_wet,
@@ -872,15 +1248,22 @@ static void track_fm1_master_screen(void){
    char num[12];track_fmt_int(num,values[i]);
    track_pix_center(num,cx,188u,TRACK_BRIGHT);
   }
-  track_pix_text(fx==1u?"K1 THR K2 RAT K3 GAIN K4 ATK":"K1 WET K2 TAIL K3 TONE K4 WID",6u,210u,TRACK_WHITE);
+  track_pix_text(fx==1u?"SEL THR K2 RAT K3 GAIN K4 ATK":"SEL WET K2 TAIL K3 TONE K4 WID",6u,210u,TRACK_WHITE);
  }
- track_pix_text("SEL FX  ENV ON/OFF  SEQ+K4 ORDER",3u,224u,TRACK_PINK);
+ track_pix_text("SELECT FX SEL ON/OFF SEQ+K4",3u,224u,TRACK_PINK);
 }
 static void beetle_draw_keyboard_octave(uint16_t y){
  char msg[24]="KEY OCT ";int8_t v=native_controls.octave;
  msg[8]=(char)(v<0?'-':'+');msg[9]=(char)('0'+(v<0?-v:v));
  msg[10]=' ';msg[11]='O';msg[12]='C';msg[13]='T';msg[14]='-';msg[15]='/';msg[16]='+';msg[17]=0;
  track_pix_text(msg,9u,y,TRACK_WHITE);
+}
+/* On-screen numerical counters, deliberately no format strings or heap. */
+static void track_rc_metric(const char *name,uint32_t value,uint16_t y){
+ char digits[18];track_fmt_int(digits,value);
+ track_pix_text(name,10u,y,TRACK_WHITE);
+ uint16_t width=track_pix_width(digits);
+ track_pix_text(digits,width<230u?(uint16_t)(230u-width):8u,y,TRACK_PINK);
 }
 static void track_fm1_paint(void){
  if((int32_t)(track_boot_splash_until-etch_ms)>0){
@@ -900,8 +1283,9 @@ static void track_fm1_paint(void){
   track_fmt_int(n,TRACK_GROOVE_RATCHET(s));track_pix_text(n,108u,131u,track_groove_focus==1u?TRACK_PINK:TRACK_WHITE);
   track_pix_text("PROB %",12u,160u,track_groove_focus==2u?TRACK_PINK:TRACK_WHITE);
   track_fmt_int(n,TRACK_GROOVE_PROB(s));track_pix_text(n,108u,160u,track_groove_focus==2u?TRACK_PINK:TRACK_WHITE);
-  track_pix_text("K3 ADJUST   SEL RESET",9u,195u,TRACK_PINK);
-  track_pix_text("SEQ/HOME: TRACKER",11u,220u,TRACK_WHITE);
+  track_pix_text("SEQ+OP1/2 COPY/PASTE",7u,183u,TRACK_WHITE);
+  track_pix_text("SEQ+OP3/4 FILL/CLEAR",7u,201u,TRACK_PINK);
+  track_pix_text("K3 VALUE SEL RESET",12u,222u,TRACK_WHITE);
   return;
  }
  if(track_page==21u){
@@ -969,9 +1353,78 @@ static void track_fm1_paint(void){
   track_pix_text("EDIT WHILE STOPPED",12u,228u,TRACK_PINK);
   return;
  }
+
+ if(track_page==25u){
+  track_page_header("INSTRUMENT LIBRARY",43u);
+  track_pix_text("8 PROJECT PATCH SLOTS",13u,48u,TRACK_PINK);
+  for(uint8_t slot=0u;slot<BEETLE_LIBRARY_SLOTS;slot++){
+   uint16_t y=(uint16_t)(66u+slot*16u);
+   if(slot==track_library_slot)lcd_fill(9u,y-2u,220u,15u,TRACK_ROW_BG);
+   char num[5];track_fmt_int(num,slot+1u);track_pix_text(num,14u,y,slot==track_library_slot?TRACK_PINK:TRACK_WHITE);
+   char name[BEETLE_LIBRARY_NAME+1u];
+   for(uint8_t k=0u;k<BEETLE_LIBRARY_NAME;k++)name[k]=track_library.name[slot][k];
+   name[BEETLE_LIBRARY_NAME]=0;
+   track_pix_text(beetle_library_valid(&track_library,slot)?name:"[EMPTY]",48u,y,slot==track_library_slot?TRACK_PINK:TRACK_WHITE);
+   if(beetle_library_valid(&track_library,slot))track_pix_text("*",200u,y,TRACK_PINK);
+  }
+  static const char *const actions[]={"STORE","LOAD","COPY","RENAME"};
+  track_pix_text(actions[track_library_action],11u,198u,TRACK_PINK);
+  char target[12]="INST ";track_fmt_int(target+5u,track_library_target+1u);
+  char dest[12]="DEST ";track_fmt_int(dest+5u,track_library_copy_source+1u);
+  track_pix_text(track_library_action==2u?dest:target,125u,198u,TRACK_WHITE);
+  track_pix_text(track_library_notice==1u?"PATCH STORED":track_library_notice==2u?"PATCH LOADED":
+   track_library_notice==3u?"PATCH COPIED":track_library_notice==4u?"EMPTY SLOT":track_library_notice==5u?"NAME SAVED":"K1 SLOT K2 ACTION",9u,214u,TRACK_PINK);
+  track_pix_text("K3 INST  SEL APPLY",9u,227u,TRACK_WHITE);return;
+ }
+ if(track_page==26u){
+  track_page_header("INSTRUMENT NAME",43u);
+  track_pix_text("K1 POSITION K2 LETTER",12u,53u,TRACK_PINK);
+  char name[BEETLE_LIBRARY_NAME+1u];
+  for(uint8_t k=0u;k<BEETLE_LIBRARY_NAME;k++)name[k]=track_library_name_editor.touched[k]?track_library_name_editor.name[k]:'_';
+  name[BEETLE_LIBRARY_NAME]=0;
+  uint16_t left=(uint16_t)(120u-track_pix_width(name)/2u);
+  track_pix_text(name,left,100u,TRACK_WHITE);
+  lcd_fill((uint16_t)(left+6u*(track_library_name_editor.cursor%BEETLE_LIBRARY_NAME)),110u,5u,2u,TRACK_PINK);
+  track_pix_text("SEL CONFIRM",20u,175u,TRACK_PINK);
+  track_pix_text("HOME CANCEL",20u,207u,TRACK_WHITE);return;
+ }
+ if(track_page==27u){
+  /* Copy under interrupt exclusion: ALNK0 writes counters, never the UI. */
+  struct beetle_rc_monitor snap;
+  uint32_t clips,voice_shed;
+  fm1_irq_off();snap=native_rc;clips=native_audio_clip_frames;voice_shed=native_voice_shed_count;fm1_irq_enable_all();
+  track_page_header(track_rc_tab?"RC MIDI INPUT":"RC AUDIO LOAD",43u);
+  track_pix_text("READ ONLY / HARDWARE PROBE",10u,40u,TRACK_PINK);
+  if(!track_rc_tab){
+   track_rc_metric("DSP MAX x0.1%",beetle_rc_tenths(snap.max_render),64u);
+   track_rc_metric("WALL MAX x0.1%",beetle_rc_tenths(snap.max_wall),80u);
+   track_rc_metric("NEST MAX x0.1%",beetle_rc_tenths(snap.max_nested),96u);
+   track_rc_metric("DMA OK BLOCKS",snap.blocks,112u);
+   track_rc_metric("WALL >= 85%",snap.wall_85,128u);
+   track_rc_metric("WALL >= 95%",snap.wall_95,144u);
+   track_rc_metric("LATE AFTER COPY",snap.late,160u);
+   track_rc_metric("BLOCKED BEFORE",snap.guard,176u);
+   track_rc_metric("CLIP FRAMES",clips,192u);
+   track_rc_metric("VOICE SHED",voice_shed,208u);
+  }else{
+   track_rc_metric("MIDI RX PACKETS",snap.midi_rx,65u);
+   track_rc_metric("MIDI F8 CLOCKS",snap.midi_clock,83u);
+   track_rc_metric("RX OVERFLOWS",snap.midi_overflows,101u);
+   track_rc_metric("CLOCK MIN MS",snap.clock_min_ms,119u);
+   track_rc_metric("CLOCK MAX MS",snap.clock_max_ms,137u);
+   track_rc_metric("CLOCK LAST MS",snap.clock_last_ms,155u);
+   track_pix_text("MILLISECONDS RESOLUTION",11u,178u,TRACK_PINK);
+   track_pix_text("NOT CLOCK SYNC / LATENCY",11u,195u,TRACK_WHITE);
+  }
+  track_pix_text("K1 TAB  HOME MENU  SEQ EXIT",8u,227u,TRACK_PINK);
+  return;
+ }
  if(track_page==0u){track_fm1_grid();return;}
  if(track_page==6u){track_fm1_mixer_screen();return;}
+ if(track_page==23u){beetle_snapshot_screen();return;}
+ if(track_page==24u){beetle_group_screen();return;}
  if(track_page==9u){track_fm1_song_screen();return;}
+ if(track_page==30u){track_fm1_live_mixer_screen();return;}
  if(track_page==16u){track_fm1_drum_editor_screen();return;}
  if(track_page==17u){track_fm1_master_screen();return;}
  if(track_page==2u){
@@ -1016,7 +1469,7 @@ static void track_fm1_paint(void){
    char num[4];track_u8(num,row);track_pix_text(num,14u,y,TRACK_BRIGHT);
    uint8_t count=0u;const struct track_song_event *ev=0;
    for(uint8_t n=0u;n<clip->count;n++)if(clip->data[n].step==row){if(count==track_punch_edit_index)ev=&clip->data[n];count++;}
-   static const char *const fx[]={"REPEAT","REVERSE","FILTER","TAPE","STUTTER","OCT UP","OCT DN","MUTE"};
+   static const char *const fx[]={"REPEAT","RING MOD","FILTER","TAPE","STUTTER","OCT UP","OCT DN","MUTE"};
    track_pix_text(ev?(ev->down?fx[ev->fx&7u]:"[STP]"):"---",68u,y,TRACK_BRIGHT);
    if(ev&&ev->down==2u){char param[12]="ALG ";track_fmt_int(param+4u,ev->param);
     track_pix_text(param,154u,y,TRACK_PINK);
@@ -1054,7 +1507,7 @@ static void track_fm1_paint(void){
  }
  if(track_page==4u){
   track_page_header("PUNCH-IN FX",43u);
-  static const char *const punches[]={"REPEAT","REVERSE","FILTER","TAPE STOP","STUTTER","OCT UP","OCT DOWN","MUTE"};
+  static const char *const punches[]={"REPEAT","RING MOD","FILTER","TAPE STOP","STUTTER","OCT UP","OCT DOWN","MUTE"};
   for(uint8_t j=0u;j<8u;j++){
    uint16_t x=(uint16_t)(17u+(j%2u)*106u),y=(uint16_t)(58u+(j/2u)*32u);
    uint8_t held=(uint8_t)(((track_live_punch_mask|track_replay_punch_mask)&(1u<<j))!=0u);
@@ -1062,10 +1515,18 @@ static void track_fm1_paint(void){
    char name[20];name[0]=(char)('1'+j);name[1]=' ';
    uint8_t k=0u;while(punches[j][k]&&k<16u){name[k+2u]=punches[j][k];k++;}name[k+2u]=0;
    track_pix_text(name,x+4u,y+6u,held?TRACK_DARK:TRACK_WHITE);
-   if(held&&j<5u){char alg[16]="ALG ";char val[12];track_fmt_int(val,track_chip.punch_param[j]);
-    uint8_t i=4u;for(uint8_t p=0u;val[p]&&i<14u;)alg[i++]=val[p++];alg[i]=0;
-    track_pix_text(alg,x+4u,y+16u,TRACK_WHITE);}
+   if(held&&j<5u){
+    if(j==4u){
+     static const char *const rates[]={"/8","/4","/2","X1","X2","X4","X8"};
+     char alg[16]="BPM ";const char *rate=rates[beetle_stutter_index(track_chip.punch_param[4])];
+     uint8_t i=4u;for(uint8_t p=0u;rate[p]&&i<14u;)alg[i++]=rate[p++];alg[i]=0;
+     track_pix_text(alg,x+4u,y+16u,TRACK_WHITE);
+    }else {char alg[16]="K1  ";char val[12];track_fmt_int(val,track_chip.punch_param[j]);
+     uint8_t i=4u;for(uint8_t p=0u;val[p]&&i<14u;)alg[i++]=val[p++];alg[i]=0;
+     track_pix_text(alg,x+4u,y+16u,TRACK_WHITE);}
+   }
   }
+  track_pix_text("HOLD KEY + K1: INTENSITY",12u,192u,TRACK_PINK);
   track_pix_text(track_state.record_armed?"REC: ON":"REC: OFF",12u,202u,track_state.record_armed?TRACK_PINK:TRACK_WHITE);
   track_pix_text(track_replay_punch_mask?"REC FX PLAYING / LIT":"WHITE KEYS HOLD TO PLAY",12u,221u,TRACK_BRIGHT);return;
  }
@@ -1080,8 +1541,8 @@ static void track_fm1_paint(void){
    static const char *const combining[]={"DETUNE B","MIX A/B","MORPH","DRIVE","SUB OSC","NOISE","FM DEPTH"};
    static const char *const sidcombine[]={"DETUNE B","MIX A/B","FILT MODE","RESONANCE","SUB OSC","NOISE","FM DEPTH"};
    const struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
-   const struct track_va_patch *p=&track_chip.patches[st->instrument&3u];
-   const uint8_t sid_mode=(uint8_t)(track_chip.osc_type[st->instrument&3u]>=TRACK_CHIP_RESID_LITE);
+   const struct track_va_patch *p=&track_chip.patches[track_input_instrument[track_state.transport.edit_channel]&3u];
+   const uint8_t sid_mode=(uint8_t)(track_chip.osc_type[track_input_instrument[track_state.transport.edit_channel]&3u]>=TRACK_CHIP_RESID_LITE && track_chip.osc_type[track_input_instrument[track_state.transport.edit_channel]&3u]<=TRACK_CHIP_SID_NOISE);
    char values[7][24],items[7][40];const char *entries[7];
    uint8_t count=(track_osc_bank==3u)?7u:4u;
    for(uint8_t i=0;i<count;i++){
@@ -1101,15 +1562,15 @@ static void track_fm1_paint(void){
     uint8_t j=0;while(values[i][j]&&at<39u)items[i][at++]=values[i][j++];items[i][at]=0;entries[i]=items[i];
    }
    track_web_list(entries,count,track_osc_cursor,51u,20u);
-   track_pix_text("K1 SELECT  K3 EDIT",12u,195u,TRACK_PINK);
+   track_pix_text(track_edit_patch_full?"4 PATCH SLOTS IN USE":"K1 SELECT  K3 EDIT",12u,195u,TRACK_PINK);
    beetle_draw_keyboard_octave(214u);return;
   }
-  static const char *const types[]={"RETRO PULSE","RETRO WAVE","VA OSC","VA OSC2","SID 6581","SID 8580","SID DIRTY","SID BASS","SID NOISE"};
+  static const char *const types[]={"RETRO PULSE","RETRO WAVE","VA OSC","VA OSC2","SID 6581","SID 8580","SID DIRTY","SID BASS","SID NOISE","NES PULSE","NES TRIANGLE","NES NOISE"};
   static const char *const keys[]={"TYPE","ATTACK","DECAY","SUSTAIN","RELEASE","DUTY","CUTOFF","VOLUME"};
   const struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
-  const struct track_instrument_ui_values *v=&track_ui_inst[st->instrument&3u];
+  const struct track_instrument_ui_values *v=&track_ui_inst[track_input_instrument[track_state.transport.edit_channel]&3u];
   char values[8][24];char items[8][40];const char *entry[8];
-  uint8_t type=track_chip.osc_type[st->instrument&3u]%TRACK_CHIP_TYPES;
+  uint8_t type=track_chip.osc_type[track_input_instrument[track_state.transport.edit_channel]&3u]%TRACK_CHIP_TYPES;
   const char *name=types[type];uint8_t k=0u;
   while(name[k]&&k<23u){values[0][k]=name[k];k++;}values[0][k]=0;
   const uint8_t cents[]={v->attack,v->decay,v->sustain,v->release};
@@ -1128,7 +1589,7 @@ static void track_fm1_paint(void){
    items[i][pos]=0;entry[i]=items[i];
   }
   track_web_list(entry,8u,track_osc_cursor,51u,19u);
-  track_pix_text(track_edit_poly?"POLY AUDITION":"MONO AUDITION",17u,202u,TRACK_PINK);
+  track_pix_text(track_edit_patch_full?"4 PATCH SLOTS IN USE":(track_edit_poly?"POLY AUDITION":"MONO AUDITION"),17u,202u,TRACK_PINK);
   beetle_draw_keyboard_octave(216u);return;
  }
  if(track_page==19u){
@@ -1153,17 +1614,49 @@ static void track_fm1_paint(void){
   lcd_fill(9u,201u,221u,1u,0x4807u);
   track_pix_text("HOME: MENU  SEQ: TRACKER",10u,208u,TRACK_BRIGHT);
   char count[18]="";char a[8],b[8];
-  track_fmt_int(a,(uint32_t)track_help_offset+1u);
+  track_fmt_int(a,(uint32_t)track_help_offset+BEETLE_HELP_VISIBLE>=BEETLE_HELP_COUNT?BEETLE_HELP_COUNT:(uint32_t)track_help_offset+BEETLE_HELP_VISIBLE);
   track_fmt_int(b,BEETLE_HELP_COUNT);
   uint8_t n=0u,j=0u;while(a[j]&&n<8u)count[n++]=a[j++];count[n++]='/';
   j=0u;while(b[j]&&n<15u)count[n++]=b[j++];count[n]=0;
   track_pix_center(count,120u,225u,TRACK_PINK);
   return;
  }
+ if(track_page==29u){
+  track_page_header("PROJECTS",43u);
+  const char *const options[]={"NEW PROJECT","LOAD PROJECT"};
+  track_web_list(options,2u,track_boot_menu_choice,82u,32u);
+  track_pix_center("K1 CHOOSE   SEL OPEN",120u,209u,TRACK_PINK);
+  return;
+ }
+ if(track_page==28u){
+  track_page_header("CREDITS",43u);
+  static const char *const lines[]={
+   "BEETLE / SIKKENWORKS",
+   "JOPPE SIKKEN",
+   "DESIGN / FIRMWARE / UI",
+   "",
+   "FELUCCA / LEO KUROSHITA",
+   "HUGELTON INSTRUMENTS",
+   "FM1 HAL / BOOT / OTA",
+   "",
+   "RESID / DAG LEM (SID REF)",
+   "NES_SND_EMU / SHAY GREEN",
+   "JAMES ATHEY (MAINTAINER)",
+   "NES TECHNICAL REFERENCE"
+  };
+  /* Keep all credit lines visible above the footer on the 240px display. */
+  for(uint8_t i=0u;i<12u;i++){
+   uint16_t y=(uint16_t)(53u+i*12u);
+   uint16_t color=(i==0u||i==4u||i==8u||i==9u)?TRACK_PINK:TRACK_WHITE;
+   track_pix_text(lines[i],8u,y,color);
+  }
+  track_pix_text("HOME MENU  SEQ TRACKER",9u,217u,TRACK_BRIGHT);
+  return;
+ }
  if(track_page==1u){
   track_page_header("PROJECTS",43u);
-  const char *const entries[]={"SAVE","SAVE AS","LOAD PROJECT","NEW PROJECT","HELP"};
-  track_web_list(entries,5u,track_menu_index,54u,26u);
+  const char *const entries[]={"SAVE","SAVE AS","LOAD PROJECT","NEW PROJECT","HELP","CREDITS","DIAGNOSTICS"};
+  track_web_list(entries,7u,track_menu_index,52u,19u);
   char status[24]="SLOT ";track_fmt_int(status+5u,(uint32_t)track_state.project_slot+1u);
   track_pix_text(status,20u,188u,TRACK_PINK);
   track_pix_text("K1 MENU K4 SLOT",20u,203u,TRACK_WHITE);
@@ -1220,7 +1713,7 @@ static void track_fm1_paint(void){
    track_storage_result==TRACK_JOURNAL_FOREIGN?"FOREIGN STORAGE":
    track_storage_result==TRACK_JOURNAL_NO_PROJECT?"NO PROJECT":
    track_storage_result==TRACK_JOURNAL_HARDWARE_LOCKED?"FLASH SAVE LOCKED":
-   track_storage_result==TRACK_JOURNAL_CAPACITY?"PROJECT TOO FULL":"STORAGE ERROR",120u,109u,TRACK_WHITE);
+   track_storage_result==TRACK_JOURNAL_CAPACITY?(track_new_project_full?"NO FREE PROJECT SLOT":"PROJECT TOO FULL"):"STORAGE ERROR",120u,109u,TRACK_WHITE);
   track_pix_center(track_storage_result==TRACK_JOURNAL_OK?
    (track_storage_just_initialized?"INITIALIZED + PROJECT SAVED":"CRC VERIFIED"):
    "NO DATA WRITTEN",120u,131u,TRACK_BRIGHT);
@@ -1278,10 +1771,20 @@ static void track_fm1_draw(void){
  if(track_page==6u){fm1_irq_off();for(uint8_t c=0u;c<TRACK_CHANNELS;c++)track_lane_pcm_peak[c]=0u;fm1_irq_enable_all();}
 }
 static void track_begin_save(void){
+ track_save_return_page=track_page==29u?0u:track_page;
  track_name_begin(&track_editor,track_named?track_title:0);
  track_page=2u;
 }
 static void track_complete_save(void){
+ if(track_new_project_full){
+  /* All 12 slots occupied or flash ownership unknown. Never auto-overwrite. */
+  track_storage_result=TRACK_JOURNAL_CAPACITY;track_page=8u;return;
+ }
+ /* A synchronous SAVE blocks input polling (including VERIFY). Catch any SEL
+  * edge produced while it runs, even when returning directly to TRACKER.
+  * Also protect error/overwrite/provisioning paths. */
+ beetle_load_input_arm(&track_load_input_guard,etch_ms);
+ track_sel_tracker_ready=0u;
  track_storage_just_initialized=0u;
  if(track_state.transport.playing||native_safe||native_tripped||native_updating){
   track_storage_result=TRACK_JOURNAL_HARDWARE_LOCKED;track_page=8u;return;
@@ -1332,29 +1835,50 @@ static void track_complete_save(void){
  track_overwrite_wait=0u;
  /* Only successful saves jump back into the sequencer. Failed writes retain
   * the explicit error page; nothing is silently reported as saved. */
- track_page=track_storage_result==TRACK_JOURNAL_OK?0u:8u;
+ track_page=track_storage_result==TRACK_JOURNAL_OK?track_save_return_page:8u;
+}
+/* Never guess that a used, foreign or unreadable bank is free. A complete
+ * two-bank preview is read-only. A manually selected SAVE AS is separate. */
+static uint8_t beetle_first_unused_slot(void){
+#if BEETLE_NATIVE_STORAGE
+ if(beetle_hal_probe_ownership()==BEETLE_CLAIM_BLANK)return 0u;
+ if(beetle_hal_probe_ownership()!=BEETLE_CLAIM_EXISTING)return TRACK_PROJECTS;
+ for(uint8_t slot=0u;slot<TRACK_PROJECTS;slot++){
+  char name[TRACK_NAME_MAX+1u];
+  int result=track_journal_preview(&beetle_hal_journal_io,slot,name);
+  if(result==TRACK_JOURNAL_NO_PROJECT)return slot;
+  /* OK = occupied; CRC/IO/foreign errors are never free. */
+ }
+ return TRACK_PROJECTS;
+#else
+ return 0u; /* read-only firmware never writes projects */
+#endif
 }
 static void beetle_project_new_session(void){
- uint8_t selected=track_state.project_slot;
+ uint8_t next=beetle_first_unused_slot();
+ uint8_t selected=next<TRACK_PROJECTS?next:track_state.project_slot;
+ track_new_project_full=(uint8_t)(next>=TRACK_PROJECTS);
  fm1_irq_off();
  track_chip_silence(&track_chip);track_drum_stop(&track_drum);
- track_init(&track_state);track_song_init(&track_song,&track_state);
+ track_init(&track_state);beetle_mute_cancel(&track_mute_queue);beetle_live_reset();beetle_snapshots_init(&track_snapshots);track_snapshot_slot=0u;beetle_groups_init(&track_groups);track_group_slot=track_group_lane=0u;track_song_init(&track_song,&track_state);
  beetle_edit_reset(&beetle_ed);
  track_mixer_init(&track_mix);track_drum_init(&track_drum);
  track_chip_init(&track_chip);
  for(uint8_t k=0u;k<5u;k++)track_punch_base_param[k]=track_chip.punch_param[k];
  track_punch_clear(&track_rec_events);
- track_ui_inst_reset();
- for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++)track_lane_instrument[c]=(uint8_t)(c&3u);
+ track_ui_inst_reset();beetle_library_init(&track_library);track_library_slot=track_library_action=track_library_target=track_library_copy_source=track_library_notice=0u;
+ for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++){track_lane_instrument[c]=(uint8_t)(c&3u);track_input_instrument[c]=(uint8_t)(c&3u);}
+ track_input_instrument[TRACK_DRUM_CHANNEL]=3u;for(uint8_t ch=0u;ch<TRACK_CHANNELS;ch++)track_input_explicit[ch]=0u;track_edit_patch_full=0u;
  track_state.project_slot=selected;track_state.dirty=0u;
  track_live_punch_mask=0u;track_replay_punch_mask=0u;
  track_swing_pending_mask=0u;track_preview_mask=0u;
  for(uint8_t i=0;i<27u;i++){track_preview_channel[i]=255u;track_preview_note[i]=255u;}
  fm1_irq_enable_all();
  for(uint8_t i=0;i<=TRACK_NAME_MAX;i++)track_title[i]=0u;
- track_named=0u;track_unsaved_action=0u;track_session_saved_slot=255u;track_saved_toast_until=0u;track_page=0u;
+ track_named=0u;track_unsaved_action=0u;track_overwrite_wait=0u;track_session_saved_slot=255u;track_saved_toast_until=0u;track_save_return_page=0u;track_preset_focus_valid=0u;track_load_from_boot=0u;track_page=0u;
 }
 static void beetle_project_open_load_browser(void){
+ track_load_from_boot=(uint8_t)(track_page==29u);
  track_page=14u;track_load_feedback=TRACK_JOURNAL_NO_PROJECT;track_load_scan=0u;
  for(uint8_t i=0u;i<TRACK_PROJECTS;i++){
   track_load_status[i]=0u;track_load_titles[i][0]=0;
@@ -1394,15 +1918,17 @@ static void beetle_storage_erase_progress(uint8_t done,uint8_t total){
  screen();
 }
 static void beetle_project_load_selected(void){
+ /* Fence SEL on both successful and failed LOAD; a queued confirmation press
+  * must never be reinterpreted as step deletion on the return frame. */
+ beetle_load_input_arm(&track_load_input_guard,etch_ms);
+ track_sel_tracker_ready=0u;
 #if BEETLE_NATIVE_STORAGE
  if(!track_state.transport.playing&&!native_safe&&!native_tripped&&!native_updating){
   track_storage_busy_kind=2u;track_page=18u;screen();
   native_pause();track_storage_result=beetle_project_load_slot(track_state.project_slot);native_start();
   if(track_storage_result==TRACK_JOURNAL_OK){
+   track_new_project_full=0u;
    beetle_edit_reset(&beetle_ed);
-   /* A SEL edge arriving during blocking flash I/O must not clear a step
-    * as soon as the TRACKER is shown. Require release and a quiet period. */
-   beetle_load_input_arm(&track_load_input_guard,etch_ms);
   }
   track_page=track_storage_result==TRACK_JOURNAL_OK?0u:14u;
   if(track_page==14u)track_load_feedback=track_storage_result;
@@ -1413,6 +1939,9 @@ static void beetle_project_load_selected(void){
  track_unsaved_action=0u;
 }
 static void track_fm1_poll(void){
+ /* Capture the page BEFORE any button or project-menu action can navigate.
+  * SEL can be a project confirmation at entry and a Tracker press by exit. */
+ const uint8_t input_entry_page=track_page;
  uint32_t now=etch_ms;
  if(now-track_last_poll<18u)return;
  track_last_poll=now;
@@ -1425,6 +1954,11 @@ static void track_fm1_poll(void){
  /* Drain input from a completed blocking project LOAD before it can
   * reach the tracker or trigger SEL/step deletion. */
  beetle_load_input_filter(&track_load_input_guard,now,buttons,&pressed,&released);
+ /* Every transition through a non-tracker page or any active I/O guard
+  * revokes the delete permission. Re-arm only when the TRACKER was
+  * actually polled with SEL physically released (including error cases). */
+ beetle_sel_rearm(&track_sel_tracker_ready,input_entry_page,
+                  buttons,pressed,&track_load_input_guard);
  uint8_t changed=(uint8_t)(pressed||released||k1||k2||k3||k4||sel||alg);
  track_runtime_validate();
  /* Drain the initial encoder/button pulses left by the ETCH boot splash. */
@@ -1441,7 +1975,49 @@ static void track_fm1_poll(void){
   * continues toggling mono/poly only in EDIT. The physical recovery combo
   * at power-up remains handled before this input loop. */
  if(track_page==0u || track_page==5u){
-  enum etch_octave_action key_oct=etch_octave_scan(&track_key_oct_chord,buttons);
+  /* SEQ + OCT-/+ edits ONLY the selected saved synth NOTE (one octave).
+   * Latch at the actual chord press, to avoid accidentally shifting the live
+   * keyboard when SEQ and OCT are released in different orders. The chord
+   * is valid from any tracker edit column, but not on CH6 or empty/STP. */
+  if(track_page==0u && (buttons&(1u<<11)) && (buttons&3u))
+   track_step_oct_held|=(uint8_t)(buttons&3u);
+  if(track_step_oct_held){
+   const uint8_t completed=(uint8_t)(track_step_oct_held & released & 3u);
+   if(completed){
+    track_seq_fired=1u; /* modifier release never navigates away */
+    if(!track_state.transport.playing && !track_state.record_armed &&
+       track_state.transport.edit_channel<TRACK_SYNTH_CHANNELS){
+     const int8_t semitones=(int8_t)((completed&1u)?-12:12);
+     const struct track_step *step=&track_state.active.ch[track_state.transport.edit_channel]
+                                               [track_state.transport.edit_step];
+     if(step->note<TRACK_NOTE_STOP){
+      fm1_irq_off();
+      beetle_edit_begin(&beetle_ed,&track_song,&track_state);
+      if(track_adjust_octave(&track_state,semitones)>0){
+       (void)beetle_edit_commit(&beetle_ed,&track_song,&track_state);
+       if(track_scroll_preview_active){
+        track_chip_note_off(&track_chip,track_scroll_preview_channel,track_scroll_preview_note);
+        track_scroll_preview_active=0u;
+       }
+       const struct track_step *updated=&track_state.active.ch[track_state.transport.edit_channel]
+                                                        [track_state.transport.edit_step];
+       if(track_chip_note(&track_chip,track_state.transport.edit_channel,
+                           updated->instrument,updated->note,100u)){
+        track_scroll_preview_channel=track_state.transport.edit_channel;
+        track_scroll_preview_note=updated->note;
+        track_scroll_preview_active=1u;track_scroll_preview_until=now+180u;
+       }
+      }else beetle_ed.pending_valid=0u;
+      fm1_irq_enable_all();changed=1u;
+     }
+    }
+   }
+   track_step_oct_held&=(uint8_t)(buttons&3u);
+   /* Reset chord state; no octave change may bleed through afterwards. */
+   track_key_oct_chord.last=0u;track_key_oct_chord.combo_latched=0u;
+  }
+  enum etch_octave_action key_oct=track_step_oct_held?ETCH_OCT_NONE:
+    etch_octave_scan(&track_key_oct_chord,buttons);
   if(key_oct==ETCH_OCT_MINUS||key_oct==ETCH_OCT_PLUS){
    native_controls.octave=beetle_keyboard_shift(native_controls.octave,
       key_oct==ETCH_OCT_MINUS?-1:1);
@@ -1460,7 +2036,19 @@ static void track_fm1_poll(void){
    changed=1u;
   }
  }else { /* Never leave a half-pressed octave chord stuck across pages. */
-  track_key_oct_chord.last=0u;track_key_oct_chord.combo_latched=0u;
+  track_step_oct_held=0u;track_key_oct_chord.last=0u;track_key_oct_chord.combo_latched=0u;
+ }
+ if(track_page==29u){
+  /* Only displayed after a real FM1 boot. Do not allow global shortcuts
+   * or TRACKER note/step edits to consume the same confirmation edge. */
+  if(k1)track_boot_menu_choice=(uint8_t)((((int32_t)track_boot_menu_choice+k1)%2+2)%2);
+  if(pressed&(1u<<3)){
+   beetle_load_input_arm(&track_load_input_guard,now);
+   if(track_boot_menu_choice==0u)beetle_project_new_session();
+   else beetle_project_open_load_browser();
+  }
+  if(changed||now-track_last_paint>700u){screen();track_last_paint=now;}
+  return;
  }
  if(track_page==13u){
   if(pressed&(1u<<8)){track_unsaved_action=0u;track_page=1u;track_home_fired=1u;track_home_since=now;}
@@ -1495,7 +2083,7 @@ static void track_fm1_poll(void){
      track_session_saved_slot=track_state.project_slot;track_saved_toast_until=etch_ms+1300u;
     }
     native_start();track_overwrite_wait=0u;track_storage_confirm_since=0u;
-    track_page=track_storage_result==TRACK_JOURNAL_OK?0u:8u;
+    track_page=track_storage_result==TRACK_JOURNAL_OK?track_save_return_page:8u;
     screen();return;
    }
   }else track_storage_confirm_since=0u;
@@ -1507,7 +2095,7 @@ static void track_fm1_poll(void){
  if(track_page==14u){
   track_preview_release(0u);(void)fm1_input_note_edges();
   if(k1||k4){track_state.project_slot=beetle_list_move(track_state.project_slot,k1+k4);track_load_feedback=TRACK_JOURNAL_NO_PROJECT;}
-  if(pressed&(1u<<8)){track_page=1u;track_home_fired=1u;track_home_since=now;}
+  if(pressed&(1u<<8)){track_page=track_load_from_boot?29u:1u;track_home_fired=1u;track_home_since=now;}
   else if(pressed&(1u<<3)){
    if(track_state.dirty){track_unsaved_action=3u;track_page=13u;}
    else if(track_load_status[track_state.project_slot]==2u){
@@ -1517,6 +2105,18 @@ static void track_fm1_poll(void){
   if(track_page==14u && track_load_scan<TRACK_PROJECTS){beetle_project_scan_one();changed=1u;}
   if(changed||now-track_last_paint>=((track_state.transport.playing||(int32_t)(track_boot_splash_until-now)>0)?90u:850u)){screen();track_last_paint=now;}
   return;
+ }
+ /* Undo/Redo on EDIT, MIXER, SONG, MASTER and LIBRARY screens. OP5/6
+  * are otherwise instrument audition keys, so only consume when SEQ is held.
+  * The active transport must be STOPPED to avoid racing the audio ISR. */
+ if((track_page==5u||track_page==6u||track_page==9u||track_page==17u||
+     track_page==25u||track_page==26u) && (buttons&(1u<<11)) &&
+     !track_state.transport.playing){
+  uint32_t key_edges=fm1_input_note_edges();
+  if(key_edges&((1u<<10)|(1u<<13))){
+   fm1_irq_off();(void)track_history_step((uint8_t)((key_edges&(1u<<13))!=0u));fm1_irq_enable_all();
+   track_seq_fired=1u;screen();track_last_paint=now;return;
+  }
  }
  /* Isolated block editor: no sound/input note changes while editing. */
  if(track_page==20u){
@@ -1528,7 +2128,14 @@ static void track_fm1_poll(void){
    beetle_ed.amount=(int8_t)amount;beetle_ed.status=0u;
   }
   if(pressed&(1u<<3)){
-   if(!track_state.transport.playing){fm1_irq_off();(void)beetle_edit_block_execute(&beetle_ed,&track_song,&track_state);fm1_irq_enable_all();}
+   if(!track_state.transport.playing){
+    fm1_irq_off();
+    if(beetle_ed.action==5u||beetle_ed.action==6u){
+     uint8_t applied=track_history_step((uint8_t)(beetle_ed.action==6u));
+     beetle_ed.status=applied?(uint8_t)(beetle_ed.action==6u?3u:2u):4u;
+    }else (void)beetle_edit_block_execute(&beetle_ed,&track_song,&track_state);
+    fm1_irq_enable_all();
+   }
    else beetle_ed.status=4u;
   }
   if(pressed&(1u<<8)){track_page=0u;track_home_fired=1u;track_home_since=now;}
@@ -1543,19 +2150,42 @@ static void track_fm1_poll(void){
  if(track_page==22u){
   if(k1)track_state.transport.edit_step=track_row_move_length(track_state.transport.edit_step,k1,track_state.active.length);
   if(k2){int32_t f=(int32_t)track_groove_focus+k2;track_groove_focus=(uint8_t)(f<0?0:f>2?2:f);}
-  if(k3 || (pressed&(1u<<3))){
+  /* Page-local SEQ chord; do not let OP1/2 modify the tracker lane
+   * clipboard, or OP3/4 overwrite all six lanes. The input is consumed
+   * even during PLAY to avoid deferred edits on the next screen. */
+  if(pressed&(1u<<11))track_seq_fired=0u;
+  uint32_t groove_keys=fm1_input_note_edges();
+  if((buttons&(1u<<11)) && (groove_keys&((1u<<1)|(1u<<3)|(1u<<5)|(1u<<8)))){
+   uint8_t ch=track_state.transport.edit_channel;
+   struct track_step *step=&track_state.active.ch[ch][track_state.transport.edit_step];
+   track_seq_fired=1u;
+   if(groove_keys&(1u<<1))beetle_groove_copy(&track_groove_clip,step);
+   if(!track_state.transport.playing && !track_state.record_armed &&
+      ((groove_keys&((1u<<3)|(1u<<5)|(1u<<8)))!=0u)){
+    fm1_irq_off();beetle_edit_begin(&beetle_ed,&track_song,&track_state);
+    if(groove_keys&(1u<<3)) (void)beetle_groove_paste(&track_groove_clip,step);
+    if(groove_keys&(1u<<5)) (void)beetle_groove_fill(&track_state.active,ch,step->groove);
+    if(groove_keys&(1u<<8)) (void)beetle_groove_clear(&track_state.active,ch);
+    if(beetle_edit_commit(&beetle_ed,&track_song,&track_state))track_state.dirty=1u;
+    fm1_irq_enable_all();
+   }
+  }
+  if((k3 || (pressed&(1u<<3))) && !(buttons&(1u<<11)) && !track_state.transport.playing && !track_state.record_armed){
    fm1_irq_off();beetle_edit_begin(&beetle_ed,&track_song,&track_state);
-   struct track_step *s=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
-   int32_t v=track_groove_focus==0u?TRACK_GROOVE_MICRO(s):track_groove_focus==1u?TRACK_GROOVE_RATCHET(s):(int32_t)((s->groove>>5u)&3u);
+   struct track_step *step=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
+   int32_t v=track_groove_focus==0u?TRACK_GROOVE_MICRO(step):track_groove_focus==1u?TRACK_GROOVE_RATCHET(step):(int32_t)((step->groove>>5u)&3u);
    v=(pressed&(1u<<3))?(track_groove_focus==1u?1:0):v+k3;
-   if(track_groove_focus==0u)track_groove_set_micro(s,(uint8_t)(v<0?0:v>7?7:v));
-   else if(track_groove_focus==1u)track_groove_set_ratchet(s,(uint8_t)(v<1?1:v>4?4:v));
-   else track_groove_set_probability(s,(uint8_t)(v<0?0:v>3?3:v));
-   (void)beetle_edit_commit(&beetle_ed,&track_song,&track_state);
-   track_state.dirty=1u;fm1_irq_enable_all();
+   if(track_groove_focus==0u)track_groove_set_micro(step,(uint8_t)(v<0?0:v>7?7:v));
+   else if(track_groove_focus==1u)track_groove_set_ratchet(step,(uint8_t)(v<1?1:v>4?4:v));
+   else track_groove_set_probability(step,(uint8_t)(v<0?0:v>3?3:v));
+   if(beetle_edit_commit(&beetle_ed,&track_song,&track_state))track_state.dirty=1u;
+   fm1_irq_enable_all();
   }
   if(pressed&(1u<<8)){track_page=0u;track_home_fired=1u;track_home_since=now;}
-  if(pressed&(1u<<11))track_page=0u;
+  if(released&(1u<<11)){
+   if(!track_seq_fired)track_page=0u;
+   track_seq_fired=0u;
+  }
   screen();track_last_paint=now;return;
  }
  if(track_page==21u){
@@ -1579,6 +2209,142 @@ static void track_fm1_poll(void){
   if(changed||now-track_last_paint>=650u){screen();track_last_paint=now;}
   return;
  }
+ /* SEQ + SEL from MIXER opens four performance mute snapshots. Consume
+  * the entire chord here before ordinary SEL toggles QUANT MUTES. */
+ if(track_page==6u && (buttons&(1u<<11)) && (pressed&(1u<<3))){
+  track_snapshot_slot=0u;track_seq_fired=1u;track_page=23u;
+  (void)fm1_input_note_edges();screen();track_last_paint=now;return;
+ }
+ /* Hold SEQ and tap EDIT from synth EDIT to open instrument library. */
+ if(track_page==5u && (buttons&(1u<<11)) && (pressed&(1u<<6)) &&
+    track_state.transport.edit_channel<TRACK_SYNTH_CHANNELS){
+  track_library_slot=track_library_action=track_library_notice=0u;
+  track_library_target=track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step].instrument&3u;
+  track_page=25u;track_seq_fired=1u;
+  (void)fm1_input_note_edges();screen();track_last_paint=now;return;
+ }
+ /* FX from PERFORMANCE opens MUTE GROUPS without triggering step FX. */
+ if(track_page==23u && (pressed&(1u<<2))){
+  track_group_slot=track_group_lane=0u;track_page=24u;
+  (void)fm1_input_note_edges();screen();track_last_paint=now;return;
+ }
+ if(track_page==24u){
+  if(k1){int32_t next=(int32_t)track_group_slot+k1;
+   if(next<0)next=0;if(next>=BEETLE_GROUP_SLOTS)next=BEETLE_GROUP_SLOTS-1;
+   track_group_slot=(uint8_t)next;changed=1u;}
+  if(k2){int32_t next=(int32_t)track_group_lane+k2;
+   if(next<0)next=0;if(next>=TRACK_CHANNELS)next=TRACK_CHANNELS-1;
+   track_group_lane=(uint8_t)next;changed=1u;}
+  if(pressed&(1u<<3)){fm1_irq_off();
+   uint8_t dirty=beetle_group_member_toggle(&track_groups,track_group_slot,track_group_lane);
+   fm1_irq_enable_all();if(dirty)track_state.dirty=1u;changed=1u;}
+  if(k3){fm1_irq_off();
+   uint8_t dirty=beetle_group_toggle(&track_groups,track_group_slot,&track_mute_queue,&track_mix,track_state.transport.playing);
+   fm1_irq_enable_all();if(dirty)track_state.dirty=1u;changed=1u;}
+  if(pressed&(1u<<8) || pressed&(1u<<2)){track_page=23u;track_home_fired=1u;track_home_since=now;changed=1u;}
+  else if(pressed&(1u<<7)){track_page=6u;changed=1u;}
+  else if(pressed&(1u<<11)){track_page=0u;changed=1u;}
+  if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
+  (void)fm1_input_note_edges();
+  if(changed||now-track_last_paint>=650u){screen();track_last_paint=now;}
+  return;
+ }
+ if(track_page==23u){
+  if(k1){int32_t next=(int32_t)track_snapshot_slot+k1;
+   if(next<0)next=0;if(next>=BEETLE_SNAPSHOT_SLOTS)next=BEETLE_SNAPSHOT_SLOTS-1;
+   track_snapshot_slot=(uint8_t)next;changed=1u;}
+  if(k2){fm1_irq_off();uint8_t dirty=beetle_snapshot_store(&track_snapshots,track_snapshot_slot,&track_mix);
+   fm1_irq_enable_all();if(dirty)track_state.dirty=1u;changed=1u;}
+  if(k3 || (pressed&(1u<<3))){fm1_irq_off();
+   uint8_t dirty=beetle_snapshot_recall(&track_snapshots,track_snapshot_slot,&track_mute_queue,&track_mix,track_state.transport.playing);
+   fm1_irq_enable_all();if(dirty)track_state.dirty=1u;changed=1u;}
+  if(pressed&(1u<<8) || pressed&(1u<<7)){
+   track_page=6u;track_home_fired=1u;track_home_since=now;changed=1u;
+  }else if(pressed&(1u<<11)){track_page=0u;changed=1u;}
+  if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
+  (void)fm1_input_note_edges();
+  if(changed||now-track_last_paint>=650u){screen();track_last_paint=now;}
+  return;
+ }
+
+ /* Instrument library operations never reach tracker note-clear or live FX.
+  * All patch transfers happen under the audio IRQ lock. */
+ if(track_page==25u){
+  if(k1){int32_t v=(int32_t)track_library_slot+k1;if(v<0)v=0;if(v>=BEETLE_LIBRARY_SLOTS)v=BEETLE_LIBRARY_SLOTS-1;track_library_slot=(uint8_t)v;changed=1u;}
+  if(k2){int32_t v=(int32_t)track_library_action+k2;track_library_action=(uint8_t)((v%4+4)%4);changed=1u;}
+  if(k3){int32_t v=(int32_t)track_library_target+k3;if(v<0)v=0;if(v>3)v=3;track_library_target=(uint8_t)v;changed=1u;}
+  if(k4 && track_library_action==2u){int32_t v=(int32_t)track_library_copy_source+k4;
+   if(v<0)v=0;if(v>=BEETLE_LIBRARY_SLOTS)v=BEETLE_LIBRARY_SLOTS-1;track_library_copy_source=(uint8_t)v;changed=1u;}
+  if(pressed&(1u<<3)){
+   if(track_state.transport.playing){track_library_notice=4u;}
+   else if(track_library_action==0u){
+    struct track_store_instrument patch;
+    track_history_begin_library(track_library_slot);
+    fm1_irq_off();track_library_capture_active(track_library_target,&patch);
+    track_library_notice=beetle_library_store(&track_library,track_library_slot,&patch)?1u:4u;
+    fm1_irq_enable_all();track_state.dirty=1u;
+    /* New patches receive a stable default name until the user renames. */
+    if(track_library.name[track_library_slot][0]==0){char temp[9]="PATCH 01";
+     temp[6]=(char)('0'+(track_library_slot+1u)/10u);temp[7]=(char)('0'+(track_library_slot+1u)%10u);
+     beetle_library_rename(&track_library,track_library_slot,temp);}
+    track_history_commit_library(track_library_slot);
+   }else if(track_library_action==1u){
+    struct track_store_instrument patch;
+    track_library_notice=beetle_library_load(&track_library,track_library_slot,&patch)?2u:4u;
+    if(track_library_notice==2u){
+     track_history_begin_instrument(track_library_target,track_state.transport.edit_channel);
+     fm1_irq_off();track_library_apply_active(track_library_target,&patch);fm1_irq_enable_all();
+     track_type_capture(track_library_target);track_history_commit_instrument(track_library_target,track_state.transport.edit_channel);track_state.dirty=1u;}
+   }else if(track_library_action==2u){
+    track_history_begin_library(track_library_copy_source);
+    track_library_notice=beetle_library_copy(&track_library,track_library_slot,track_library_copy_source)?3u:4u;
+    track_history_commit_library(track_library_copy_source);
+    if(track_library_notice==3u)track_state.dirty=1u;
+   }else if(beetle_library_valid(&track_library,track_library_slot)){
+    char name[BEETLE_LIBRARY_NAME+1u];
+    for(uint8_t j=0u;j<BEETLE_LIBRARY_NAME;j++)name[j]=track_library.name[track_library_slot][j];
+    name[BEETLE_LIBRARY_NAME]=0;track_name_begin(&track_library_name_editor,name);track_page=26u;
+   }else track_library_notice=4u;
+   changed=1u;
+  }
+  if(pressed&(1u<<8)){track_page=5u;track_home_fired=1u;track_home_since=now;changed=1u;}
+  if(pressed&(1u<<11)){track_page=0u;track_seq_fired=1u;changed=1u;}
+  (void)fm1_input_note_edges();if(changed||now-track_last_paint>=650u){screen();track_last_paint=now;}return;
+ }
+ if(track_page==26u){
+  if(k1){int32_t v=(int32_t)track_library_name_editor.cursor+k1;if(v<0)v=0;if(v>=BEETLE_LIBRARY_NAME)v=BEETLE_LIBRARY_NAME-1;
+   track_library_name_editor.cursor=(uint8_t)v;changed=1u;}
+  if(k2){track_name_change(&track_library_name_editor,k2);changed=1u;}
+  if(pressed&(1u<<3)){
+   char name[TRACK_NAME_MAX+1u];track_name_finish(&track_library_name_editor,0u,name);
+   track_history_begin_library(track_library_slot);
+   beetle_library_rename(&track_library,track_library_slot,name);
+   track_history_commit_library(track_library_slot);
+   track_state.dirty=1u;track_page=25u;track_library_notice=5u;changed=1u;
+  }
+  if(pressed&(1u<<8)){track_page=25u;track_home_fired=1u;track_home_since=now;changed=1u;}
+  (void)fm1_input_note_edges();if(changed||now-track_last_paint>=650u){screen();track_last_paint=now;}return;
+ }
+ /* RC hardware telemetry is read-only. Never pass its input events into
+  * tracker editing, flash menus, Punch-In or the musical transport. */
+ if(track_page==27u){
+  if(k1){track_rc_tab=(uint8_t)(track_rc_tab^(uint8_t)(k1&1));changed=1u;}
+  if(pressed&(1u<<8)){track_page=1u;track_home_fired=1u;track_home_since=now;changed=1u;}
+  if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
+  if(released&(1u<<11)){track_page=0u;changed=1u;}
+  (void)fm1_input_note_edges();
+  if(changed||now-track_last_paint>=500u){screen();track_last_paint=now;}
+  return;
+ }
+ /* Credits is read-only and never forwards edits to the tracker. */
+ if(track_page==28u){
+  if(pressed&(1u<<8)){track_page=1u;track_home_fired=1u;track_home_since=now;changed=1u;}
+  if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
+  if(released&(1u<<11)){track_page=0u;changed=1u;}
+  (void)fm1_input_note_edges();
+  if(changed||now-track_last_paint>=750u){screen();track_last_paint=now;}
+  return;
+ }
  /* HELP never changes patterns, instrument state, slots or tempo.
   * Trap navigation here so HOME does not accidentally arm long-press guide. */
  if(track_page==19u){
@@ -1600,7 +2366,7 @@ static void track_fm1_poll(void){
 
  /* Punch-In white keys: F G A B C D E F (left to right), hold-to-play.
   * Input read is from the existing Felucca debounced key matrix. */
- if(track_page==4u || track_state.record_armed){
+ if(track_page==4u || (track_state.record_armed && track_page!=16u && track_page!=30u)){
   static const uint8_t white_key_pos[8]={0u,2u,4u,6u,7u,9u,11u,12u};
   uint32_t mask=fm1_in.notes;
   for(uint8_t i=0u;i<8u;i++){
@@ -1608,8 +2374,8 @@ static void track_fm1_poll(void){
    uint8_t after=(uint8_t)((mask&bit)!=0u);
    if(before!=after){
     fm1_irq_off();
-    if(after){track_live_punch_mask|=(uint8_t)(1u<<i);track_punch_focus=i;/* Preserve the ALGORITHM setting per FX across press/release. */}
-    else {track_live_punch_mask&=(uint8_t)~(1u<<i);/* Preserve the ALGORITHM setting per FX across press/release. */
+    if(after){track_live_punch_mask|=(uint8_t)(1u<<i);track_punch_focus=i;}
+    else {track_live_punch_mask&=(uint8_t)~(1u<<i);
      if(track_punch_focus==i){track_punch_focus=255u;for(uint8_t j=0u;j<8u;j++)if(track_live_punch_mask&(1u<<j))track_punch_focus=j;}}
     track_state.punch_mask=(uint8_t)(track_live_punch_mask|track_replay_punch_mask);
     track_sync_punch_params();fm1_irq_enable_all();
@@ -1628,7 +2394,7 @@ static void track_fm1_poll(void){
   track_old_note_mask=mask;
  }else if(track_live_punch_mask){
   fm1_irq_off();track_live_punch_mask=0u;track_punch_focus=255u;
-  /* Keep each Punch-In ALGORITHM setting when leaving the page. */
+  /* Retain all five adjustable Punch-In settings, including Ring Mod. */
   track_state.punch_mask=track_replay_punch_mask;track_sync_punch_params();fm1_irq_enable_all();
   track_old_note_mask=0u;changed=1u;
  }
@@ -1636,11 +2402,16 @@ static void track_fm1_poll(void){
   /* ALGORITHM edits a held Punch-In and remembers its value until reconfigured.
   * Octaves/MUTE deliberately have no parameter. Otherwise ALG chooses
   * the current pattern in the TRACK screen; SELECT remains channel turn. */
- if(alg){
+ if(k1){
   uint8_t fx=track_punch_focus;
   if(fx>=5u){fx=255u;for(uint8_t j=0u;j<5u;j++)if(track_live_punch_mask&(1u<<j))fx=j;}
   if(fx<5u && (track_live_punch_mask&(1u<<fx))){
-   int32_t value=(int32_t)track_punch_base_param[fx]+alg*3;
+   int32_t value;
+   if(fx==4u){
+    int32_t index=(int32_t)beetle_stutter_index(track_punch_base_param[4])+k1;
+    if(index<0)index=0;if(index>6)index=6;
+    value=beetle_stutter_value((uint8_t)index);
+   }else value=(int32_t)track_punch_base_param[fx]+k1;
    if(value<0)value=0;if(value>100)value=100;
    fm1_irq_off();
    if(track_punch_base_param[fx]!=(uint8_t)value){
@@ -1652,12 +2423,13 @@ static void track_fm1_poll(void){
     track_state.dirty=1u;
    }
    track_sync_punch_params();fm1_irq_enable_all();
-  }else if(!track_live_punch_mask && track_page==0u && !track_state.transport.playing){
+  }
+ }
+ if(alg && !track_live_punch_mask && track_page==0u && !track_state.transport.playing){
    int32_t pat=(int32_t)track_state.pattern_slot+alg;
    if(pat<0)pat=0;if(pat>=TRACK_PATTERNS)pat=TRACK_PATTERNS-1;
    fm1_irq_off();(void)track_song_switch(&track_song,&track_state,(uint8_t)pat);fm1_irq_enable_all();
   }
- }
  uint32_t mixer_key_pressed=0u;
  if(track_page==11u && (pressed&(1u<<8))){
   track_overwrite_wait=0u;track_page=2u;track_home_fired=1u;changed=1u;
@@ -1721,7 +2493,7 @@ static void track_fm1_poll(void){
   track_seq_since=0u;track_seq_fired=0u;/* Copy persists across SEQ releases and pattern switches. */
  }
  if(pressed&(1u<<9)){
-  if(track_page==2u)track_complete_save();else if(track_named){track_name_begin(&track_editor,track_title);track_complete_save();}else track_begin_save();
+  if(track_page==2u)track_complete_save();else if(track_named){track_save_return_page=track_page;track_name_begin(&track_editor,track_title);track_complete_save();}else track_begin_save();
   changed=1u;
  }
  if(track_page==11u){
@@ -1733,6 +2505,7 @@ static void track_fm1_poll(void){
    int32_t slot=(int32_t)track_state.project_slot+k4;
    if(slot<0)slot=0;if(slot>=TRACK_PROJECTS)slot=TRACK_PROJECTS-1;
    track_state.project_slot=(uint8_t)slot;
+   track_new_project_full=0u; /* explicitly chosen overwrite via SAVE AS */
   }
  }else{
   if(pressed&(1u<<2)){
@@ -1742,9 +2515,15 @@ static void track_fm1_poll(void){
    }
   if(pressed&(1u<<6)){track_page=(uint8_t)(track_page==5u?16u:5u);track_osc_cursor=0u;track_osc_bank=0u;track_type_queued=0;}
   if(pressed&(1u<<5)){track_page=17u;track_osc_cursor=0u;} /* LFO => MASTER */
-  if(pressed&(1u<<10)){track_page=9u;} /* ARP => SONG */
-  /* GLO is the dedicated MIXER shortcut. ARP alone opens SONG.
-   * A second press returns to TRACKER, never opens SONG. */
+  if(pressed&(1u<<10)){
+   /* Live Mixer can be entered only when SONG is enabled, never just
+    * because the Song editor is visible. ARP while SONG OFF stays here. */
+   if(track_page==9u){if(track_song.enabled)track_page=30u;}
+   else if(track_page==30u){track_page=9u;}
+   else {track_page=9u;}
+   changed=1u;
+  }
+  /* GLO remains the dedicated conventional MIXER shortcut. */
   if(pressed&(1u<<7))track_page=(track_page==6u)?0u:6u;
   /* Do not toggle record at button-down: a long press is a separate gesture. */
   if(pressed&(1u<<13)){track_rec_since=now?now:1u;track_rec_long=0u;}
@@ -1760,7 +2539,7 @@ static void track_fm1_poll(void){
   if(pressed&(1u<<12)){
    fm1_irq_off();
    if(track_state.transport.playing){
-    track_stop(&track_state);track_live_punch_mask=0u;track_replay_punch_mask=0u;track_sync_punch_params();
+    beetle_mute_cancel(&track_mute_queue);track_live_mutes.pending=track_live_mutes.pending_values=0u;track_live_solos.pending=track_live_solos.pending_values=0u;track_stop(&track_state);track_live_punch_mask=0u;track_replay_punch_mask=0u;track_sync_punch_params();
     if(track_song_follow_active){track_song.edit_row=track_song_preplay_row;track_song_follow_active=0u;}
    }else{
     if(track_song.enabled){
@@ -1778,17 +2557,18 @@ static void track_fm1_poll(void){
   track_scroll_preview_active=0u;fm1_irq_enable_all();
  }
  if(track_page==0u){
+   const uint8_t can_delete_step=(uint8_t)(track_sel_tracker_ready &&
+     beetle_step_delete_eligible(input_entry_page,track_page,&track_load_input_guard,pressed));
    fm1_irq_off();
    if(!track_state.transport.playing && !track_state.record_armed &&
-     (k3||preset||(pressed&((1u<<3)|(1u<<4)))||
-      (fm1_in.notes && (track_state.transport.edit_column==0u ||
-       (track_state.transport.edit_channel==TRACK_DRUM_CHANNEL && track_state.transport.edit_column==1u)))))
+     (k3||preset||can_delete_step||(pressed&(1u<<4))||
+      (fm1_in.notes && !(buttons&(1u<<11)))))
      beetle_edit_begin(&beetle_ed,&track_song,&track_state);
-   if(pressed&(1u<<3)){
+   if(can_delete_step){
     (void)track_clear_step(&track_state,track_state.transport.edit_channel,track_state.transport.edit_step);
     changed=1u;
    }
-   if(k1)track_state.transport.edit_step=track_row_move_length(track_state.transport.edit_step,k1,track_state.active.length);
+   if(k1 && !track_live_punch_mask)track_state.transport.edit_step=track_row_move_length(track_state.transport.edit_step,k1,track_state.active.length);
    if(k2)track_state.transport.edit_column=track_column_move(track_state.transport.edit_column,k2);
    if(k3){
     /* K3 NOTE scroll auditions the final selected pitch; it must not wait
@@ -1799,6 +2579,10 @@ static void track_fm1_poll(void){
      track_scroll_preview_active=0u;
     }
     track_wheel_value(k3);
+    if(track_state.transport.edit_column==1u && track_state.transport.edit_channel<TRACK_SYNTH_CHANNELS)
+     track_input_instrument[track_state.transport.edit_channel]=
+      (uint8_t)track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step].instrument;
+    if(track_state.transport.edit_column==1u&&track_state.transport.edit_channel<TRACK_SYNTH_CHANNELS)track_input_explicit[track_state.transport.edit_channel]=1u;
     if(audition){
      uint8_t lane=track_state.transport.edit_channel;
      const struct track_step *st=&track_state.active.ch[lane][track_state.transport.edit_step];
@@ -1811,34 +2595,47 @@ static void track_fm1_poll(void){
      }
     }
    }
-   if(preset && (track_state.transport.edit_column==0u || (track_state.transport.edit_channel==TRACK_DRUM_CHANNEL&&track_state.transport.edit_column==1u))){
-    struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
-    if(track_state.transport.edit_channel==TRACK_DRUM_CHANNEL&&track_state.transport.edit_column==1u){
-     if(st->chord>=1u&&st->chord<=TRACK_DRUM_COUNT)track_preset_last_note2=(uint8_t)st->chord;
-     int32_t index=st->chord==0u?1:st->chord==15u?2:0;
-     index=((index+(preset%3))%3+3)%3;
-     st->chord=index==1?0u:index==2?15u:track_preset_last_note2;
-     track_state.dirty=1u;changed=1u;
-    }else{
-    if(st->note<TRACK_NOTE_STOP)track_preset_last_note=st->note;
-    const uint8_t drum=(uint8_t)(track_state.transport.edit_channel==TRACK_DRUM_CHANNEL);
-    if(drum&&track_preset_last_note>=TRACK_DRUM_COUNT)track_preset_last_note=0u;
-    int32_t index=st->note==TRACK_NOTE_EMPTY?1:st->note==TRACK_NOTE_STOP?2:0;
-    index=((index+(preset%3))%3+3)%3;
-    st->note=index==1?TRACK_NOTE_EMPTY:index==2?TRACK_NOTE_STOP:track_preset_last_note;
-    track_state.dirty=1u;changed=1u;
+   if(preset && (track_state.transport.edit_column==0u ||
+           (track_state.transport.edit_channel==TRACK_DRUM_CHANNEL&&track_state.transport.edit_column==1u))){
+    uint8_t ch=track_state.transport.edit_channel,row=track_state.transport.edit_step;
+    uint8_t col=track_state.transport.edit_column,pat=track_state.pattern_slot;
+    struct track_step *st=&track_state.active.ch[ch][row];
+    uint8_t is_chord=(uint8_t)(ch==TRACK_DRUM_CHANNEL && col==1u);
+    uint8_t value=is_chord?st->chord:st->note;
+    const uint8_t empty=(ch==TRACK_DRUM_CHANNEL&&col==1u)?0u:TRACK_NOTE_EMPTY;
+    const uint8_t stop=(ch==TRACK_DRUM_CHANNEL&&col==1u)?15u:TRACK_NOTE_STOP;
+    if(!track_preset_focus_valid || track_preset_focus_pattern!=pat ||
+       track_preset_focus_channel!=ch || track_preset_focus_step!=row ||
+       track_preset_focus_column!=col){
+      track_preset_focus_valid=1u;track_preset_focus_pattern=pat;
+      track_preset_focus_channel=ch;track_preset_focus_step=row;
+      track_preset_focus_column=col;track_preset_focus_original=255u;
     }
+    if(value!=empty && value!=stop)
+     track_preset_focus_original=value;
+    uint8_t original=track_preset_focus_original;
+    /* An originally empty step has just EMPTY and STP; no phantom
+     * note inherited from another cell or another pattern. */
+    uint8_t has_note=(uint8_t)(original!=255u);
+    int32_t idx=(value==empty)?(has_note?1:0):
+       (value==stop)?(has_note?2:1):0;
+    int32_t count=has_note?3:2;
+    idx=((idx+(preset%count))%count+count)%count;
+    value=has_note?(idx==0?original:idx==1?empty:stop):(idx==0?empty:stop);
+    if(is_chord)st->chord=value;else st->note=value;
+    track_state.dirty=1u;changed=1u;
    }
-   if(pressed&(1u<<4)){ /* ENV key: instant step note-off */
+   if(pressed&(1u<<4)){ /* ENV: STOP only the focused NOTE cell. */
     struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
-    st->note=TRACK_NOTE_STOP;st->chord=0u;track_state.dirty=1u;changed=1u;
+    beetle_stop_focused_note(st,track_state.transport.edit_channel,track_state.transport.edit_column);
+    track_state.dirty=1u;changed=1u;
    }
    if(sel){int32_t target=(int32_t)track_state.transport.edit_channel+sel;
     if(target<0){track_page=10u;track_punch_edit_row=track_state.transport.edit_step;track_punch_edit_index=0u;}
     else {if(target>=TRACK_CHANNELS)target=TRACK_CHANNELS-1u;track_state.transport.edit_channel=(uint8_t)target;}
    }
-   /* OCT-/+ now control the physical keyboard's octave here too.
-    * K3 continues to edit instrument presets and NOTE pitch as before. */
+   /* OCT-/+ alone shifts the live keyboard. SEQ+OCT-/+ transposes the
+    * selected saved synth note with short preview and undo support. */
    fm1_irq_enable_all();
    /* Physical keyboard: NOTE entry advances exactly one step (15 -> 00).
     * NOTE2 on the drum channel changes only the second hit, no advance.
@@ -1867,17 +2664,16 @@ static void track_fm1_poll(void){
     }
     if((combo_edges&(1u<<10u)) && !track_state.transport.playing){
      fm1_irq_off();(void)beetle_edit_commit(&beetle_ed,&track_song,&track_state);
-     if(beetle_edit_undo(&beetle_ed,&track_song,&track_state))changed=1u;
+     if(track_history_step(0u))changed=1u;
      fm1_irq_enable_all();track_seq_fired=1u;
     }
     if((combo_edges&(1u<<13u)) && !track_state.transport.playing){
      fm1_irq_off();(void)beetle_edit_commit(&beetle_ed,&track_song,&track_state);
-     if(beetle_edit_redo(&beetle_ed,&track_song,&track_state))changed=1u;
+     if(track_history_step(1u))changed=1u;
      fm1_irq_enable_all();track_seq_fired=1u;
     }
    }
-   if(!track_state.record_armed && !(buttons&(1u<<11)) && (track_state.transport.edit_column==0u ||
-      (track_state.transport.edit_channel==TRACK_DRUM_CHANNEL && track_state.transport.edit_column==1u))){
+   if(!track_state.record_armed && !(buttons&(1u<<11))){
     uint32_t keypressed=fm1_input_note_edges();
     if(buttons&(1u<<11))keypressed=0u; /* Chords handled at page level below. */
     for(uint8_t k=0u;k<27u;k++)if(keypressed&(1u<<k)){
@@ -1885,17 +2681,25 @@ static void track_fm1_poll(void){
      const uint8_t note=(uint8_t)(ch==TRACK_DRUM_CHANNEL?k%TRACK_DRUM_COUNT:
                            beetle_keyboard_pitch(k,native_controls.octave));
      fm1_irq_off();
-     if(ch==TRACK_DRUM_CHANNEL && track_state.transport.edit_column==1u){
-      track_state.active.ch[ch][track_state.transport.edit_step].chord=(uint8_t)(1u+note);
-      track_state.dirty=1u;
-     }else (void)track_enter_note(&track_state,note);
+     {
+      const uint8_t at=track_state.transport.edit_step;
+      /* CH6 NOTE2 is a separate drum hit. When NOTE2 has focus, write
+       * only its 1..14 chord encoding; keep NOTE1 and step cursor intact.
+       * Any other focused column retains the V0.85 NOTE1-entry behavior. */
+      if(ch==TRACK_DRUM_CHANNEL && track_state.transport.edit_column==1u){
+       (void)track_enter_drum_note2(&track_state,note);
+      }else if(track_enter_note(&track_state,note)==0 && ch<TRACK_SYNTH_CHANNELS){
+       track_state.active.ch[ch][at].instrument=(uint8_t)(track_input_instrument[ch]&3u);
+       track_input_explicit[ch]=1u;
+      }
+     }
      track_preset_last_note=note;
      /* Key audition works while STOPPED; playback itself owns voices during
       * transport. Audio ISR renders these native chip/drum voices. */
      if(!track_state.transport.playing){
       if(ch==TRACK_DRUM_CHANNEL)(void)track_drum_trigger(&track_drum,note);
       else if(track_chip_note(&track_chip,ch,
-           track_state.active.ch[ch][(uint8_t)((track_state.transport.edit_step+TRACK_STEPS-1u)%TRACK_STEPS)].instrument,
+           track_input_instrument[ch],
            note,100u)){
        track_preview_channel[k]=ch;track_preview_note[k]=note;track_preview_mask|=(1u<<k);
       }
@@ -1905,7 +2709,7 @@ static void track_fm1_poll(void){
    }else (void)fm1_input_note_edges();
    fm1_irq_off();(void)beetle_edit_commit(&beetle_ed,&track_song,&track_state);fm1_irq_enable_all();
   }else{
-   if(track_page==5u && !track_state.record_armed){
+   if(track_page==5u){
     /* Never write pattern notes in EDIT. Only audition the currently selected
      * instrument; release keys explicitly gate their voices. */
     uint32_t held=fm1_in.notes;
@@ -1923,31 +2727,30 @@ static void track_fm1_poll(void){
      }
      track_edit_voice_key[k]=255u;track_edit_voice_note[k]=255u;
     }
-    if(track_state.transport.edit_channel==TRACK_DRUM_CHANNEL){
-     for(uint8_t k=0u;k<27u;k++)if(onset&(1u<<k))
-      (void)track_drum_trigger(&track_drum,(uint8_t)(k%TRACK_DRUM_COUNT));
-    }else{
-     const uint8_t ch=track_state.transport.edit_channel;
-     const struct track_step *st=&track_state.active.ch[ch][track_state.transport.edit_step];
+    /* EDIT always auditions the selected OSC patch. CH6 uses a safe
+     * temporary synth lane; DRUM EDIT (page 16) remains drum preview. */
+    {
+     const uint8_t ch=track_state.transport.edit_channel==TRACK_DRUM_CHANNEL?0u:track_state.transport.edit_channel;
+     const struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
      for(uint8_t k=0u;k<27u;k++)if(onset&(1u<<k)){
       if(!track_edit_poly){track_chip_silence(&track_chip);
        for(uint8_t j=0u;j<27u;j++){track_edit_voice_key[j]=255u;track_edit_voice_note[j]=255u;}}
       track_edit_order[k]=++track_edit_serial;
       uint8_t pitch=beetle_keyboard_pitch(k,native_controls.octave);
-      if(track_chip_note(&track_chip,ch,(uint8_t)(st->instrument&3u),pitch,100u)){
+      if(track_chip_note(&track_chip,ch,(uint8_t)(track_input_instrument[track_state.transport.edit_channel]&3u),pitch,100u)){
        track_edit_voice_key[k]=track_chip.last_voice_index;track_edit_voice_note[k]=pitch;
       }
      }
     }
     /* Mono last-note priority with return to previously held note. */
-    if(!track_edit_poly&&offs&&!(onset)&&held&&track_state.transport.edit_channel!=TRACK_DRUM_CHANNEL){
+    if(!track_edit_poly&&offs&&!(onset)&&held){
      uint8_t newest=255u;uint32_t latest=0u;
      for(uint8_t j=0u;j<27u;j++)if((held&(1u<<j))&&track_edit_order[j]>=latest){latest=track_edit_order[j];newest=j;}
      if(newest<27u && track_edit_voice_key[newest]==255u){const struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
       track_chip_silence(&track_chip);
       for(uint8_t j=0u;j<27u;j++){track_edit_voice_key[j]=255u;track_edit_voice_note[j]=255u;}
       uint8_t pitch=beetle_keyboard_pitch(newest,native_controls.octave);
-      if(track_chip_note(&track_chip,track_state.transport.edit_channel,(uint8_t)(st->instrument&3u),pitch,100u)){
+      if(track_chip_note(&track_chip,track_state.transport.edit_channel==TRACK_DRUM_CHANNEL?0u:track_state.transport.edit_channel,(uint8_t)(track_input_instrument[track_state.transport.edit_channel]&3u),pitch,100u)){
        track_edit_voice_key[newest]=track_chip.last_voice_index;track_edit_voice_note[newest]=pitch;
       }
      }
@@ -1956,13 +2759,29 @@ static void track_fm1_poll(void){
     (void)fm1_input_note_edges();
     if(onset||offs)changed=1u;
    }else{
+    /* V0.80 DRUM ENGINE EDIT: every physical key auditions the currently
+     * selected component, including while REC was armed elsewhere. These
+     * are onset edges only and NEVER insert/clear a tracker step. Audio
+     * IRQ ownership is respected; the normal drum voice pool is used. */
+    if(track_page==16u){
+     uint32_t pressed_notes=fm1_input_note_edges();
+     if(pressed_notes){
+      fm1_irq_off();
+      for(uint8_t k=0u;k<27u;k++)if(pressed_notes&(1u<<k))
+       (void)track_drum_trigger(&track_drum,track_drum_component);
+      fm1_irq_enable_all();changed=1u;
+     }
+    }
     if(track_edit_prev_keys){track_audio_all_off(&native_audio);track_edit_prev_keys=0u;
      for(uint8_t j=0u;j<27u;j++){track_edit_voice_key[j]=255u;track_edit_voice_note[j]=255u;}}
-    if(track_page==6u)mixer_key_pressed=fm1_input_note_edges();
-    else (void)fm1_input_note_edges();
+    if(track_page==6u || (track_page==30u && track_song.enabled))mixer_key_pressed=fm1_input_note_edges();
+    else if(track_page!=16u)(void)fm1_input_note_edges();
    }
    if(k4&&track_page==9u){fm1_irq_off();track_set_bpm(&track_state,(uint16_t)((int32_t)track_state.transport.bpm+k4));fm1_irq_enable_all();}
    if(track_page==9u){
+    if(!track_state.transport.playing&&(k3||(pressed&(1u|2u|(1u<<3)))))
+     (void)beetle_edit_begin_bytes(&beetle_ed,BEETLE_EDIT_SONG,0u,
+       &track_song.chain[0],BEETLE_SONG_EDIT_BYTES);
     if(k1){int32_t row=(int32_t)track_song.edit_row+k1;
      if(row<0)row=0;if(row>=track_song.count)row=track_song.count-1u;
      track_song.edit_row=(uint8_t)row;
@@ -1973,8 +2792,13 @@ static void track_fm1_poll(void){
     if(pressed&2u){fm1_irq_off();(void)track_song_insert(&track_song,track_song.edit_row);track_state.dirty=1u;fm1_irq_enable_all();}
     if(pressed&1u){fm1_irq_off();(void)track_song_delete(&track_song,track_song.edit_row);track_state.dirty=1u;fm1_irq_enable_all();}
     if(pressed&(1u<<3)){
-     fm1_irq_off();track_song.enabled^=1u;fm1_irq_enable_all();changed=1u;
+     fm1_irq_off();track_song.enabled^=1u;
+     if(!track_song.enabled)beetle_live_reset();
+     fm1_irq_enable_all();changed=1u;
     }
+    if(!track_state.transport.playing)
+     (void)beetle_edit_commit_bytes(&beetle_ed,BEETLE_EDIT_SONG,0u,
+       &track_song.chain[0],BEETLE_SONG_EDIT_BYTES);
    }
    if(track_page==10u){
     if(sel>0){track_page=0u;track_state.transport.edit_channel=0u;changed=1u;}
@@ -2041,13 +2865,18 @@ static void track_fm1_poll(void){
      else if(track_type_queued<0){k3=-1;track_type_queued++;changed=1u;}
      else k3=0;
     }else track_type_queued=0;
-    if(k3){fm1_irq_off();
-     struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
-     uint8_t ch=track_state.transport.edit_channel;
-     struct track_instrument_ui_values *ui=&track_ui_inst[st->instrument&3u];
+    if(k3){
+     uint8_t hist_ch=track_state.transport.edit_channel;
+     if(!track_edit_prepare_patch(hist_ch)){k3=0;changed=1u;}
+     if(k3){
+     uint8_t hist_id=(uint8_t)(track_input_instrument[hist_ch]&3u);
+     track_history_begin_instrument(hist_id,hist_ch);
+     fm1_irq_off();
+     uint8_t ch=hist_ch;
+     struct track_instrument_ui_values *ui=&track_ui_inst[hist_id];
      int32_t v=0;
      if(track_osc_bank){
-      struct track_va_patch *p=&track_chip.patches[st->instrument&3u];
+      struct track_va_patch *p=&track_chip.patches[hist_id];
       if(track_osc_bank==1u||track_osc_bank==2u){
        uint8_t b=(uint8_t)(track_osc_bank==2u);
        if(track_osc_cursor==0u){
@@ -2069,31 +2898,33 @@ static void track_fm1_poll(void){
           track_osc_cursor==4u?&p->sub:track_osc_cursor==5u?&p->noise:&p->fm_depth;
        v=(int32_t)*target+k3*5;if(v<0)v=0;if(v>100)v=100;*target=(uint8_t)v;
       }
-     }else if(track_osc_cursor==0u){v=(int32_t)track_chip.osc_type[st->instrument&3u]+k3;
-      track_chip.osc_type[st->instrument&3u]=(uint8_t)((v+(int32_t)TRACK_CHIP_TYPES)%TRACK_CHIP_TYPES);
+     }else if(track_osc_cursor==0u){v=(int32_t)track_chip.osc_type[hist_id]+k3;
+      track_type_switch(hist_id,(uint8_t)(((v%(int32_t)TRACK_CHIP_TYPES)+(int32_t)TRACK_CHIP_TYPES)%(int32_t)TRACK_CHIP_TYPES));
      }else if(track_osc_cursor>=1u&&track_osc_cursor<=4u){
       uint8_t *ptr=track_osc_cursor==1u?&ui->attack:track_osc_cursor==2u?&ui->decay:
        track_osc_cursor==3u?&ui->sustain:&ui->release;
       v=(int32_t)*ptr+k3;if(v<0)v=0;if(v>99)v=99;*ptr=(uint8_t)v;
-      if(track_osc_cursor==1u)track_chip.env_attack[st->instrument&3u]=(uint8_t)v;
-      else if(track_osc_cursor==2u)track_chip.env_decay[st->instrument&3u]=(uint8_t)v;
-      else if(track_osc_cursor==3u)track_chip.env_sustain[st->instrument&3u]=(uint8_t)v;
-      else track_chip.env_release[st->instrument&3u]=(uint8_t)v;
+      if(track_osc_cursor==1u)track_chip.env_attack[hist_id]=(uint8_t)v;
+      else if(track_osc_cursor==2u)track_chip.env_decay[hist_id]=(uint8_t)v;
+      else if(track_osc_cursor==3u)track_chip.env_sustain[hist_id]=(uint8_t)v;
+      else track_chip.env_release[hist_id]=(uint8_t)v;
      }else if(track_osc_cursor==5u){
       v=(int32_t)ui->duty+k3;if(v<1)v=1;if(v>99)v=99;ui->duty=(uint8_t)v;
-      track_chip.duty[ch]=(uint8_t)(v<19?0:v<38?1:v<63?2:3);
+      track_chip.duty[hist_id]=(uint8_t)(v<19?0:v<38?1:v<63?2:3);
      }else if(track_osc_cursor==6u){
       v=(int32_t)ui->cutoff+k3*100;if(v<100)v=100;if(v>18000)v=18000;ui->cutoff=(uint16_t)v;
-      track_chip.cutoff[ch]=(uint8_t)(v/75u>250u?250u:v/75u);
+      track_chip.cutoff[hist_id]=(uint8_t)(v/75u>250u?250u:v/75u);
      }else if(track_osc_cursor==7u){
       v=(int32_t)ui->volume+k3;if(v<0)v=0;if(v>100)v=100;ui->volume=(uint8_t)v;
-      /* This also changes current channel loudness until project storage is available. */
-      track_mix.ch[ch].volume=(uint8_t)v;
+      /* Patch volume is independent of the mixer lane fader. */
      }
      /* Live edits update ALL active voices using this shared patch; waveform,
       * tuning, FM and ADSR changes never require a fresh keypress. */
-     track_chip_refresh_instrument(&track_chip,(uint8_t)(st->instrument&3u));
-     track_state.dirty=1u;fm1_irq_enable_all();}
+     track_chip_refresh_instrument(&track_chip,hist_id);
+     track_type_capture(hist_id);
+     track_state.dirty=1u;fm1_irq_enable_all();
+     track_history_commit_instrument(hist_id,hist_ch);}
+    }
    }
    if(track_page==16u){
     if(sel){int32_t v=(int32_t)track_drum_component+sel;if(v<0)v=0;if(v>=TRACK_DRUM_COUNT)v=TRACK_DRUM_COUNT-1;track_drum_component=(uint8_t)v;}
@@ -2108,15 +2939,18 @@ static void track_fm1_poll(void){
     if(pressed&(1u<<3)){track_drum_component_default(&track_drum.components[track_drum_component],track_drum_component);track_state.dirty=1u;}
    }
    if(track_page==17u){
+    if(!track_state.transport.playing&&(k1||k2||k3||k4||(pressed&(1u<<3))||(k4&&(buttons&(1u<<11)))))
+     (void)beetle_edit_begin_bytes(&beetle_ed,BEETLE_EDIT_MASTER,0u,
+       &track_master_cfg,sizeof(track_master_cfg));
     if(sel){int32_t v=(int32_t)track_master_focus+sel;if(v<0)v=0;if(v>2)v=2;track_master_focus=(uint8_t)v;}
     uint8_t fx=track_master_cfg.order[track_master_focus];
-    if(pressed&(1u<<4)){track_master_cfg.enabled[fx]^=1u;track_state.dirty=1u;}
+    if(pressed&(1u<<3)){track_master_cfg.enabled[fx]^=1u;track_state.dirty=1u;}
     if(k4 && (buttons&(1u<<11))){
       int32_t j=(int32_t)track_master_focus+(k4>0?1:-1);
       if(j>=0&&j<3){uint8_t x=track_master_cfg.order[track_master_focus];track_master_cfg.order[track_master_focus]=track_master_cfg.order[j];track_master_cfg.order[j]=x;track_master_focus=(uint8_t)j;track_state.dirty=1u;}
      }
     if(fx==0u){int32_t v;int32_t d[4]={k1,k2,k3,0};
-     /* K1..K4 edit each band. OCT- changes Q/width; OCT+ shifts center.
+     /* K1..K4 edit EQ bands. OCT- changes Q/width; OCT+ shifts center.
       * Hold SEQ with K4 to reorder effect blocks instead. */
      if(!(buttons&(1u<<11)))d[3]=k4;
      for(uint8_t i=0u;i<4u;i++)if(d[i]){
@@ -2132,36 +2966,84 @@ static void track_fm1_poll(void){
      uint8_t *fields[4]={f0,f1,f2,f3};int32_t d[4]={k1,k2,k3,(buttons&(1u<<11))?0:k4};
      for(uint8_t i=0u;i<4u;i++)if(d[i]){int32_t v=(int32_t)*fields[i]+d[i];if(v<0)v=0;if(v>100)v=100;*fields[i]=(uint8_t)v;track_state.dirty=1u;}
     }
+    if(!track_state.transport.playing)
+     (void)beetle_edit_commit_bytes(&beetle_ed,BEETLE_EDIT_MASTER,0u,
+       &track_master_cfg,sizeof(track_master_cfg));
+   }
+   if(track_page==30u && track_song.enabled){
+    fm1_irq_off();
+    if(pressed&1u){track_live_q_mute^=1u;
+     if(!track_live_q_mute)beetle_live_commit(&track_live_mutes);changed=1u;}
+    if(pressed&2u){track_live_q_solo^=1u;
+     if(!track_live_q_solo)beetle_live_commit(&track_live_solos);changed=1u;}
+    for(uint8_t k=0u;k<27u;k++)if(mixer_key_pressed&(1u<<k)){
+     int8_t mute_lane=beetle_black_mute_lane(k);
+     int8_t solo_lane=beetle_white_solo_lane(k);
+     if(mute_lane>=0)beetle_live_toggle(&track_live_mutes,(uint8_t)mute_lane,
+       track_mix.ch[(uint8_t)mute_lane].mute,(uint8_t)(track_state.transport.playing && track_live_q_mute));
+     else if(solo_lane>=0)beetle_live_toggle(&track_live_solos,(uint8_t)solo_lane,
+       track_mix.ch[(uint8_t)solo_lane].solo,(uint8_t)(track_state.transport.playing && track_live_q_solo));
+     changed=1u;
+    }
+    fm1_irq_enable_all();
    }
    if(track_page==6u){
+    if(!track_state.transport.playing && (k3||mixer_key_pressed||(pressed&(1u<<3))))
+     (void)beetle_edit_begin_bytes(&beetle_ed,BEETLE_EDIT_MIXER,0u,
+       &track_mix,sizeof(track_mix));
+    /* Mixer SEL switches quantized mute mode; never reaches tracker CLEAR.
+     * Switching OFF commits already armed changes immediately. */
+    if(pressed&(1u<<3)){
+     fm1_irq_off();
+     track_mix.quantize_mutes^=1u;
+     if(!track_mix.quantize_mutes)beetle_mute_commit(&track_mute_queue,&track_mix);
+     fm1_irq_enable_all();track_state.dirty=1u;changed=1u;
+    }
     if(k1||k2)track_mixer_move(&track_mix,k1,k2);
-    if(k3){fm1_irq_off();if(track_mixer_change(&track_mix,k3))track_state.dirty=1u;fm1_irq_enable_all();}
+    if(k3){fm1_irq_off();
+     if(track_state.transport.playing&&track_mix.quantize_mutes&&track_mix.col==2u){
+      if(beetle_mute_arm(&track_mute_queue,&track_mix,track_mix.row,(uint8_t)(k3>0)))track_state.dirty=1u;
+     }else if(track_mixer_change(&track_mix,k3))track_state.dirty=1u;
+     fm1_irq_enable_all();}
     /* Six left-most physical black keys are direct lane-mute toggles.
      * Press edges only, not continuously held keys. Disabled for other pages. */
     if(mixer_key_pressed){
      fm1_irq_off();
      for(uint8_t k=0u;k<27u;k++)if(mixer_key_pressed&(1u<<k)){
       int8_t lane=beetle_black_mute_lane(k);
-      if(lane>=0){track_mix.ch[(uint8_t)lane].mute^=1u;track_state.dirty=1u;}
+      if(lane>=0){
+       if(track_state.transport.playing&&track_mix.quantize_mutes){
+        if(beetle_mute_toggle(&track_mute_queue,&track_mix,(uint8_t)lane))track_state.dirty=1u;
+       }else {track_mix.ch[(uint8_t)lane].mute^=1u;track_state.dirty=1u;}
+      }else{
+       int8_t solo_lane=beetle_white_solo_lane(k);
+       if(solo_lane>=0){track_mix.ch[(uint8_t)solo_lane].solo^=1u;track_state.dirty=1u;}
+      }
      }
      fm1_irq_enable_all();
     }
+    if(!track_state.transport.playing)
+     (void)beetle_edit_commit_bytes(&beetle_ed,BEETLE_EDIT_MIXER,0u,
+       &track_mix,sizeof(track_mix));
    }
    if(track_page==1u && k4){
     int32_t v=(int32_t)track_state.project_slot+k4;
     if(v<0)v=0;if(v>=(int32_t)TRACK_PROJECTS)v=TRACK_PROJECTS-1;track_state.project_slot=(uint8_t)v;
    }
    if(track_page==1u && k1){
-    int32_t m=(int32_t)track_menu_index+k1;if(m<0)m=0;if(m>4)m=4;track_menu_index=(uint8_t)m;
+    int32_t m=(int32_t)track_menu_index+k1;if(m<0)m=0;if(m>6)m=6;track_menu_index=(uint8_t)m;
    }
    if(track_page==1u && (pressed&(1u<<3))){
     if(track_menu_index==0u){
-     if(track_named){track_name_begin(&track_editor,track_title);track_complete_save();}
+     if(track_named){track_save_return_page=track_page;track_name_begin(&track_editor,track_title);track_complete_save();}
      else track_begin_save();
     }else if(track_menu_index==1u){
      /* SAVE AS always opens the title editor. K4 can select any of 12 slots. */
-     if(track_state.project_slot+1u<TRACK_PROJECTS)track_state.project_slot++;
-     track_overwrite_wait=0u;track_begin_save();
+     track_overwrite_wait=0u;track_new_project_full=0u;track_begin_save();
+    }else if(track_menu_index==6u){
+     track_rc_tab=0u;track_page=27u;changed=1u;
+    }else if(track_menu_index==5u){
+     track_page=28u;changed=1u;
     }else if(track_menu_index==4u){
      track_help_offset=0u;track_page=19u;changed=1u;
     }else if(track_menu_index==3u){

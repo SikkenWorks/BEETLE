@@ -5,6 +5,7 @@
 #include "audio_core.h"
 #include "native_panel_midi.h"
 #include "native_audio_timing.h"
+#include "beetle_rc_diagnostics.h"
 #include "native_output_startup.h"
 #include "native_performance_midi.h"
 #include "native_preset_ramp.h"
@@ -14,7 +15,7 @@ static int32_t native_dma[ETCH_NATIVE_FRAMES*4] __attribute__((aligned(4)));
 static int16_t native_mono[ETCH_NATIVE_FRAMES] __attribute__((section(".noinit")));
 static int16_t native_stereo[ETCH_NATIVE_FRAMES*2] __attribute__((section(".noinit")));
 #if ETCH_NATIVE_UAC
-static int32_t native_usb_stereo[ETCH_NATIVE_FRAMES*2] __attribute__((section(".noinit")));
+static int32_t native_usb_stereo[ETCH_NATIVE_FRAMES*2] __attribute__((section(".usb_audio_ram")));
 #endif
 #ifndef ETCH_NATIVE_PANEL_MIDI
 #define ETCH_NATIVE_PANEL_MIDI 0
@@ -35,6 +36,8 @@ static volatile uint8_t native_scope_held_note;
 static uint32_t native_scope_window_peak;
 static uint8_t native_scope_silent_windows;
 static volatile uint32_t native_halves,native_late,native_max_ticks;
+/* ALNK0 and the MIDI consumer own these counters; UI copies with IRQs off. */
+static struct beetle_rc_monitor native_rc;
 static volatile uint8_t native_ui_pressure; /* ISR-owned hysteretic LCD budget hint */
 static volatile uint32_t native_max_wall_ticks,native_max_nested_ticks;
 /* DMA pre-publish guard hits: block writes into a buffer that may be active. */
@@ -108,9 +111,11 @@ static void native_compile_edit(void){
 #if ETCH_NATIVE_USB
 static void native_midi_drain(uint8_t play){
  uint32_t end=mi_w;RING_PUBLISH();
- if(midi_in_overflow){etch_native_midi_panic(&native_audio);mi_r=end;RING_PUBLISH();midi_in_overflow=0;return;}
+ if(midi_in_overflow){beetle_rc_inc(&native_rc.midi_overflows);etch_native_midi_panic(&native_audio);mi_r=end;RING_PUBLISH();midi_in_overflow=0;return;}
  for(uint32_t count=0;mi_r!=end&&count<MQ;count++){
-  uint32_t pkt=midi_in_q[mi_r%MQ];RING_PUBLISH();++mi_r;
+  uint32_t pkt=midi_in_q[mi_r%MQ];
+  uint32_t received_ms=midi_in_ms[mi_r%MQ];RING_PUBLISH();++mi_r;
+  beetle_rc_midi(&native_rc,(uint8_t)(pkt>>8),received_ms);
   if(play)etch_native_midi(&native_audio,(uint8_t)(pkt>>8),(uint8_t)(pkt>>16),(uint8_t)(pkt>>24));
  }
 }
@@ -198,7 +203,7 @@ etch_native_reset(&native_audio);native_audio.keys=keys&0x7ffffffu;}
   if(!etch_audio_dma_preflight(half,fm1_audio_free_half(),start,
       fm1_ticks(),ETCH_NATIVE_FRAMES*544u)){
    fm1_audio_ack_half();
-   ++native_dma_blocked;++native_late;
+   ++native_dma_blocked;++native_late;beetle_rc_guard(&native_rc);
    /* A single late half should not permanently disable sound. Never touch
     * an expired buffer; acknowledge and retry on the next hardware half. */
    native_budget_late();
@@ -281,6 +286,7 @@ etch_native_reset(&native_audio);native_audio.keys=keys&0x7ffffffu;}
   struct etch_audio_timing measure=etch_audio_timing_end(start,fm1_ticks(),
       native_nested_ticks,ETCH_NATIVE_FRAMES*544u,
       (uint8_t)(fm1_audio_free_half()!=half));
+  beetle_rc_audio(&native_rc,measure);
   if(measure.render_ticks>native_max_ticks)native_max_ticks=measure.render_ticks;
   if(measure.wall_ticks>native_max_wall_ticks)native_max_wall_ticks=measure.wall_ticks;
   if(measure.nested_ticks>native_max_nested_ticks)native_max_nested_ticks=measure.nested_ticks;

@@ -1,4 +1,4 @@
-/* BEETLE V0.38 · Fixed-point master bus (EQ -> dynamics -> reverb by default).
+/* BEETLE V0.73 · Fixed-point master bus (EQ -> dynamics -> reverb by default).
  * No allocation, libm, flash I/O or blocking in the audio interrupt.
  * The FM1 hardware MASTER attenuator follows this bus in audio_target.c.
  * SPDX-License-Identifier: GPL-3.0-only */
@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "track_project_store.h"
 #define TRACK_MASTER_REVERB_FRAMES 1024u
+#define TRACK_MASTER_GUARD 0xBEE7052Au
 struct track_master_fx_state {
  int32_t crossover[2][4];
  uint32_t envelope;
@@ -19,16 +20,29 @@ struct track_master_fx_state {
  volatile uint16_t recover_count;
 };
 static inline int32_t master_limit(int32_t v){return v>32767?32767:v< -32768?-32768:v;}
+/* The UI/codec limit parameters to 0..100, but DMA audio must remain safe
+ * even if a torn UI write or invalid RAM value reaches a processing block.
+ * These checks run once per block, not once per sample. */
+static inline uint8_t track_master_safe_percent(uint8_t v){return v>100u?100u:v;}
+static inline uint8_t track_master_state_intact(const struct track_master_fx_state *s){
+ if(s->guard!=TRACK_MASTER_GUARD || s->delay_pos>=TRACK_MASTER_REVERB_FRAMES ||
+    s->envelope>65536u || s->recover_frames>TRACK_MASTER_REVERB_FRAMES ||
+    s->reverb_lp_l < -262144 || s->reverb_lp_l > 262144 ||
+    s->reverb_lp_r < -262144 || s->reverb_lp_r > 262144)return 0u;
+ for(uint8_t channel=0u;channel<2u;channel++)for(uint8_t band=0u;band<4u;band++)
+  if(s->crossover[channel][band]< -262144 || s->crossover[channel][band]>262144)return 0u;
+ return 1u;
+}
 static inline void track_master_default(struct track_master_settings *c){
  for(uint8_t j=0;j<4;j++){c->eq[j]=50u;c->eq_freq[j]=50u;c->eq_width[j]=50u;}
  c->comp_threshold=75u;c->comp_ratio=40u;c->comp_gain=50u;c->comp_attack=28u;
  c->reverb_wet=15u;c->reverb_feedback=32u;c->reverb_tone=50u;c->reverb_spread=50u;
  for(uint8_t j=0;j<3;j++){c->enabled[j]=1u;c->order[j]=j;}
 }
-#define TRACK_MASTER_GUARD 0xBEE7052Au
 static inline void track_master_dsp_init(struct track_master_fx_state *s){
  if(!s)return;
  s->envelope=0u;s->delay_pos=0u;s->reverb_lp_l=s->reverb_lp_r=0;
+ for(uint8_t channel=0u;channel<2u;channel++)for(uint8_t band=0u;band<4u;band++)s->crossover[channel][band]=0;
  s->scope_level=0u;s->guard=TRACK_MASTER_GUARD;
  s->recover_frames=TRACK_MASTER_REVERB_FRAMES;
 }
@@ -41,28 +55,27 @@ static inline void track_master_process(struct track_master_fx_state *s,
  /* A cold, zeroed DSP object is safe, including older host test fixtures. */
  if(s->guard==0u && s->delay_pos==0u && s->envelope==0u &&
     s->recover_frames==0u)s->guard=TRACK_MASTER_GUARD;
- if(s->guard!=TRACK_MASTER_GUARD || s->delay_pos>=TRACK_MASTER_REVERB_FRAMES ||
-    s->envelope>65536u || s->recover_frames>TRACK_MASTER_REVERB_FRAMES){
+ if(!track_master_state_intact(s)){
   if(s->recover_count<65535u)s->recover_count++;
   track_master_dsp_init(s);
  }
  static const uint8_t freq_base[4]={3u,18u,64u,175u};
  uint16_t coeff[4];int32_t egain[4];uint8_t eq_flat=1u;
  for(uint8_t band=0;band<4u;band++){
-  uint32_t freq=(uint32_t)freq_base[band]*(50u+(uint32_t)c->eq_freq[band])/100u;
+  uint32_t freq=(uint32_t)freq_base[band]*(50u+(uint32_t)track_master_safe_percent(c->eq_freq[band]))/100u;
   if(freq<1u)freq=1u;if(freq>245u)freq=245u;
   coeff[band]=(uint16_t)freq;
-  int32_t g=100+((int32_t)c->eq[band]-50)*(25+(int32_t)c->eq_width[band])/50;
+  int32_t g=100+((int32_t)track_master_safe_percent(c->eq[band])-50)*(25+(int32_t)track_master_safe_percent(c->eq_width[band]))/50;
   egain[band]=g<25?25:g;
   if(g!=100)eq_flat=0u;
  }
- const uint32_t comp_thr=4500u+(uint32_t)c->comp_threshold*235u;
- const uint32_t attack_div=4u+(uint32_t)c->comp_attack/4u;
- const uint32_t release_div=160u+(uint32_t)c->comp_attack*8u;
- const uint16_t tap_spread=(uint16_t)(16u+(uint32_t)c->reverb_spread*64u/100u);
- const uint16_t fb=(uint16_t)((uint32_t)c->reverb_feedback*60u/100u);
- const uint16_t tone=(uint16_t)(12u+(uint32_t)c->reverb_tone*2u);
- const int32_t wet=(int32_t)c->reverb_wet*45/100;
+ const uint32_t comp_thr=4500u+(uint32_t)track_master_safe_percent(c->comp_threshold)*235u;
+ const uint32_t attack_div=4u+(uint32_t)track_master_safe_percent(c->comp_attack)/4u;
+ const uint32_t release_div=160u+(uint32_t)track_master_safe_percent(c->comp_attack)*8u;
+ const uint16_t tap_spread=(uint16_t)(16u+(uint32_t)track_master_safe_percent(c->reverb_spread)*64u/100u);
+ const uint16_t fb=(uint16_t)((uint32_t)track_master_safe_percent(c->reverb_feedback)*60u/100u);
+ const uint16_t tone=(uint16_t)(12u+(uint32_t)track_master_safe_percent(c->reverb_tone)*2u);
+ const int32_t wet=(int32_t)track_master_safe_percent(c->reverb_wet)*45/100;
  for(uint32_t f=0;f<frames;f++){
   if(s->recover_frames){
    /* 1024 bounded frames clear both reverb paths without a large ISR memset. */
@@ -97,11 +110,11 @@ static inline void track_master_process(struct track_master_fx_state *s,
     int32_t gain=256;
     if(s->envelope>threshold){
      uint32_t over=s->envelope-threshold;
-     uint32_t reduction=over*((uint32_t)c->comp_ratio+20u)/140u;
+     uint32_t reduction=over*((uint32_t)track_master_safe_percent(c->comp_ratio)+20u)/140u;
      uint32_t denom=s->envelope+reduction;
      gain=denom?(int32_t)(((uint32_t)s->envelope*256u)/denom):256;
     }
-    gain=(gain*(75+(int32_t)c->comp_gain/2))/100;
+    gain=(gain*(75+(int32_t)track_master_safe_percent(c->comp_gain)/2))/100;
     l=master_limit(l*gain/256);r=master_limit(r*gain/256);
    }else{
     const uint16_t pos=s->delay_pos;

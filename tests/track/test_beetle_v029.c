@@ -20,7 +20,8 @@ int main(void){
  assert(track_enter_note(&e,64u)==0);assert(e.active.ch[0][1].note==64u && e.transport.edit_step==2u);
  e.transport.edit_step=15u;assert(track_enter_note(&e,67u)==0);
  assert(e.active.ch[0][15].note==67u && e.transport.edit_step==0u);
- e.transport.edit_column=1u;assert(track_enter_note(&e,70u)!=0 && e.transport.edit_step==0u);
+ e.transport.edit_column=1u;assert(track_enter_note(&e,70u)==0 && e.transport.edit_step==1u && e.active.ch[0][0].note==70u);
+ e.transport.edit_step=0u;
  e.transport.edit_column=0u;e.transport.edit_channel=3u;
  assert(track_enter_note(&e,0u)==0 && e.active.ch[3][0].note==0u && e.transport.edit_step==1u);
  assert(track_enter_note(&e,14u)!=0 && e.transport.edit_step==1u);

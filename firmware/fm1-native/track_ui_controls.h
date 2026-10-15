@@ -10,6 +10,12 @@ static inline int8_t beetle_black_mute_lane(uint8_t note_index){
  for(uint8_t i=0;i<6u;i++)if(black_keys[i]==note_index)return (int8_t)i;
  return -1;
 }
+/* Six white keys immediately beneath the six black mute keys. */
+static inline int8_t beetle_white_solo_lane(uint8_t note_index){
+ static const uint8_t white_keys[6]={0u,2u,4u,7u,9u,12u};
+ for(uint8_t i=0u;i<6u;i++)if(white_keys[i]==note_index)return (int8_t)i;
+ return -1;
+}
 static inline uint8_t beetle_hold_finished(uint32_t now,uint32_t start){
  return (uint8_t)(start!=0u && (uint32_t)(now-start)>=BEETLE_STORAGE_HOLD_MS);
 }

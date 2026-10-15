@@ -58,6 +58,9 @@ struct track_engine {struct track_pattern active;struct track_harmony harmony;st
 uint8_t track_note_scroll(uint8_t value,int32_t detents,uint8_t drum);
 void track_init(struct track_engine *e);
 int track_enter_note(struct track_engine *e,uint8_t note);
+/* Drum NOTE2 uses chord encoding: 0=empty, 1..14=pad, 15=STP.
+ * Entry does not alter NOTE1, selected row or non-note fields. */
+int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note);
 int track_set_note(struct track_engine *e,uint8_t channel,uint8_t step,uint8_t note);
 int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step);
 /* True if the current pattern contains any musical event in this lane.

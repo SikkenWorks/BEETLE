@@ -8,7 +8,7 @@
 #include "track_core.h"
 #define TRACK_MIXER_FIELDS 5u /* VOL PAN MUTE SOLO SWING; CH label is not editable */
 struct track_mixer_channel {uint8_t volume;int8_t pan;uint8_t mute,solo,swing;};
-struct track_mixer {struct track_mixer_channel ch[TRACK_MIXER_CHANNELS];uint8_t row,col;};
+struct track_mixer {struct track_mixer_channel ch[TRACK_MIXER_CHANNELS];uint8_t row,col,quantize_mutes;};
 /* ISR-observed post-lane-volume peaks, in actual signed-16 PCM units.
  * The UI clears these only after both LCD slices have completed. */
 extern volatile uint16_t track_lane_pcm_peak[TRACK_CHANNELS];

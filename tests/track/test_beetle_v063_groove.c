@@ -24,7 +24,7 @@ int main(int argc,char **argv){
  a.song.patterns[0].ch[5][4].chord=15u; /* NOTE2 STP, NOT NOTE1 STP */
  a.song.patterns[0].ch[5][4].note=0u;
  uint32_t used=0;assert(track_store_encode(&a,buffer,sizeof(buffer),&used)==0);
- assert(buffer[4]==12u&&buffer[5]==0u); /* V12 little endian */
+ assert(buffer[4]==TRACK_STORE_VERSION&&buffer[5]==0u); /* current version; V12 is migration-tested by V0.66 */
  assert(track_store_decode(&b,buffer,used)==0);
  assert(b.song.patterns[0].ch[1][2].groove==s->groove);
  assert(b.song.patterns[0].ch[1][2].dynamics==s->dynamics);

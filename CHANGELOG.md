@@ -1,4 +1,318 @@
+## BEETLE 1.01 RC1 — Independent drum columns, audio STOP, and simulator menu spacing
+
+- **CH6 NOTE1 + ENV:** inserts `[STP]` into NOTE1 without clearing an existing NOTE2 drum hit or NOTE2 `[STP]`.
+- **CH6 NOTE2 + ENV:** inserts `[STP]` into NOTE2 without changing NOTE1 (regression retained).
+- **Audio playback:** a drum NOTE1 STOP releases only the last NOTE1 voice; NOTE2 STOP releases only the last NOTE2 voice. In the WebSimulator and on the FM1 they no longer stop each other.
+- **Synth lanes:** unchanged ENV STOP behavior, including chord reset.
+- **WebSimulator PROJECTS:** selected-row background corrected to fit inside its own 20-pixel row; SAVE selection no longer overlaps SAVE AS.
+- **Other simulator menus:** standardized list selection backgrounds and SONG row frames to remain strictly within their rows; no user-facing item removed.
+- **Credits:** keep author attribution, replace the overly emphatic disclaimer with a neutral technical reference; source-level provenance review in `CODE-PROVENANCE-AUDIT.md`.
+- Project storage format **V17** and all existing features retained. The new native build requires physical FM1 qualification before final release.
+
+## BEETLE 1.0 RC1 — Live Mixer isolation, independent quantizers, NOTE2 STOP
+
+- Live Mixer remains SONG-only. Turning SONG OFF now removes all transient live mute/solo overrides and pending queues without writing to or changing the ordinary saved Mixer; playback also uses the temporary overlay for both new note triggering and the audio rendering paths.
+- Native screen now explicitly displays `[X] S` or `[Q S]` for solo; mapped white-key LEDs track live SOLO. Black-key LEDs track live MUTE.
+- OCT− toggles quantized MUTE; OCT+ toggles quantized SOLO while on Live Mixer. Each defaults ON in Live Mixer, is independent, commits only at a pattern boundary during playback, and becomes immediate when disabled. Queued second taps cancel.
+- Native and WebSimulator Punch-In K1 REPEAT/RING MOD/FILTER/TAPE STOP increments changed from 3 to 1. Stutter remains stepped BPM fractions.
+- CH6 NOTE2+ENV now encodes chord=15 STOP, preserves NOTE1 and does not insert a STOP in the first drum cell. Matching WebSimulator ENV behavior included.
+- Fixed WebSimulator playback mixer resets: live performance overrides now survive individual step scheduling without being serialized to the project. Also corrected the 120% simulated mixer gain limit and no-audio-context Punch parameter adjustment.
+- Updated on-device HELP, browser HELP and bilingual README. V17 project data stays unchanged. JieLi hardware-test, pilot, and storage/UAC build compiled; the protected first 16 KiB and OTA loader are unchanged.
+- **RC qualification:** firmware image retains experimental project-write/storage risks and requires the project maintainer's physical FM1 tests, including project backup/recovery, before final 1.0 publication. No unperformed hands-on test is claimed.
+
+## V0.88 — Song Mode Live Mixer gate & CH6 NOTE2 entry
+
+- Live Mixer is available only with Song Mode enabled. A second ARP press while SONG is OFF leaves the Song editor visible; when SONG is ON it opens Live Mixer. If SONG gets disabled while Live Mixer is active, the firmware returns to the Song editor and refuses Live Mixer key actions.
+- In the Tracker, the physical keyboard on CH6 now writes NOTE2 when that column is focused. NOTE2 uses the existing packed chord/second-hit representation (0 empty, 1–14 drums, 15 STP). A note entry never changes NOTE1, instrument, effect, velocity or the selected step, and previews the inserted drum hit. NOTE1 input from the other columns still advances to the next step.
+- WebSimulator implements matching NOTE2 entry and Song gating, including note preview and project-backup persistence. No project-format migration (V17 retained), new flash partitions or bootloader edits.
+- Three JieLi build variants, C NOTE2 regression, native route tests, existing native regressions and Chromium browser note-entry/screen tests passed. Specific new behavior awaits the project maintainer's usual physical FM1 testing before publication.
+
+## V0.87 — Punch-In ergonomics, Live SOLO, waveform presets
+
+- K1 controls held Punch-In FX; ALGORITHM returns to pattern selection. Ring Mod defaults to 20 and Stutter to BPM-relative ×1.
+- Mute on six black keys and SOLO on six corresponding white keys in both MIXER and Live Mixer, including active FM1 LED feedback.
+- MASTER FX uses SELECT for row selection and K1–K4 for EQ, compressor and reverb editing; SEL toggles FX power.
+- Project schema V17 persists ADSR, cutoff and oscillators independently for each waveform TYPE per patch slot. V16 and previous supported projects can still be loaded. Project saves are capacity-checked before flash writes; a sufficiently dense project can exceed the fixed slot capacity.
+- HELP end indicator corrected. Additional invalid-type wrapping check added. Physical FM1 verification remains part of the maintainer's release process.
+
+## V0.86 — Live Mixer, New Mix Defaults, 120% Faders
+
+- Synth channels CH1–CH5 start at mixer **50%**, CH6 digital drums remain **80%**; applies to new projects only.
+- Quantized mutes default **OFF** in the normal Mixer for new projects. Existing stored preferences remain intact.
+- **Live Mixer** opens with a second **ARP** press from SONG MODE; pressing ARP again returns. The first six white keys mute/unmute CH1–CH6. During playback they are always queued to the next pattern boundary, independently of the saved quantized mute setting; stopped transport applies immediately.
+- Conventional mixer K3 volume range extended to **0–120%**. Both save preflight and V16 decoder accept 120% (reject 121%). Fixed-point velocity scaling remains bounded at MIDI 127; at high levels and dense arrangements clipping is still possible and must be checked on hardware.
+- On-device HELP, README and WebSimulator updated. No project schema or reserved flash partition changes. The project maintainer physically tests beta releases before public publication.
+
+## V0.85 — Tracker Keyboard Input, Step Octave & LED Feedback
+
+- **Tracker note entry:** pressing any musical key now writes to `NOTE` regardless of the edit cursor being on `NOTE`, `INS`, `CHD` or `FX`. The other cell values remain untouched, and step advancement still respects the active pattern length. On CH6 keyboard entry targets drum NOTE1, never NOTE2.
+- **SEQ + OCT− / OCT+:** on an existing synth NOTE, shift only that selected step's saved pitch by −12 or +12 semitones (MIDI 0–127 bounds) and immediately preview the transposed sound. Undo/Redo records the modification. Empty `[---]`, stop `[STP]` and CH6 drums are unchanged. This shortcut never changes the global performance-keyboard octave.
+- **Keyboard OCT LED:** on the physical FM1, OCT− stays illuminated when the keyboard octave is negative and OCT+ stays illuminated when it is positive; neither stays lit at octave zero. Pressed button illumination remains intact. The WebSimulator mirrors this indication.
+- **Documentation:** release history appears in `CHANGELOG.md` only; the README stays a current user manual with the two GitHub Pages install/simulator badges and complete third-party credits and licence links.
+- **Compatibility:** project V16, protected loader, six lanes, firmware storage layout and existing instruments unchanged. New actions checked in native C tests and browser simulator; device-owner hardware tests remain the public beta release gate.
+
+## BEETLE V0.84 — MASTER Controls, Ring Mod & Project UX
+
+- K1 now selects MASTER FX; SEL toggles the selected effect with `[X]` / `[ ]` indicators. SELECT rotary edits knob/parameter 1; K2–K4 control the remaining parameters. Obscuring EQ help text removed.
+- Reverse Punch-In replaced by true stereo Ring Mod, adjustable and persistent default 20. No extra audio delay memory required.
+- BPM-linked Stutter now synchronizes for isolated CH6 drum transients even with no synth voices sounding.
+- Stronger step Vibrato modulation; corrected sinusoid amplitude normalization.
+- Startup LOAD browser HOME now returns to the startup two-option chooser.
+- WebInstaller simplified, with integrity checks, mandatory confirmation and advanced options preserved.
+- Firmware identifier `FM-1_2084`. Existing project format V16 preserved. Older Reverse events will produce Ring Mod in this version.
+- Three native build variants compile; host regression, browser, and firmware package tests passed. Device-owner hardware confirmation required for these specific changes prior to public release.
+
+## V0.83 — OCT Punch-In & Copy-on-Write Instrument Focus
+
+- OCT UP and OCT DOWN now retune every sounding native synth voice, including dual oscillators and NES NOISE, rather than only newly scheduled sequencer notes. Release restores the original pitch without changing recorded notes.
+- Instrument editing automatically clones any already-used patch to a free slot before changing its type/parameters, leaving existing tracker/song instrument IDs untouched. New keyboard-entered notes use the last focused instrument.
+- If all four available V16 synth patches are occupied/reserved, EDIT refuses the operation with `4 PATCH SLOTS IN USE`. It never destroys existing song timbres to make room.
+- Native host tests cover all twelve synth types; interactive Chromium confirms old/new waveform isolation and full-slot rejection.
+- All three JieLi build variants compile; OTA Freedom pinned ETCH package simulation passes. USB-audio support, original OTA loader, V16 schema, project compatibility, credits and licensing maintained. No physical FM1 test has been performed by the assistant; maintainer validates before public beta release.
+
+## V0.82 — BPM-Synced Stutter, Reverse Speed, DMG Timbre, SEL Input Interlock
+
+- Seven beat-related STUTTER gate rates, controlled by ALGORITHM; saved within the existing five Punch-In parameters.
+- Frozen 128 ms reverse snapshot now reads at 1× by default; ALGORITHM changes 0.5×–2×, and resets without saving after key release.
+- Stronger DMG RETRO PULSE color with AC-coupled/filtered output. NES TRIANGLE closer in rendered level to NES PULSE.
+- Additional SEL release/re-arm latch after both successful and failed project LOAD/SAVE. Step clearing is permitted only for a new Tracker-local SEL press.
+- Three JieLi build variants, V0.82 full regression, previous audio and flash-fault-injection tests passed in software. Protected loader, V16 project codec and credits unchanged.
+
+## V0.81 — Boot chooser, first-free project slots, EDIT preview, SAVE return, USB Audio Class
+
+- Power-on only: choose NEW PROJECT or LOAD PROJECT. Normal PROJECTS menu remains unchanged.
+- NEW PROJECT finds the lowest empty of 12 project slots without replacing occupied/invalid data; a full volume cannot be silently overwritten.
+- EDIT on CH6 auditions the current synth patch instead of drums. DRUM EDIT retains the component audition keyboard.
+- PRESET note-cell cycle uses only the original note (if any), EMPTY and STP.
+- Song Mode footer now reads `SEL "TOGGLE ON/OFF"`. Successful saves return to the invoking screen.
+- Optional compiled USB Audio Class capture path enabled for the storage build; 44.1 kHz stereo final mix, separate RAM region, real FM1 USB enumeration and recording not yet qualified for this change.
+- Three JieLi target builds and targeted software/OTA/Chromium tests passed. No changes to project schema V16, existing synths, OTA loader or licences.
+
+## V0.80 — Game Boy DMG-style RETRO PULSE and Drum Component Preview
+
+- Replaced RETRO PULSE's generic pulse comparator with DMG-inspired eight-position duty patterns, 11-bit divider note table, 4-bit stepped amplitude and a bounded high-pass output stage. The NES PULSE engine remains separate and unchanged.
+- Drum Engine Editor now interprets key-on edges from all 27 FM1 keys as read-only audition triggers for the selected component, including when REC is armed; no step is entered or cleared.
+- WebSimulator adds Drum Engine Editor preview and editing controls; its sampled-drum WebAudio timbre approximation is not identical to the FM1 DSP.
+- All instrument indices and V16 project compatibility retained. Firmware product: `FM-1_2080`.
+- Native JieLi builds, regression tests, OTA integrity and browser checks performed; user conducts the normal pre-release physical FM1 validation.
+
+## V0.79 — Project I/O SEL safety / Tracker-only delete
+
+- Fix: physical SEL can only clear a step if the input polling cycle **starts and ends** on the Tracker page, and no project-I/O input guard is active.
+- Project SAVE now fences queued SEL presses during WRITING and VERIFYING, including direct return to the Tracker, overwrite/provisioning prompts, and error paths.
+- Project LOAD now fences queued SEL for successful and failed reads, including READING and VERIFYING.
+- A released SEL must remain quiet for 320 ms before Tracker deletion can be re-enabled. Real new presses work normally afterwards.
+- WebSimulator project save/load/new transitions follow the same brief SEL fence.
+- New native C guard regression test and project transition static assertions; all previous features, NES instruments and credits preserved.
+- No project schema, firmware flash layout or protected OTA loader changes. Physical-device behavior of this specific fix must be checked before public beta publication.
+
+## V0.78 documentation / on-device credits correction
+
+- The FM1 PROJECTS → CREDITS screen and WebSimulator now explicitly label `Nes_Snd_Emu` as `NES TECHNICAL REF ONLY` and `NO NES_SND_EMU CODE USED`.
+- This credits clarification does not change the NES oscillator DSP or project format. The patched native firmware image has been rebuilt because the on-device display strings live in firmware code.
+
+## V0.78 — NES pulse / triangle / noise and on-device CREDITS
+
+- Three new instrument types (IDs 9–11) added to the existing nine, preserving old IDs and project schema V16.
+- Lightweight 8-step pulse, 32-step 4-bit triangle and 15-bit NES-style noise with NTSC period selection. No DMC, expansion chips, or claim of cycle-accurate emulation.
+- Native hardware UI PROJECTS: CREDITS under HELP and above DIAGNOSTICS, read-only and safely exiting with HOME/SEQ.
+- WebSimulator adds corresponding three oscillator voices and CREDITS page.
+- Attribution for SikkenWorks (Joppe Sikken), Felucca (Leo Kuroshita/Hügelton Instruments), reSID (Dag Lem), Nes_Snd_Emu (Shay Green, James Athey). Appropriate upstream licence copies and links included. Original Nes_Snd_Emu C++ code is not linked.
+- Maintainer's FM1 hardware tests acknowledged accurately; new features require normal pre-release physical validation.
+
 # BEETLE Changelog
+
+## V0.77 — Firmware Freedom (installer opt-in, RC qualification)
+
+- Separate disabled-by-default **Firmware Freedom** advanced mode with a second consent checkbox.
+- SHA-256 pinned stock V15, ETCH V1.36 and ETCH V1.37 firmware images; rejects mismatches, unknown devices and loader-only initiation.
+- Felucca and other custom firmware slots remain blocked until individually audited `.fwsc` images are available. No generic OTA safety bypass.
+- Source `.fwsc` and WebInstaller regenerated for `FM-1_2077`; unchanged flash layout, bootloader, native DSP and project format V16.
+- GitHub README includes exact user-supplied INSTALL and SIMULATOR badges/URLs.
+- BEETLE's real-hardware beta testing by its maintainer is acknowledged. New cross-firmware transfer routes still need distinct hardware sign-off.
+
+# BEETLE V0.76 — Offline dump inspection and guarded project salvage (pre-RC)
+
+**2026-10-15.** Full V0.75 source retained. No changes to project codec V16, firmware flash layout, DSP, normal strict A/B LOAD/SAVE policy or protected OTA bootloader.
+
+- `source/tools/beetle_v071_backup_audit.py` can scan an independent exact 1MiB dump (`scan-dump`) and classify all twelve A/B project pairs with ownership-marker warnings.
+- `salvage-dump` can write a **new local CRC-checked TRK1 extract**, with an explicit acknowledgement option, from a valid bank even when the companion bank is foreign. Never writes to FM1; refusing overwrites and ambiguous equal generation split-brain states; output does not imply native semantic decode or device restore.
+- New regression suite `test_v076_dump_salvage.py`; all earlier tests preserved. Three native builds and simulated OTA passed. New identity `FM-1_2076`, V0.75 predecessor allowlisted. Protected loader preserved byte-for-byte.
+- **RC1 remains BLOCKED** by independent rescue, physical flash ownership, real hardware audio, MIDI and power-loss testing. Experimental storage can erase prior firmware user data.
+
+---
+
+# BEETLE V0.75 — Final RC Hardening (pre-RC)
+
+**2026-10-15.** Based on complete V0.74. No features removed; V16 project
+serialization and the 12-slot physical flash layout remain unchanged.
+
+1. `track_journal.c`: verify the nested 24-byte TRK1 project header, version,
+   slot, length, header CRC and payload CRC while scanning the journal bank.
+   Prevent a CRC-consistent but internally invalid newer record from being
+   selected as the committed source during the next save.
+2. `test_v075_atomic_recovery.c`: 219 injected read/erase/program failures,
+   including partial NOR operations on a dense multichannel project.
+   Assert latest known-good bank never changes. Under torn foreign headers,
+   saving and potentially loading remain fail-closed, not automatically
+   recovered.
+3. `test_v075_audio_endurance.c`: render 60 seconds at 44.1 kHz with active
+   SID-flavored voices, drum triggers, MASTER and Punch-In. Host DSP integrity
+   checks pass; **no hardware cycle measurements** implied.
+4. Rebuild all 3 target variants; package an audited experimental firmware
+   `FM-1_2075`. Keep reference loader and first 16KiB identical. Installer
+   predecessor allowlist now includes the released V0.73 and V0.74 IDs.
+5. Existing V0.74/V0.73 regression suites and simulated OTA checks pass.
+
+**Remaining blockers:** validated independent ROM/recovery path, verified full
+flash backup and restore, real power-loss behavior, FM1 timing/30+ minute
+hardware audio test, MIDI clock and physical flash ownership. **NOT RC1.**
+
+---
+
+# BEETLE V0.74 — Stability & Recovery (pre-RC)
+
+**2026-10-15.** Complete V0.73 source retained. No musical features removed;
+project schema **V16**, 12 slots, 48 patterns and protected loader unchanged.
+
+- **Fail-closed native project preflight:** reject BPM outside 30–300, invalid
+  scale/key options, song enabled/loop flags, song chain entries/repetitions,
+  pattern lengths, lane mixer parameters, drum controls, and invalid MASTER FX
+  settings/order. These values previously could be serialized with a valid CRC
+  but fail validation on subsequent load. Preflight runs before the journal
+  performs even its first flash read/erase/program in a SAVE.
+- **Restore input safety:** V16 project decoder also rejects malformed song
+  loop/enable flags. No changes to the encoded binary layout or CRC scheme.
+- **New tests:** 23 invalid project settings, zero I/O on failed saves, unchanged
+  previous journal bank, CRC rollback, valid V16 save/load, all prior V0.73
+  regressions and rebuilt FM1 target variants.
+- **Firmware:** `FM-1_2074`; original pinned ETCH V1.37 16KiB header and
+  OTA loader are byte-identical; source-level package/integrity tests pass.
+
+**Safety:** this is not hardware RC1. Physical flash ownership, erase behaviour,
+boot reliability, rescue capability, MIDI and audio margins are unverified.
+The experimental storage variant may overwrite older ETCH/Felucca data if
+user deliberately provisions it. Do not flash a valuable device without an
+independently tested recovery route and verified full-flash backup.
+
+---
+
+# BEETLE V0.73 — Hardware Diagnostics & Performance (pre-RC)
+
+**2026-10-15. All existing six-lane tracker features and V16 project compatibility preserved.**
+
+## Native FM1, read-only diagnostics
+
+- **HOME → DIAGNOSTICS**, then turn **K1** to switch AUDIO/MIDI views; HOME returns to the project menu, SEQ returns to the tracker. This view does not edit any project parameters or write to flash.
+- AUDIO: max DSP / wall / nested ISR time in **tenths of a percent** of the **128-frame / 44.1 kHz DMA deadline**; processed DMA half-blocks; wall time above 85% or 95%; late DMA ownership; pre-publish guard refusals; digital clip frames; voice-budget shedding.
+- MIDI INPUT: count inbound USB/TRS MIDI packets, received 0xF8 clock messages and overflow resets. Shows coarse arrival intervals in milliseconds (min, max, latest); a gap over 500ms clears the old interval baseline. **This does not prove clock-sync accuracy, MIDI latency, nor physical wiring.**
+- Every new counter is bounded and updated without allocating, logging, formatting or dividing in the ISR. Reads take a short IRQ-disabled snapshot for display.
+- Relocated the always-initialized `track_state` into the existing guarded RAM pool to pass the tighter 96-KiB JieLi pilot build without increasing memory boundaries or touching HAL/loader layout.
+- **No changes to the V16 project serializer, 12-slot A/B flash mapping, protected V1.37 loader or destructive storage confirmation policy.**
+
+## Software validation
+
+- Three native pi32v2 builds compile, including read-only diagnostic, OTA pilot (no project-storage writes), and *experimental* storage + OTA variant.
+- Host unit tests cover wrapped TIMER4 measurements, nested ISR clamping, wall utilization, DMA guard counts, saturating counters, wrapped MIDI millisecond timestamps, an actual 0ms-resolution interval and >500ms clock pause.
+- Original V0.72 RC audio tests, earlier edit, project journaling, backup and recovery tests pass. Simulated OTA validates V0.73 against pinned ETCH V1.37 loader and stock/predecessor identities, rejecting corrupt packages.
+- WebSimulator stays browser-only (WebAudio does not show fictional hardware load). No real device testing was performed.
+
+**Release gate: NOT RC1.** Flash partition ownership, full-flash backup and independent rescue, real audio-DMA margin, USB MIDI timing, analogue performance, OTA update, stock restoration and power-interruption recovery all remain unverified on the physical FM1. The `.fwsc` storage build is **not recommended for installation on a valuable device**.
+
+---
+
+# BEETLE Changelog
+
+## V0.72 — RC Hardening: MASTER FX Guardrails & Native Audio Stress (15 October 2026)
+
+- **MASTER FX state recovery:** validate the eight fixed-point EQ filter states and two reverb low-pass states before arithmetic. Bad RAM values now trigger the pre-existing bounded dry recovery path and reset all crossover accumulators; this prevents signed-overflow cascades from a damaged DSP state without touching user instrument/project data.
+- **Conservative parameter clamping:** even an unexpected 101–255 value reaching audio processing is capped at 100, once per processing block, for EQ gains/frequencies/widths, compressor threshold/ratio/makeup/attack, and reverb wet/feedback/tone/spread. Valid project values 0–100 preserve the original DSP parameter calculations.
+- **Real native DSP host stress:** added UBSan run exercising eight synthvoices, up to six drum voices, compressor/EQ/reverb and Punch-In, plus a separate chunk-parity check (128 frames versus 4×32 frames), damage recovery, extreme parameter validation, and 271 BPM settings (30–300). No host sanitizer failures in this test. A short synthetic host render **is not** a real-time CPU benchmark or an extended FM1 soak test.
+- **Compatibility:** unchanged V16 project codec, 12-slot A/B bank map and save format, existing controls and all previous BEETLE features. Three separately compiled JieLi images: read-only diagnostic, OTA pilot with project writes disabled, and experimental storage-capable variant. Firmware identity `FM-1_2072`; previously supported `FM-1_2071` remains on the installer source allowlist.
+- **OTA/package checks:** new V0.72 `.fwsc` checksum/embedded installer pairing validated; the protected ETCH V1.37 loader and first 16 KiB are byte-for-byte unchanged. Source-level simulated update/identity/corruption tests pass. Physical FM1 installation, flash wear/power loss, fallback boot/USB recovery, sustained audio timing and analogue output **have not been validated**.
+- **RC decision:** this is **V0.72 experimental / pre-RC**, not RC1. The attached `RC-HARDWARE-CHECKLIST.md` defines mandatory evidence before promoting any firmware to RC1.
+
+## V0.71 — Backup Integrity & A/B Recovery Qualification (15 October 2026)
+
+- **WebSimulator verified backups:** EXPORT PROJECT becomes VERIFIED BACKUP with a self-contained `.beetle-backup.json` envelope, SHA-256 over the complete JSON project, a byte-length bound and explicit format/version metadata. RESTORE BACKUP checks integrity and project structure **before** replacing browser working memory; damaged, unknown or oversized backups are refused. Older plain browser JSON project files can still be imported, explicitly marked unverified. This is **browser-side only**, not a native FM1 backup transport or flash restore.
+- **Offline TRKJ read-only audit:** new `source/tools/beetle_v071_backup_audit.py` validates user-supplied individual A/B bank images, ownership markers, bank CRC32, project header CRC32, generation, and slot identifiers. It can extract the newest valid TRK1 project record to a new `.trk1` file without overwrite. It **cannot acquire** these bank images from the FM1 and **never writes** to a device; verifying structural CRC is not a substitute for semantic firmware decoding or hardware recovery.
+- **Journal recovery regressions:** twelve project slots checked with current V16 fixtures; no-op saves cause no erase; interrupted second-bank writes preserve the committed first bank; successful next commit and corrupt-bank CRC fallback tested; foreign-bank protection refuses further writes. Host simulation only.
+- **Compatibility:** V16 project format, six-lane engine, instruments, Mute Groups, Snapshots, performance modes, MASTER FX and V0.70 Extended Undo/Redo retained unchanged. Native three build variants use the V0.71 identity. Updater/experimental storage package continues to require proven hardware recovery and explicit destructive confirmation on first use.
+- **Limits:** there is no verified physical FM1 project extraction path, no independent recovery proof, and no certified on-device storage safety. A cryptographically verified browser JSON backup cannot be directly flashed into the native firmware.
+
+## V0.70 — Unified Extended Undo/Redo (15 October 2026)
+
+- **One chronological six-action Undo/Redo history** across tracker patterns (including Punch-In events), synth instrument parameters, mixer parameters, Song Mode arrangement, MASTER FX, and instrument library STORE/LOAD/COPY/RENAME.
+- **SEQ + OP5** Undo and **SEQ + OP6** Redo now work from TRACKER, EDIT, MIXER, SONG, MASTER, and LIBRARY screens while playback is stopped; in the WebSimulator use the existing Undo/Redo buttons or Ctrl+Z / Ctrl+Y.
+- Native firmware reuses the existing six pattern-history snapshots for smaller, typed snapshots instead of allocating another six-entry pool. Instrument restoration reapplies patch parameters to the synth DSP; mixer Undo cancels pending mute changes to avoid stale quantized commands.
+- **No project file format change:** still V16. The Undo/Redo history remains in RAM and clears when a project is loaded or a new session is started.
+- **Scope:** direct mixer/instrument/song/master/library edits while stopped are supported. Live queued mute events, changes made during PLAY, and other unrelated global settings are not automatically undoable.
+- WebSimulator updated to match the extended history, with browser-based regression testing of five distinct editing domains and Undo/Redo. Native mixed-domain host tests and the prior V0.56 pattern editing and V0.69 library storage regressions pass.
+- Native target builds and simulated OTA tests remain **software-only**; actual FM1 flash safety and realtime CPU load are not physically certified.
+
+
+## V0.69 — Instrument Library (project-local patches)
+
+- Added an **eight-slot instrument library** for complete synth patches. Each slot holds the oscillator/SID type, VA oscillator parameters, ADSR, duty, cutoff and level, plus an **eight-character name**. The four actively editable instruments and six-lane tracker remain unchanged.
+- From a synth-lane **EDIT**, hold **SEQ + EDIT** to open the new **INSTRUMENT LIBRARY** screen. **K1** selects slot 1–8; **K2** selects STORE / LOAD / COPY / RENAME; **K3** selects target instrument 1–4; **K4** chooses destination slot in COPY; **SEL** performs the operation. RENAME opens the native character editor (K1 position, K2 character, SEL confirm). HOME returns to EDIT, SEQ to TRACKER.
+- STORE copies the selected active patch to a library slot; LOAD replaces the chosen active patch; COPY duplicates the selected library slot into another slot; RENAME changes the eight-character label. All operations work only while transport is stopped, to avoid changing the patch during audio playback. UI actions are non-destructive to sequencer notes.
+- **Project format V16:** the library's validity mask, occupied names and occupied complete patches are serialized after the V15 Mute Groups data, covered by the existing CRC32; read-only preview and fail-closed A/B journal remain intact. Old V15 records open with eight empty library slots. A library is **stored inside its project**, not in shared flash. To move patches to another project use the WebSimulator's complete project JSON export/import; on-device cross-project patch import remains unimplemented pending a verified safe flash design.
+- Updated FM1 HELP and WebSimulator (including a dedicated browser Library button for testing). Original six lanes, V0.58 moon boot animation, DSP, Mute Groups and Snapshots are unchanged.
+- **Validation:** all three JieLi build variants compile; V16 roundtrip and V15 migration, copy/store/load/name and CRC host tests pass; prior V0.63–V0.68 groove/mute regression paths pass; Chromium UI and simulated OTA checks are software-only. Hardware validation is still absent; the storage firmware remains experimental.
+
+## V0.68 — Mute Groups (Live Performance)
+
+- Added **four independent six-lane Mute Groups** alongside V0.67 Performance Snapshots.
+- Open **GLO → SEQ+SEL (PERFORMANCE) → FX (MUTE GROUPS)**. K1 selects group 1–4; K2 selects lane 1–6; SEL adds/removes the lane; K3 mutes/unmutes all members together; HOME returns to PERFORMANCE. GLO returns to mixer; SEQ returns to tracker.
+- A group only changes member lanes. Its toggle computes the target from effective queued/live mute states: if all members are muted, unmute them; otherwise mute them. Empty groups are safely ignored.
+- Respects **Quantized Mutes ON/OFF** during PLAY and keeps pending changes for lanes outside the group. Shares the existing pattern-boundary mute queue and works alongside full Performance Snapshots.
+- Project schema **V15** saves four compact group membership masks (4 bytes total). Supported older V13/V14 projects migrate with four empty groups. Existing snapshots remain intact. Browser project export/import also carries group membership.
+- Added GROUPS display, HELP instructions, WebSimulator controls and tests. The audio voice engine, V0.58 moon/Beetle boot animation and protected OTA loader are unchanged.
+- **Validation:** three JieLi native builds, bounded host tests (including V14/V13 migrations, group queue and snapshot interactions), simulator browser interaction, and software-only OTA integrity simulation. Physical FM1 behaviour remains unverified; storage and firmware updates are experimental and can cause data loss or an unbootable device.
+
+## V0.67 — Performance Snapshots: Four Live Mute Scenes (2026-10-15)
+
+- **Four performance snapshots:** the MIXER now opens a dedicated PERFORMANCE screen with **SEQ + SEL**. Each slot stores an independent six-channel mute combination. **K1** selects a slot, **K2** stores the currently active mute mask, **K3 or SEL** recalls it, **HOME/GLO** returns to MIXER, and **SEQ** returns to TRACKER.
+- **Visual display:** all four snapshot rows fit the FM1's native 240×240 screen, with six blocks per saved snapshot. **Pink means muted; white means unmuted.** Empty slots are identified as `EMPTY` and cannot accidentally overwrite existing channel states when recalled.
+- **Live quantization:** while PLAY is running and QUANT MUTES is ON, recalling a snapshot replaces any existing queued mutes with a complete target arrangement, which commits at the next pattern boundary. With QUANT MUTES OFF (or transport stopped), all six mute values change immediately. A recall does not alter volume, solo, pan, swing, audio effect settings or recorded note data.
+- **Project persistence:** new fixed-size **V14 project record**, appending a validity bitmap and four six-bit mute masks (five bytes). V13 and older supported projects open with four empty snapshots; CRC and out-of-range values are rejected. No changes to the five-byte sequencer step encoding or audio sample processing.
+- **WebSimulator:** matching PERFORMANCE screen, shortcut, store/recall flow and project JSON migration/export. The browser's quantization is timing-approximate; native firmware uses the existing sample-boundary queue.
+- **Tests:** standalone snapshot host tests, V14 save/load and V13 migration, prior groove and mute regression tests, interactive Chromium tests and simulated OTA tests. All three JieLi build variants compile. **Real FM1 behaviour and storage safety remain unverified.**
+- **Release cleanup:** generated object files, obsolete V0.66 web tools, build logs and caches excluded. Complete C source, licensed reference files, previous regression tests, moon loading screen and ReSID credits remain included.
+
+**Safety:** the physical storage-enabled firmware is still an experimental build. Do not format or flash without an independent verified backup and recovery route; an app build and simulated OTA test are not proof of safe recovery.
+
+## V0.66 — Mixer Quantized Mutes ON/OFF (2026-10-15)
+
+- **MIXER SEL toggle:** GLO opens MIXER; press **SEL** to switch **QUANTIZED MUTES ON/OFF**, clearly shown at the bottom of the 240×240 screen. K1/K2/K3 mixer editing and the six black-key mutes are preserved.
+- **ON (default):** during PLAY, a changed lane mute is queued to the next pattern boundary. `Q1` and `Q0` show pending mute/unmute. During STOP, mute changes apply immediately.
+- **OFF:** changing the mixer MUTE field or pressing a mapped black key applies immediately, including during PLAY. Turning the mode OFF while queued changes exist **commits those queued changes immediately**, rather than losing or delaying them. Turning it ON again does not retroactively queue earlier direct changes.
+- **Project persistence:** quantize setting is stored per project in the new **V13 project format**, with a single appended byte. Older V12 and earlier projects open with Quantized Mutes **ON** by default; the existing step encoding, audio DSP and drum/synth engines are unchanged. Invalid flag values and broken CRC are refused.
+- **WebSimulator:** identical mixer SEL interaction and ON/OFF display. Export/import preserves the setting, including compatibility with previous browser projects that have no flag. Browser audio timing is an approximation of native sample-boundary timing.
+- **Tests:** host mute mode and V13 roundtrip / V12 migration tests, existing V0.63–V0.65 regression tests, browser interaction and simulated OTA integrity; read-only, pilot and experimental storage-native builds compile. No physical FM1 validation.
+- **Cleanup:** only V0.66 release artifacts in the clean ZIP; the original source, current webtools, licensed upstream assets, moon loading art and historical regression tests are retained.
+
+**Safety:** experimental FM1 update/storage can brick the device or erase user data. Flash only with independent verified backup/recovery. Firmware/software tests do not establish on-device safety.
+
+## V0.65 — Live Performance: Quantized Lane Mutes (2026-10-15)
+
+- **Quantized mutes:** while PLAY is running, changing a MUTE field in MIXER with K3 or using the six hardware black-key lane toggles arms a mute/unmute to be applied exactly at the **next pattern boundary**. Other mixer controls (volume, pan, solo and swing) retain their existing editing behavior.
+- **Clear pending state:** `Q1` means a mute is queued and `Q0` means an unmute is queued; `ON`/`--` indicate committed state. Toggling a pending lane back to its original state cancels that lane's pending change. Queues are cleared on STOP, project loading, or NEW. Changes committed at the next boundary are persisted by the existing project SAVE; the transient queue is never serialized.
+- **Realtime safety:** the pending state occupies two bytes, uses no dynamic allocation, and commits inside the existing audio step-boundary callback. No change to PCM render, 5-byte step size, or V12 project format. This was checked in host tests and compiled on the JieLi toolchain, **not verified on a physical FM1**.
+- **WebSimulator:** MIXER displays `Q1`/`Q0` and schedules queued mutes for the following pattern start. Browser timing approximates hardware timing with WebAudio and a host timer; it is not sample-identical to FM1 firmware.
+- **Documentation:** HELP, README, and this CHANGELOG explain the behavior. Prior source files, license notices and ReSID attribution remain preserved; old release installers/binaries are not included in the new ZIP.
+
+**Safety:** all OTA and persistent flash writes remain experimental; a complete flash backup and independent recovery route are still required for device testing.
+
+## V0.64 — Groove Copy/Paste, Lane Fill & Clear (2026-10-15)
+
+- **STEP GROOVE tools:** on STEP GROOVE (SEQ+ENV), hold SEQ and press OP1 to copy the selected step's MICRO/RATCHET/PROB settings, OP2 to paste those settings to the selected step, OP3 to fill every *active step in the current lane* with the current step's groove, or OP4 to reset all active steps in the current lane to defaults. The shortcuts are page-local; the tracker retains its original lane and full-pattern copy/paste shortcuts.
+- **Non-destructive:** these actions edit only the existing 7-bit groove value; note, drum NOTE2, instrument, chord, step FX and velocity/gate remain untouched. Fill/Clear respect pattern length (1–16) and do not alter stored events in hidden steps.
+- **Edit safety:** Paste/Fill/Clear run only while playback is stopped, under the existing audio IRQ lock and pattern history recording. Each multi-step fill/clear is a single Undo/Redo action. The clipboard contains one byte and is cleared when loading a different project.
+- **UI:** the STEP GROOVE page now explains the new combinations without text clipping. HELP documents both the new and existing shortcuts. K1 remains the only scroll encoder in HELP.
+- **WebSimulator:** matching actions added as dedicated STEP GROOVE buttons. Simulator project saves retain V12 compatibility; no new project fields or audio format changes.
+- **Regression tests:** bounded 1–16 fill, empty clipboard, repeated paste, preserving musical step fields, plus existing V0.63 groove/legacy project migration fixture.
+- **Build status:** no performance claim for physical FM1. The JieLi toolchain and OTA package are still experimental and require independent hardware recovery validation.
 
 ## V0.63 — Sequencer 2.0: microtiming, ratchets, probability + drum NOTE2 PRESET (2026-10-15)
 

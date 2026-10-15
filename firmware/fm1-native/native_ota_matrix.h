@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * ETCH V0.72 OTA matrix visualizer. Pure RAM renderer: no USB, flash, audio,
+ * ETCH V0.73 OTA matrix visualizer. Pure RAM renderer: no USB, flash, audio,
  * GPIO or timer calls. A 240 x 40 stripe is published by the main-loop adapter.
  * All output pixels use the FM1 LCD DMA's native byte-swapped RGB565 layout.
  */

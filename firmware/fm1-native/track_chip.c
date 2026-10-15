@@ -1,6 +1,8 @@
 /* TRACK 0.5 native chip-inspired oscillator DSP, GPL-3.0-only. */
 #include "track_chip.h"
 #include "beetle_sid_lite.h"
+#include "beetle_nes_apu.h"
+#include "beetle_punch_timing.h"
 #include "track_mixer.h"
 #include <string.h>
 /* Exact note-to-Q32 increments generated offline; no libm in firmware. */
@@ -21,6 +23,26 @@ static const uint32_t note_steps[128]={
  323577341u,342818251u,363203285u,384800477u,407681904u,431923931u,457607465u,484818220u,
  513647012u,544190053u,576549277u,610832681u,647154683u,685636503u,726406571u,769600953u,
  815363807u,863847862u,915214929u,969636441u,1027294024u,1088380105u,1153098554u,1221665363u,
+};
+/* DMG NR13/NR14 11-bit period quantization (f = 131072 / (2048 - period)).
+ * Precomputed outside the realtime path. MIDI note tracking retains Game Boy tuning. */
+static const uint32_t dmg_note_steps[128]={
+ 6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,
+ 6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,
+ 6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,
+ 6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,6236104u,
+ 6236104u,6236104u,6236104u,6236104u,6369913u,6750558u,7151431u,7575849u,
+ 8023448u,8504534u,9008684u,9547723u,10115139u,10709149u,11346938u,12020061u,
+ 12739825u,13493980u,14294854u,15142711u,16056988u,16997743u,18004662u,19081173u,
+ 20230277u,21418297u,22714066u,24040123u,25479651u,26987960u,28621760u,30321390u,
+ 32073631u,34040814u,36060184u,38219476u,40396535u,42836594u,45428132u,48170963u,
+ 51061220u,54090276u,57243520u,60499076u,64147262u,67900559u,72120368u,76438952u,
+ 80793070u,85673188u,90534078u,95979737u,102122441u,108180551u,113975938u,121574334u,
+ 128942475u,135801118u,143430394u,151967917u,161586140u,172504123u,182361501u,193413713u,
+ 202623890u,216361103u,227951876u,240854813u,255306101u,271602235u,290120570u,303935835u,
+ 327315515u,345008245u,364723002u,386827426u,411784034u,425510169u,455903752u,490973272u,
+ 510612203u,555013264u,580241139u,607871670u,638265253u,671858161u,709183615u,750900298u,
+ 797831567u,851020338u,911807505u,981946544u,1063775422u,1063775422u,1160482279u,1276530507u,
 };
 /* 4-bit-style retro wavetable, plus harmonic-limited VA tables. */
 #include "track_va_table.h"
@@ -76,9 +98,9 @@ static int32_t va_shape(uint8_t wave,uint32_t phase,uint32_t step,uint8_t width)
 }
 void track_chip_init(struct track_chip_engine *s){
  if(!s)return;
- memset(s,0,sizeof(*s));s->health_cookie=TRACK_CHIP_COOKIE;s->phrase_div_q8=256u;
+ memset(s,0,sizeof(*s));s->health_cookie=TRACK_CHIP_COOKIE;s->phrase_div_q8=256u;s->punch_bpm=120u;
  for(unsigned i=0;i<8;i++)s->punch_param[i]=50u;
- s->punch_param[2]=0u;
+ s->punch_param[1]=20u;s->punch_param[2]=0u;s->punch_param[4]=50u;
  for(unsigned i=0;i<TRACK_CHANNELS;i++){s->step_gain[i]=100u;s->fx_type[i]=0u;s->fx_value[i]=50u;s->duty[i]=2u;s->cutoff[i]=96u;s->cut_after[i]=0xFFFFFFFFu;}
  for(unsigned i=0;i<4;i++){s->osc_type[i]=(uint8_t)i;track_va_patch_default(&s->patches[i]);
   s->env_attack[i]=1u;s->env_decay[i]=14u;s->env_sustain[i]=100u;s->env_release[i]=16u;}
@@ -140,12 +162,27 @@ static void track_chip_tune_voice(struct track_chip_voice *v,const struct track_
  const struct track_va_patch *p=&s->patches[v->instrument];
  int32_t pitch=0;
  if(s->fx_type[v->channel]==11u)pitch=(int32_t)((uint32_t)s->fx_value[v->channel]*24u/100u)-12;
- int32_t a=(int32_t)v->note+(int32_t)p->coarse+pitch;
- int32_t b=(int32_t)v->note+(int32_t)p->coarse_b+pitch;
+ int32_t a=(int32_t)v->note+(int32_t)p->coarse+pitch+(int32_t)s->punch_octave;
+ int32_t b=(int32_t)v->note+(int32_t)p->coarse_b+pitch+(int32_t)s->punch_octave;
  if(a<0)a=0;if(a>127)a=127;
  if(b<0)b=0;if(b>127)b=127;
- v->step=tune_step(note_steps[a],p->fine);
+ v->step=tune_step(v->type==TRACK_CHIP_RETRO_PULSE?dmg_note_steps[a]:note_steps[a],p->fine);
  v->step2=tune_step(note_steps[b],(int32_t)p->fine_b+(int32_t)p->detune);
+ if(v->type==TRACK_CHIP_NES_NOISE)v->step2=beetle_nes_noise_increment((uint8_t)a);
+}
+/* Punch octave is a live pitch transformation, not a transposition of
+ * stored notes. Changes also retune sustained/held voices immediately.
+ * One shared path handles all 12 oscillator types, including NES NOISE. */
+void track_chip_set_punch_octave(struct track_chip_engine *s,uint8_t mask){
+ if(!s)return;
+ const int8_t semitones=(int8_t)(((mask&(1u<<5))?12:0)-((mask&(1u<<6))?12:0));
+ if(s->punch_octave==semitones)return;
+ s->punch_octave=semitones;
+ for(uint8_t i=0u;i<s->voice_count;i++){
+  struct track_chip_voice *v=&s->voices[i];
+  if(v->active&&v->channel<TRACK_SYNTH_CHANNELS)
+   track_chip_tune_voice(v,s);
+ }
 }
 void track_chip_repitch_channel(struct track_chip_engine *s,uint8_t channel){
  if(!s||channel>=TRACK_SYNTH_CHANNELS)return;
@@ -227,7 +264,8 @@ int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrume
  track_chip_tune_voice(v,s);
  v->velocity=velocity;v->birth=++s->alloc_serial;
  v->phase2=0x80000000u;
- v->lfsr=0x7ffff8u;
+ v->lfsr=(v->type==TRACK_CHIP_NES_NOISE)?1u:0x7ffff8u;
+ if(v->type==TRACK_CHIP_NES_NOISE)v->step2=beetle_nes_noise_increment((uint8_t)bound((int32_t)note+(int32_t)s->punch_octave,0,127));
  /* Envelope rates are computed once on note-on, never divided in the DMA loop. */
  const uint32_t unit=1048576u;
  uint32_t a=(uint32_t)s->env_attack[instrument]*441u;
@@ -241,12 +279,12 @@ int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrume
  return 1;
 }
 static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_engine *s, uint32_t lfo_phase){
- /* VIBRATO changes phase advance of the existing note, never injects an
-  * unrelated sine tone. Maximum +/-2% pitch excursion. */
+ /* VIBRATO changes the live note pitch. The broader +/-9% maximum
+  * excursion produces a clearly audible step effect, even at medium depth. */
  uint32_t step=v->step,step2=v->step2;
  if(s->fx_type[v->channel]==6u){
   int32_t wave=(int32_t)track_va_sine[(uint8_t)(lfo_phase>>24u)];
-  int32_t cents=(wave*(int32_t)s->fx_value[v->channel]*2)/32768;
+  int32_t cents=(wave*(int32_t)s->fx_value[v->channel]*9)/13000;
   int32_t mul=10000+cents;
   step=(uint32_t)(((uint64_t)step*(uint32_t)mul)/10000u);
   step2=(uint32_t)(((uint64_t)step2*(uint32_t)mul)/10000u);
@@ -254,9 +292,26 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
  v->phase+=step;
  int32_t level=0;
  switch(v->type){
+ case TRACK_CHIP_NES_PULSE:
+  level=beetle_nes_pulse(v->phase,s->duty[v->channel]);break;
+ case TRACK_CHIP_NES_TRIANGLE:
+  /* Match NES PULSE perceived level without relying on the MASTER limiter. */
+  level=(int32_t)beetle_nes_triangle(v->phase)*19/10;break;
+ case TRACK_CHIP_NES_NOISE:{
+  uint32_t previous=v->noise_clock;
+  v->noise_clock+=step2;
+  if(v->noise_clock<previous){
+   level=beetle_nes_noise(&v->lfsr,(uint8_t)(s->duty[v->channel]>=2u));
+   v->lowpass=level;
+  }else level=v->lowpass;
+ }break;
  case TRACK_CHIP_RETRO_PULSE:{
-  static const uint32_t ratios[4]={0x20000000u,0x40000000u,0x80000000u,0xC0000000u};
-  level=v->phase<ratios[s->duty[v->channel]&3u]?11000:-11000;
+  /* Game Boy DMG CH1/CH2: 8-step duty sequencer, not generic PWM.
+   * Bit patterns are the DMG NR11/NR21 pulse duty sequences.
+   * Do not reuse NES pulse's 8-bit phase mapping or bipolar DAC. */
+  static const uint8_t dmg_duty[4]={0x80u,0x81u,0xe1u,0x7eu};
+  uint8_t phase=(uint8_t)(v->phase>>29u);
+  level=((dmg_duty[s->duty[v->channel]&3u]>>phase)&1u)?1:0;
  }break;
  case TRACK_CHIP_RETRO_WAVE:level=((int32_t)retro_wave[v->phase>>27u]-8)*1800;break;
  case TRACK_CHIP_SID_6581: case TRACK_CHIP_SID_8580:
@@ -336,7 +391,27 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   if(v->envelope<=v->release_rate){v->envelope=0u;v->active=0u;}
   else v->envelope-=v->release_rate;
  }
- level=(int32_t)(((int64_t)level*v->envelope)>>20u);
+ if(v->type==TRACK_CHIP_RETRO_PULSE){
+  /* DMG 4-bit channel DAC and AC-coupled analog output. Quantizing the
+   * existing ADSR to 16 discrete steps gives the characteristic coarse
+   * volume changes without adding a second RAM envelope or breaking
+   * existing saved patches. Filter state is voice-local, bounded and
+   * updated once per sample, including during note release. */
+  uint32_t env4=(v->envelope*15u+524288u)>>20u;
+  if(env4>15u)env4=15u;
+  int32_t dac=level?(int32_t)env4*1370:0;
+  v->lowpass+=(dac-v->lowpass)>>8u;
+  /* DMG headphone output: AC coupling, a slightly dark single-pole
+   * analogue roll-off and smooth saturation. This is intentionally a
+   * different timbre from the open/bipolar NES PULSE implementation. */
+  int32_t ac=dac-v->lowpass;
+  v->sid_bandpass+=(ac-v->sid_bandpass)>>2u;
+  int32_t shaped=(v->sid_bandpass*3+ac)/4;
+  /* 4-bit headphone DAC clips asymmetrically before a modest gain lift. */
+  if(shaped>14500)shaped=14500+(shaped-14500)/4;
+  if(shaped< -14500)shaped=-14500+(shaped+14500)/4;
+  level=shaped*2;
+ }else level=(int32_t)(((int64_t)level*v->envelope)>>20u);
  v->last_level=level;
  return (int32_t)(((int64_t)level*v->velocity)/127);
 }
@@ -483,35 +558,47 @@ void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *
   * within the original 12 KiB RAM budget, played back at original pitch.
   * Minimum reverse window is ~23 ms instead of the distorted 4 ms loop. */
  const uint32_t repeat_len=512u+((100u-s->punch_param[0])*(BEETLE_PUNCH_CAPTURE-512u))/100u;
- const uint32_t reverse_len=512u+((100u-s->punch_param[1])*(BEETLE_PUNCH_CAPTURE-512u))/100u;
- const uint32_t stutter_half=176u+((100u-s->punch_param[4])*3400u)/100u;
- const uint32_t stutter_edge=stutter_half<320u?16u:64u;
+ /* Reverse captures the entire immutable history, not a short playback
+  * window that changes pitch with ALG. Turn ALG to change read speed only. */
+ /* Ring modulation does not require any PCM capture or extra RAM. */
+ const uint32_t stutter_half=beetle_stutter_half_frames(s->punch_bpm,s->punch_param[4]);
+ const uint32_t stutter_edge=stutter_half<512u?32u:128u;
  const uint32_t tape_duration=8820u+((100u-s->punch_param[3])*79380u)/100u; /* 0.2..2 seconds */
  for(uint32_t f=0u;f<frames;f++){
   const int32_t dry_l=dst[f*2u],dry_r=dst[f*2u+1u];
   int32_t l=dry_l,r=dry_r,wet_l=l,wet_r=r;
   const uint16_t w=s->punch_write;
-  if(mode==1u || mode==2u){
-   uint32_t len=mode==1u?repeat_len:reverse_len;
-   uint32_t phase=(s->punch_position>>8u)%len;
+  if(mode==1u){
+   uint32_t len=repeat_len;
+   uint32_t phase=s->punch_position>>8u;
    uint32_t fract=s->punch_position&255u;
    uint32_t offset=BEETLE_PUNCH_CAPTURE-len;
    /* Reverse is literal reverse indexing through the immutable captured PCM,
     * not a negative playback speed on an advancing live ring buffer. */
-   uint32_t a=mode==1u?phase:(len-1u-phase);
-   uint32_t b=mode==1u?(phase+1u)%len:((phase+1u)<len?(len-2u-phase):(len-1u));
+   uint32_t a=phase;
+   uint32_t b=(phase+1u)%len;
    uint16_t ai=punch_sample(s->punch_start,offset+a);
    uint16_t bi=punch_sample(s->punch_start,offset+b);
    wet_l=punch_lerp(beetle_punch_history[ai][0],beetle_punch_history[bi][0],fract);
    wet_r=punch_lerp(beetle_punch_history[ai][1],beetle_punch_history[bi][1],fract);
    /* Declick across loop boundaries, with a short tail/head crossfade. */
    if(phase>=len-32u){
-    uint32_t t=phase-(len-32u),head=mode==1u?t:len-1u-t;
+    uint32_t t=phase-(len-32u),head=t;
     uint16_t hi=punch_sample(s->punch_start,offset+head);
     wet_l=punch_lerp(wet_l,beetle_punch_history[hi][0],(t*256u)/32u);
     wet_r=punch_lerp(wet_r,beetle_punch_history[hi][1],(t*256u)/32u);
    }
-   s->punch_position+=128u; /* half a captured frame per 44.1kHz output */
+   s->punch_position+=128u;
+   if(s->punch_position>=len*256u)s->punch_position-=len*256u;
+  }else if(mode==2u){
+   /* Genuine bipolar ring modulation (x * sine carrier), wet/dry set by
+    * ALGORITHM. Apply to the post-drum stereo mix even with zero synthvoices.
+    * 440 Hz carrier, 32-bit phase, no allocations or division in ISR. */
+   int32_t carrier=(int32_t)track_va_sine[(uint8_t)(s->punch_position>>24u)];
+   int32_t intensity=(int32_t)s->punch_param[1];
+   wet_l=(dry_l*(100-intensity)+(int32_t)(((int64_t)dry_l*carrier*5)>>16u)*intensity)/100;
+   wet_r=(dry_r*(100-intensity)+(int32_t)(((int64_t)dry_r*carrier*5)>>16u)*intensity)/100;
+   s->punch_position+=42852281u;
   }else if(mode==4u){
    /* True slowing playback head: read rate decreases from 1.0 to 0.0.
     * The same deceleration changes pitch AND time, not just amplitude. */
@@ -534,8 +621,9 @@ void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *
    wet_r=(wet_r*(int32_t)rate)>>8u;
    s->punch_position+=rate;
   }else if(mode==5u){
-   /* Stutter is a live mute/unmute gate, NOT a short audio loop. */
-   uint32_t phase=s->punch_position%(2u*stutter_half);
+   /* Stutter is a LIVE bipolar amplitude gate, always locked to BPM. */
+   uint32_t phase=s->punch_position;
+   if(phase>=2u*stutter_half)phase=0u;
    uint32_t gate=0u;
    if(phase<stutter_half){
     gate=256u;
@@ -544,7 +632,7 @@ void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *
    }
    wet_l=(dry_l*(int32_t)gate)>>8u;
    wet_r=(dry_r*(int32_t)gate)>>8u;
-   s->punch_position++;
+   s->punch_position=phase+1u;
   }
   /* Smooth transitions at key press/release; no full-wet discontinuity. */
   const uint8_t target=mode?255u:0u;
@@ -575,9 +663,9 @@ void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *
   if(mask&128u){l=0;r=0;}
   dst[f*2u]=(int16_t)punch_clip(l);
   dst[f*2u+1u]=(int16_t)punch_clip(r);
-  /* Freezing the history while REPEAT / REVERSE / TAPE are held makes
-   * the snapshot immutable. STUTTER keeps capturing the live stream. */
-  if(mode!=1u&&mode!=2u&&mode!=4u){
+  /* Freeze capture only for REPEAT / TAPE. Ring Mod and STUTTER
+   * always process fresh live audio, including drum-only playback. */
+  if(mode!=1u&&mode!=4u){
    if(!s->punch_decimate_phase){
     s->punch_decimate_l=(int16_t)dry_l;
     s->punch_decimate_r=(int16_t)dry_r;

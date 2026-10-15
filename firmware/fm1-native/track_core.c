@@ -40,18 +40,28 @@ int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step){
  s->note=TRACK_NOTE_EMPTY;s->instrument=(uint8_t)(channel==TRACK_DRUM_CHANNEL?3u:(channel&3u));
  s->chord=0u;s->effect=0u;s->value=50u;s->dynamics=0u;s->groove=0u;e->dirty=1u;return 0;
 }
-/* Hardware keyboard note entry: advance once per accepted note, even in
- * the drum lane. At the final step wrap to 00 in the CURRENT pattern.
- * K3 pitch adjustments and NOTE2/CHD edits deliberately do not advance. */
+/* Hardware keyboard note entry ALWAYS targets NOTE, regardless of the selected
+ * INST/CHD/FX edit column, preserving those other cell values. Advance once
+ * per accepted note; on the last active row wrap to 00. */
 int track_enter_note(struct track_engine *e,uint8_t note){
  if(!e || e->transport.edit_channel>=TRACK_CHANNELS ||
-    e->transport.edit_step>=TRACK_STEPS || e->transport.edit_column!=0u)return -1;
+    e->transport.edit_step>=TRACK_STEPS)return -1;
  if(e->transport.edit_channel==TRACK_DRUM_CHANNEL && note>=TRACK_DRUM_COUNT && note!=TRACK_NOTE_STOP && note!=TRACK_NOTE_EMPTY)return -1;
  if(track_set_note(e,e->transport.edit_channel,e->transport.edit_step,note)!=0)return -1;
  e->transport.edit_step=(uint8_t)((e->transport.edit_step+1u)%(e->active.length>=1u&&e->active.length<=TRACK_STEPS?e->active.length:TRACK_STEPS));
  return 0;
 }
-int track_adjust_octave(struct track_engine *e,int8_t semitones){if(!e||e->transport.edit_channel>=TRACK_CHANNELS||e->transport.edit_step>=16u)return -1;struct track_step *s=&e->active.ch[e->transport.edit_channel][e->transport.edit_step];if(s->note>=TRACK_NOTE_STOP)return 0;int v=(int)s->note+(int)semitones;if(v<0)v=0;if(v>127)v=127;s->note=(uint8_t)v;e->dirty=1u;return 1;}
+/* Dedicated CH6 NOTE2 keyboard input; NOTE1 and the step cursor stay unchanged. */
+int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note){
+ if(!e || e->transport.edit_channel!=TRACK_DRUM_CHANNEL ||
+    e->transport.edit_column!=1u ||
+    e->transport.edit_step>=TRACK_STEPS ||
+    drum_note>=TRACK_DRUM_COUNT)return -1;
+ e->active.ch[TRACK_DRUM_CHANNEL][e->transport.edit_step].chord=(unsigned int)(drum_note+1u);
+ e->dirty=1u;
+ return 0;
+}
+int track_adjust_octave(struct track_engine *e,int8_t semitones){if(!e||e->transport.edit_channel>=TRACK_SYNTH_CHANNELS||e->transport.edit_step>=16u)return -1;struct track_step *s=&e->active.ch[e->transport.edit_channel][e->transport.edit_step];if(s->note>=TRACK_NOTE_STOP)return 0;int v=(int)s->note+(int)semitones;if(v<0)v=0;if(v>127)v=127;if(s->note==(uint8_t)v)return 0;s->note=(uint8_t)v;e->dirty=1u;return 1;}
 void track_rotate_select(struct track_engine *e,int8_t direction){if(!e||!direction)return;if(e->transport.edit_column==2u && e->transport.edit_channel!=TRACK_DRUM_CHANNEL){struct track_step *s=&e->active.ch[e->transport.edit_channel][e->transport.edit_step];s->chord=(uint8_t)((s->chord+TRACK_CHORD_COUNT+(direction>0?1u:TRACK_CHORD_COUNT-1u))%TRACK_CHORD_COUNT);e->dirty=1u;}else{e->transport.edit_channel=(uint8_t)((e->transport.edit_channel+TRACK_CHANNELS+(direction>0?1u:TRACK_CHANNELS-1u))%TRACK_CHANNELS);}}
 void track_set_channel(struct track_engine *e,uint8_t ch){if(e&&ch<TRACK_CHANNELS)e->transport.edit_channel=ch;}
 void track_set_bpm(struct track_engine *e,uint16_t bpm){if(!e)return;if(bpm<30u)bpm=30u;if(bpm>300u)bpm=300u;e->transport.bpm=bpm;e->dirty=1u;}

@@ -12,6 +12,7 @@ MEMORY
 {
     XIP    (rx)  : ORIGIN = 0x02000120, LENGTH = 0x8DFBC
     RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0x6000
+    UACRAM (rw)  : ORIGIN = 0x01C06000, LENGTH = 0x1F00 /* preserves debug mailbox at 0x01C07F00 */
     RAM    (rwx) : ORIGIN = 0x01C08000, LENGTH = 96K
     POOL   (rw)  : ORIGIN = 0x01C20000, LENGTH = 0x54000
     NOINIT (rw)  : ORIGIN = 0x01C7C000, LENGTH = 0x3D50
@@ -26,6 +27,7 @@ SECTIONS
     .bss (NOLOAD) : { _bss_start = .; *(.bss*) *(.sbss*) *(COMMON) . = ALIGN(4); _bss_end = .; } > RAM
     /* BEETLE data, guard and LCD pixels are separate and cannot alias. */
     .pool (NOLOAD) : { _pool_start = .; *(.pool*) . = ALIGN(64); } > POOL
+    .usb_audio_ram (NOLOAD) : { _usb_audio_start = .; *(.usb_audio_ram*) . = ALIGN(4); _usb_audio_end = .; } > UACRAM
     .beetle_song (NOLOAD) : { . = ALIGN(64); _beetle_song_start = .; KEEP(*(.beetle_song*)); . = ALIGN(64); _beetle_song_end = .; } > POOL
     .beetle_mem_gap (NOLOAD) : { _beetle_mem_gap_start = .; . = . + 128; _beetle_mem_gap_end = .; } > POOL
     .beetle_lcd_frame (NOLOAD) : { . = ALIGN(64); _beetle_frame_start = .; KEEP(*(.beetle_lcd_frame*)); . = ALIGN(64); _beetle_frame_end = .; _pool_end = .; } > POOL

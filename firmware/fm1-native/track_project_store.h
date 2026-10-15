@@ -7,8 +7,10 @@
 #include "track_chip.h"
 #include "track_drum.h"
 #include "track_mixer.h"
+#include "beetle_performance_snapshots.h"
+#include "beetle_mute_groups.h"
 #define TRACK_STORE_MAGIC 0x314B5254u /* little endian "TRK1" */
-#define TRACK_STORE_VERSION 12u
+#define TRACK_STORE_VERSION 17u
 #define TRACK_STORE_MAX 24576u /* include legacy V1-V3 decode capacity */
 #define TRACK_STORE_V4_MAX 12256u /* physical V4 payload budget */
 struct track_store_instrument {
@@ -16,15 +18,28 @@ struct track_store_instrument {
  uint16_t cutoff;
  struct track_va_patch va;
 };
+#define BEETLE_LIBRARY_SLOTS 8u
+#define BEETLE_LIBRARY_NAME 8u
+struct beetle_instrument_library {
+ uint8_t valid;
+ char name[BEETLE_LIBRARY_SLOTS][BEETLE_LIBRARY_NAME];
+ struct track_store_instrument patch[BEETLE_LIBRARY_SLOTS];
+};
 struct track_master_settings {uint8_t eq[4],eq_freq[4],eq_width[4],comp_threshold,comp_ratio,comp_gain,reverb_wet,reverb_feedback,reverb_tone,enabled[3],order[3],comp_attack,reverb_spread;};
 struct track_store_project {
  struct track_store_instrument instruments[4];
+ /* V17: independent TYPE settings in each of the four active patch slots. */
+ uint16_t type_valid[4];
+ struct track_store_instrument type_presets[4][TRACK_CHIP_TYPES];
+ struct beetle_instrument_library library;
  struct track_song_bank song;
  struct track_mixer mixer;
+ struct beetle_performance_snapshots snapshots;
+ struct beetle_mute_groups groups;
  struct track_harmony harmony;
  struct track_drum_timbre drum[TRACK_DRUM_COUNT];
  struct track_master_settings master;
- uint8_t punch_param[5]; /* Repeat, Reverse, Filter, Tape, Stutter */
+ uint8_t punch_param[5]; /* Repeat, Ring Mod intensity, Filter, Tape, Stutter */
  char title[13];
  uint16_t bpm;
  uint8_t slot;

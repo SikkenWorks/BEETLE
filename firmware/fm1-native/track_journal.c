@@ -49,17 +49,32 @@ static int inspect(const struct track_journal_io *i,uint8_t slot,uint8_t bank,st
  }
  s->kind=2;
  if(h[20]!=0u)return 0;
- uint32_t crc=0xFFFFFFFFu;
- /* An incremental CRC32 is equivalent to track_store_crc32 without inversion until the end. */
+ /* V0.75: the outer CRC alone does not mean an old bank contains a valid
+  * TRACK project. If the inner TRK1 header is bad but the outer CRC is
+  * intact, treating this as "committed" could erase the sole decodable
+  * sister bank on the next SAVE. Validate the inner header and its payload
+  * CRC while streaming, without allocating a second project buffer. */
+ uint32_t crc=0xFFFFFFFFu,body_crc=0xFFFFFFFFu;
+ uint8_t prefix[24]={0};
  for(uint32_t at=0;at<s->length;){
   uint32_t n=s->length-at;if(n>sizeof(chunk))n=sizeof(chunk);
   if(i->read(i->ctx,slot,bank,TRACK_JOURNAL_HEADER_BYTES+at,chunk,n))return TRACK_JOURNAL_IO;
+  if(at==0u)memcpy(prefix,chunk,sizeof(prefix));
   for(uint32_t j=0;j<n;j++){
-   crc^=chunk[j];for(uint8_t k=0;k<8u;k++)crc=(crc>>1)^((crc&1u)?0xEDB88320u:0u);
+   const uint8_t value=chunk[j];
+   crc^=value;for(uint8_t k=0;k<8u;k++)crc=(crc>>1)^((crc&1u)?0xEDB88320u:0u);
+   if(at+j>=24u){
+    body_crc^=value;
+    for(uint8_t k=0;k<8u;k++)body_crc=(body_crc>>1)^((body_crc&1u)?0xEDB88320u:0u);
+   }
   }
   at+=n;
  }
- if(~crc==s->crc)s->kind=1;
+ if(~crc==s->crc && rd32(prefix)==TRACK_STORE_MAGIC &&
+    rd16(prefix+4u)>=1u && rd16(prefix+4u)<=TRACK_STORE_VERSION &&
+    rd16(prefix+6u)==slot && rd32(prefix+8u)==s->length &&
+    rd32(prefix+12u)==~body_crc &&
+    rd32(prefix+16u)==track_store_crc32(prefix,16u))s->kind=1;
  return 0;
 }
 static int newer(uint32_t a,uint32_t b){return (int32_t)(a-b)>0;}

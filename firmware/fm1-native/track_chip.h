@@ -19,7 +19,10 @@
 #define TRACK_CHIP_SID_DIRTY 6u
 #define TRACK_CHIP_SID_BASS 7u
 #define TRACK_CHIP_SID_NOISE 8u
-#define TRACK_CHIP_TYPES 9u
+#define TRACK_CHIP_NES_PULSE 9u
+#define TRACK_CHIP_NES_TRIANGLE 10u
+#define TRACK_CHIP_NES_NOISE 11u
+#define TRACK_CHIP_TYPES 12u
 /* VA shapes: harmonic-limited saw, triangle, square, sine, variable-width pulse. */
 #define TRACK_VA_SHAPES 5u
 struct track_va_patch {
@@ -67,7 +70,9 @@ struct track_chip_engine {
  int16_t punch_decimate_l,punch_decimate_r;uint8_t punch_decimate_phase;
  uint32_t punch_position,punch_age;
  uint8_t punch_previous,punch_wet,punch_filter_wet;
- uint8_t punch_param[8]; /* 0..100 per FX, retained across key-up / page changes */
+ int8_t punch_octave; /* V0.83: temporary live octave, updates sustained voices */
+ uint16_t punch_bpm; /* Updated per audio block; never read project flash in ISR. */
+ uint8_t punch_param[8]; /* 0..100; ring modulation intensity and stutter are saved */
  int32_t punch_hp_l,punch_hp_r,punch_bp_l,punch_bp_r;
  int32_t punch_filter_l,punch_filter_r;
 };
@@ -77,6 +82,7 @@ void track_chip_fx_reset(void);
 void track_chip_begin_step(struct track_chip_engine *s);
 /* Apply FX to already-held voices without re-triggering the ADSR. */
 void track_chip_repitch_channel(struct track_chip_engine *s,uint8_t channel);
+void track_chip_set_punch_octave(struct track_chip_engine *s,uint8_t punch_mask);
 /* Returns 1 when voice accepted, 0 when pool is at capacity. */
 int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrument,uint8_t note,uint8_t velocity);
 void track_chip_silence(struct track_chip_engine *s);
@@ -91,6 +97,6 @@ void track_chip_set_mono(struct track_chip_engine *s,uint8_t mono);
 int track_chip_health(const struct track_chip_engine *s);
 void track_chip_recover(struct track_chip_engine *s);
 void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix,int16_t *stereo,uint32_t frames);
-/* Live global punch processing AFTER drums; octave controls only chip notes. */
+/* Live global punch processing AFTER drums; octave pitch is applied to every synth oscillator voice before rendering. */
 void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *stereo,uint32_t frames);
 #endif

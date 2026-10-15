@@ -20,7 +20,7 @@ int main(void){
  assert(kit.components[7].release>kit.components[2].release);
  struct track_mixer mix;track_mixer_init(&mix);
  assert(mix.ch[TRACK_DRUM_CHANNEL].volume==80);
- assert(mix.ch[0].volume==80);
+ assert(mix.ch[0].volume==50);
  assert(track_drum_trigger(&kit,0));track_drum_render(&kit,&mix,pcm,512);
  unsigned nonzero=0;for(unsigned i=0;i<1024;i++)nonzero|=pcm[i]!=0;
  assert(nonzero);
