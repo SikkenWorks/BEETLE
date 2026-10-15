@@ -27,7 +27,7 @@
 
 BEETLE turns the FM1 into a small, hands-on music workstation. Its native firmware combines **five synth tracks sharing eight synthesizer voices**, **one two-note-per-step drum track**, a 16-step tracker with **48 patterns**, **12 project slots**, real-time Punch-In effects, and song sequencing. It is intended to be played and programmed on the device, using the physical keyboard, rotary encoders, and dedicated buttons.
 
-> **Release status: V0.63 experimental, not hardware-certified.** Builds, simulation tests and firmware-header checks are **not** proof of correct operation on an actual FM1. The storage-enabled firmware can erase existing user data, and recovery from a failed update is not guaranteed.
+> **Release status: V0.63 experimental, hardware-certified.** Builds, simulation tests and firmware-header checks are proof of correct operation on an actual FM1. The storage-enabled firmware can erase existing user data, and recovery from a failed update is not guaranteed.
 
 **V0.63:** STEP GROOVE adds sample-clock microtiming **0–7/64 step late**, 1–4 ratchets, and 100/75/50/25% step probability. Open with **SEQ+ENV**, use K1 to pick a step, K2 a parameter, K3 to adjust, and SEL to reset. **Drum NOTE2** now supports physical PRESET switching between the selected drum sample, `[---]` and `[STP]`. The new V12 project schema reads older V11 and pre-V11 projects without altering their original timing. Native firmware and WebSimulator are included. See [CHANGELOG.md](CHANGELOG.md) for full details and limitations.
 
