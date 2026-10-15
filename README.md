@@ -1,4 +1,4 @@
-## BEETLE 1.01 RC1 — Current candidate
+## BEETLE
 
 CH6 ENV now updates only the focused drum note (NOTE1 or NOTE2). The WebSimulator also fixes PROJECTS selection overlap and tightens selection frames in other menus. Full history: [CHANGELOG.md](CHANGELOG.md).
 
