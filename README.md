@@ -15,8 +15,6 @@
     />
   </a>
 
-  <br><br>
-
   <a href="https://sikkenworks.github.io/BEETLE/simulator.html">
     <img
       src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_WEB_SIMULATOR-000000?style=for-the-badge&labelColor=000000&logoColor=white"
