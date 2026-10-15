@@ -192,8 +192,6 @@ BEETLE is **not a clean-room firmware**. Parts of its low-level architecture and
 
 Felucca's own attribution document, preserved at **`source/LICENSES/FELUCCA-LICENSING.txt`**, identifies additional third-party projects in the broader upstream repository: **DaisySP** (Electrosmith / Emilie Gillet, MIT), **Rings** (Emilie Gillet, MIT), **msfa/Dexed** (Google / Pascal Gauthier, Apache-2.0), **CrispyZebra**, **Fukiai**, **Inter Tight**, **DotGothic16**, **Versilian Studios VSCO-2**, **klattsch**, and **X0X**. Those are upstream acknowledgments: **this BEETLE target build does not claim to embed all of those engines, fonts, or audio assets**. See Felucca's corresponding source and notices for the actual upstream file-level relationships.
 
-The enlarged two-frame pink loading artwork is derived from an image **provided by the BEETLE project user**. The firmware draws it in nearest-neighbour pixel scaling without an external icon-font dependency.
-
 ### reSID – Technical Reference
 
 BEETLE's SID-inspired noise generator uses feedback bit positions 22 and 17, matching those used in reSID by Dag Lem.
