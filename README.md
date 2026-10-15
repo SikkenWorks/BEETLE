@@ -198,7 +198,6 @@ BEETLE's SID-inspired noise generator uses feedback bit positions 22 and 17, mat
 
 These feedback positions are derived from the hardware characteristics of the MOS 6581/8580 SID chip's noise generator.
 
-BEETLE uses a lightweight SID-inspired synthesis engine, while reSID provides a more detailed emulation of the original SID hardware.
 ### reSID credits and acknowledgment
 
 **reSID — original author: Dag Lem.** reSID is a reverse-engineered emulation of the MOS6581 SID (Sound Interface Device), developed for Commodore 64 audio. See the original project: **[libsidplayfp/reSID](https://github.com/libsidplayfp/resid)** (a mirror of VICE's reSID), including its `AUTHORS` and licensing notices.
