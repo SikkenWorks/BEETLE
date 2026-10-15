@@ -1,11 +1,3 @@
-<p align="center">
-  <img src="BEETLE.png" alt="BEETLE" width="400">
-</p>
-
-# BEETLE
-
-
-
 <div align="center">
   <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html">
     <img
@@ -24,7 +16,9 @@
   </a>
 </div>
 
-
+<p align="center">
+  <img src="BEETLE.png" alt="BEETLE" width="400">
+</p>
 
 **An open-source, six-lane tracker for the M-VAVE FM1.**  
 **SikkenWorks — Born out of passion.**
