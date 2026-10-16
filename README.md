@@ -1,3 +1,6 @@
+<p align="center">
+  <img src="BEETLE.png" alt="BEETLE" width="400">
+</p>
 > **RC1.01 Project Transfer release:** this repository's [`WebInstaller.html`](WebInstaller.html) installs the **Project Manager-compatible** firmware, not the original RC1 package. Use [`BEETLE-Project-Manager.html`](BEETLE-Project-Manager.html) for USB project slots and [`simulator.html`](simulator.html) for the simulator. See [`START-HERE.md`](START-HERE.md) for safety and file details.
 
 > **PROJECT BACKUPS:** `BEETLE-Project-Manager.html` is the 12-slot encrypted backup/restore tool. It requires the Project Transfer firmware **included with this release**. The maintainer reports a working connection after selecting the correct installer; full hardware safety/recovery validation remains pending. See [Project Manager safety/usage](PROJECT-MANAGER-README.md).
