@@ -146,6 +146,42 @@ int track_journal_load(const struct track_journal_io *i,uint8_t slot,
  }
  return TRACK_JOURNAL_INVALID;
 }
+/* Physical deletion of ONE project slot only. A/B journal records are
+ * verified by the full scanner BEFORE either bank can be erased.
+ * Erase the non-current bank first so a power cut there retains the newest
+ * valid project. If power fails while erasing the final bank, the slot may
+ * be unreadable; no false success is reported. */
+int track_journal_delete(const struct track_journal_io *i,uint8_t slot){
+#if defined(TRACK_FIRMWARE) && !BEETLE_NATIVE_STORAGE
+ (void)i;(void)slot;return TRACK_JOURNAL_HARDWARE_LOCKED;
+#else
+ if(!valid_io(i,slot))return TRACK_JOURNAL_INVALID;
+ struct bank_status b[2];int r;
+ for(uint8_t k=0;k<2u;k++)if((r=inspect(i,slot,k,&b[k]))!=0)return r;
+ uint8_t active=0u;r=choose(b,&active);
+ if(r<0)return r;
+ if(r==0)return TRACK_JOURNAL_NO_PROJECT;
+ /* Never delete an ambiguous, incomplete, or foreign bank. */
+ if((b[0].kind!=0u&&b[0].kind!=1u) ||
+    (b[1].kind!=0u&&b[1].kind!=1u))return TRACK_JOURNAL_FOREIGN;
+ const uint8_t order[2]={(uint8_t)(active^1u),active};
+ for(uint8_t n=0;n<2u;n++){
+  const uint8_t bank=order[n];
+  if(b[bank].kind==0u)continue;
+  if(i->erase(i->ctx,slot,bank))return TRACK_JOURNAL_IO;
+  struct bank_status verify;
+  if((r=inspect(i,slot,bank,&verify))!=0)return r;
+  if(verify.kind!=0u)return TRACK_JOURNAL_IO;
+ }
+ /* Verify both entire banks, not only their headers. */
+ for(uint8_t k=0;k<2u;k++){
+  struct bank_status verify;
+  if((r=inspect(i,slot,k,&verify))!=0)return r;
+  if(verify.kind!=0u)return TRACK_JOURNAL_IO;
+ }
+ return TRACK_JOURNAL_OK;
+#endif
+}
 int track_journal_save(const struct track_journal_io *i,uint8_t slot,
  const struct track_store_project *p,uint8_t *scratch,uint32_t cap,
  struct track_journal_status *status){

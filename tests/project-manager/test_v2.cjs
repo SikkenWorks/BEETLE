@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const path=require('node:path');const root=path.resolve(__dirname,'../../..');
-const source=fs.readFileSync(path.join(root,'BEETLE-1.01-RC1-WebSimulator.html'),'utf8');
+const source=fs.readFileSync(path.join(root,'simulator.html'),'utf8');
 const core=source.slice(source.indexOf('const TRACK_CORE=(()=>'),source.indexOf('const TRACK_AUDIO ='));
 const validate=source.slice(source.indexOf('function beetleVerifyProjectShape(p){'),source.indexOf('function beetleDownload(contents'));
 const env=vm.createContext({TextEncoder,TextDecoder,Uint8Array,Uint32Array,Blob,crypto:require('node:crypto').webcrypto,console});

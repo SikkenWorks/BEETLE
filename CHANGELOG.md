@@ -1,3 +1,12 @@
+## BEETLE 1.01 RC1.01 · Project Transfer V2 TRUE DELETE
+
+- New Project Manager V1.4: physically delete one occupied slot to `[ EMPTY ]` via USB MIDI V2; optional `.beetle` backup and double confirmation.
+- New opcode 0x59: full A/B verification, slot-isolated flash erase, full erased-state verification, refuse foreign data and currently loaded project.
+- V1 firmware continues to support export/import; DELETE is disabled unless V2 responds.
+- Updated embedded WebInstaller firmware (matches standalone `.fwsc` byte for byte).
+- No changes to simulator sound engine / project codec / unrelated FM1 functionality.
+- Hardware validation of physical flash erase is pending. Preserve verified backups and rescue procedure.
+
 ## Project Manager V1.1 / RC1.01 Simulator update (web-only)
 
 - No-password AES-256-GCM binary `.beetle` files, integrity tag and fresh nonce per export. Shared compatibility key is public and not a secrecy mechanism.

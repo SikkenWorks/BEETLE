@@ -37,12 +37,12 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 </head>
 <body>
 <main class="app">
-<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / V1.2</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
-<section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites. No firmware flashing from this page.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
+<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / V1.4</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
+<section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites and true slot deletion. No firmware flashing from this page.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
 <section class="box" aria-label="USB-MIDI connection">
 <div class="box-title">01 / DEVICE CONNECTION <small>USB · WEB MIDI SYSEX</small></div>
 <div class="connection"><div class="group"><label for="inPort">MIDI INPUT · FROM FM1</label><select id="inPort" class="field"><option value="">CONNECT TO SCAN</option></select></div><div class="group"><label for="outPort">MIDI OUTPUT · TO FM1</label><select id="outPort" class="field"><option value="">CONNECT TO SCAN</option></select></div><button class="button primary" id="connect">CONNECT FM1</button></div>
-<div class="help" id="deviceHelp">USB project management requires <strong>Project Transfer V1</strong> firmware. Standard RC1.01 does not include this protocol. Use Chrome/Edge over HTTPS or localhost, and grant MIDI SysEx access.</div>
+<div class="help" id="deviceHelp">USB project management requires <strong>Project Transfer V1/V2</strong> firmware. Standard RC1.01 does not include this protocol. Use Chrome/Edge over HTTPS or localhost, and grant MIDI SysEx access.</div>
 <div class="connection-diagnostics" role="status" aria-live="polite">
   <div class="diagnostic-top"><strong>CONNECTION DIAGNOSTICS</strong><button class="button quiet" type="button" id="copyDiagnostics">COPY REPORT</button></div>
   <div id="diagnosticResult">NOT CHECKED. Select the FM1 MIDI input and output, then press CONNECT FM1.</div>
@@ -61,8 +61,8 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 <div class="selection-panel"><section class="box"><div class="box-title">03 / SELECTED SLOT <small>PROJECT ACTIONS</small></div>
 <div class="selection-title"><div class="selection-index" id="selectIndex">01</div><div class="selection-summary" id="selectState">NOT SCANNED</div></div>
 <div class="selection-name" id="selectName">NO DEVICE</div>
-<div class="button-stack"><button class="button primary" id="export" disabled>↓ EXPORT .BEETLE</button><button class="button" id="import" disabled>↑ IMPORT TO THIS SLOT</button></div>
-<div class="help">Export reads the full, CRC-verified project. Import assigns the project to this slot. Occupied slots require explicit confirmation.</div>
+<div class="button-stack"><button class="button primary" id="export" disabled>↓ EXPORT .BEETLE</button><button class="button" id="import" disabled>↑ IMPORT TO THIS SLOT</button><button class="button danger" id="clear" disabled>× DELETE PROJECT · EMPTY SLOT</button></div>
+<div class="help">Export reads the full, CRC-verified project. Import assigns it to this slot. <strong>DELETE</strong> erases both A/B project banks of the selected slot so it becomes <strong>[ EMPTY ]</strong>. Requires Project Transfer V2 firmware. Export first if you want a backup.</div>
 </section>
 <section class="box"><div class="box-title">04 / FILE FORMAT <small>AES-256-GCM · NO PASSWORD</small></div>
 <div class="label">AUTOMATIC .BEETLE ENCRYPTION</div>
@@ -100,7 +100,7 @@ const BeetleFileV2=(()=>{
 })();
 
 const ERRORS={1:'Firmware has no writable BEETLE project storage.',2:'FM1 is busy. Stop playback and save unsaved edits first.',3:'Invalid project slot.',4:'This slot is empty.',5:'Invalid transfer length.',6:'Project checksum mismatch.',7:'Invalid or incompatible project file.',8:'The target slot is already occupied.',9:'FM1 flash read/write verification failed.',10:'Transfer state mismatch. Disconnect and retry.',11:'FM1 storage is not owned or verified by BEETLE.',12:'Project exceeds FM1 storage capacity.'};
-let midi=null,portIn=null,portOut=null, connected=false,deviceSchema=0,seq=0,pending=null,busy=false,selected=0;
+let midi=null,portIn=null,portOut=null, connected=false,deviceSchema=0,deviceProtocol=0,seq=0,pending=null,busy=false,selected=0;
 let identityWaiter=null,receivedMidi=0,validFrames=0,reportedState='NOT CHECKED';
 function reportDiagnostic(state,message){
  reportedState=state;
@@ -145,7 +145,7 @@ async function query(cmd,args=[],expected,timeout=4500,retries=1){if(!portOut||!
 function log(msg,error=false){$('activity').className='activity'+(error?' error':'');$('activity').lastElementChild.textContent=msg;}
 function setProgress(label,fraction){$('progressPanel').hidden=false;$('progressText').textContent=label;let pct=Math.max(0,Math.min(100,Math.round(fraction*100)));$('progressCount').textContent=pct+'%';$('progressFill').style.width=pct+'%';}
 function hideProgress(){$('progressPanel').hidden=true;}
-function setBusy(value){busy=value;$('connect').disabled=value;$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
+function setBusy(value){busy=value;$('connect').disabled=value;$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
 function draw(){const root=$('slots');root.textContent='';let count=0;for(let k=0;k<12;k++){
  const s=slots[k];if(s.state==='used')count++;const b=document.createElement('button');b.type='button';b.className='slot '+(k===selected?'selected ':'')+(s.state==='empty'?'empty ':s.state==='bad'?'unavailable':'');b.setAttribute('aria-pressed',String(k===selected));
  const head=document.createElement('div');head.className='slot-head';const num=document.createElement('span');num.className='slot-number';num.textContent='SLOT '+String(k+1).padStart(2,'0');const status=document.createElement('span');status.className='slot-state';status.textContent=s.state==='used'?'● SAVED':s.state==='empty'?'○ EMPTY':s.state==='bad'?'! ERROR':'— UNKNOWN';head.append(num,status);
@@ -154,7 +154,7 @@ function draw(){const root=$('slots');root.textContent='';let count=0;for(let k=
  }
  $('used').textContent=connected?String(count).padStart(2,'0'):'—';$('selectIndex').textContent=String(selected+1).padStart(2,'0');const s=slots[selected];$('selectName').textContent=s.state==='used'?s.name||'UNTITLED':s.state==='empty'?'EMPTY SLOT':s.state==='bad'?'UNREADABLE SLOT':'NO PROJECT INFORMATION';$('selectState').textContent=s.state==='used'?'PROJECT STORED':s.state==='empty'?'AVAILABLE':s.state==='bad'?'READ ERROR':'NOT SCANNED';setBusy(busy);
 }
-function setConnected(v){connected=v;$('led').classList.toggle('live',v);$('connectionState').textContent=v?'FM1 CONNECTED':'NOT CONNECTED';$('connect').textContent=v?'DISCONNECT':'CONNECT FM1';$('deviceHelp').textContent=v?'Connected via USB-MIDI SysEx · Project Transfer V1 · firmware project schema V'+deviceSchema+'.':'Standard RC1.01 does not support USB project transfers. The separate Project Transfer firmware is required. Never flash an experimental build without a verified backup and independent recovery route.';draw();}
+function setConnected(v){connected=v;$('led').classList.toggle('live',v);$('connectionState').textContent=v?'FM1 CONNECTED':'NOT CONNECTED';$('connect').textContent=v?'DISCONNECT':'CONNECT FM1';$('deviceHelp').textContent=v?'Connected via USB-MIDI SysEx · Project Transfer V'+deviceProtocol+' · firmware project schema V'+deviceSchema+'.':'Standard RC1.01 does not support USB project transfers. The separate Project Transfer firmware is required. Never flash an experimental build without a verified backup and independent recovery route.';draw();}
 function appendPorts(){const ins=[...midi.inputs.values()],outs=[...midi.outputs.values()];for(const [id,arr] of [['inPort',ins],['outPort',outs]]){const elem=$(id),old=elem.value;elem.textContent='';for(const x of arr){let opt=new Option(x.name||'Unnamed MIDI port',x.id);elem.add(opt);}if(arr.some(x=>x.id===old))elem.value=old;else{let idx=arr.findIndex(x=>/fm.?1|m-vave|beetle|jieli/i.test(x.name||''));if(idx>=0)elem.selectedIndex=idx;}}
 }
 async function disconnect(){
@@ -165,7 +165,7 @@ async function disconnect(){
  if(portOut)try{await portOut.close();}catch{}
  for(const s of slots){s.state='unknown';s.name='';}
  setConnected(false);log('Disconnected. No project data is retained in the page.');
- portIn=portOut=null;
+ portIn=portOut=null;deviceProtocol=0;
 }
 async function connect(){
  if(connected){await disconnect();reportDiagnostic('DISCONNECTED','The FM1 connection was closed.');return;}
@@ -176,31 +176,31 @@ async function connect(){
  const inp=midi.inputs.get($('inPort').value),out=midi.outputs.get($('outPort').value);
  if(!inp||!out){reportDiagnostic('NO PORTS','No complete USB MIDI input/output pair found. Verify USB data cable and MIDI permissions.');throw Error('No FM1 MIDI input/output pair found.');}
  portIn=inp;portOut=out;receivedMidi=0;validFrames=0;
- reportDiagnostic('PROBING','Probing the selected ports for BEETLE Project Transfer V1 (read-only)...');
+ reportDiagnostic('PROBING','Probing the selected ports for BEETLE Project Transfer V1/V2 (read-only)...');
  try{
   await portIn.open();await portOut.open();portIn.onmidimessage=onMidiMessage;
   let info;
   try{info=await query(0x50,[],0x60,3000,0);}
   catch(e){
    if(!/did not respond/i.test(String(e.message||e)))throw e;
-   reportDiagnostic('CHECKING FIRMWARE','No Project Transfer V1 response. Checking the read-only OTA firmware identity...');
+   reportDiagnostic('CHECKING FIRMWARE','No Project Transfer response. Checking the read-only OTA firmware identity...');
    const id=await probeLegacyIdentity();
    if(id){
-    const msg='FM1 responded as "'+id+'", but Project Transfer V1 did not answer. This is consistent with standard/older RC1.01 firmware. The browser cannot read slots until a compatible firmware is installed.';
+    const msg='FM1 responded as "'+id+'", but Project Transfer did not answer. This is consistent with standard/older RC1.01 firmware. The browser cannot read slots until a compatible firmware is installed.';
     reportDiagnostic('FIRMWARE WITHOUT PROJECT TRANSFER',msg);
     throw Error(msg+' Do not install experimental firmware without a verified backup and independent recovery route.');
    }
    const msg='No Project Transfer or firmware identity reply from the selected MIDI ports. Confirm FM1 is powered on, USB DATA cable is used, correct input AND output are selected, and no other MIDI application is holding the device. The installed firmware may also lack the protocol.';
    reportDiagnostic('NO USB REPLY',msg);throw Error(msg);
   }
-  if(info.length<4||info[0]!==1||info[1]!==12){reportDiagnostic('UNSUPPORTED FIRMWARE','The device replied, but the Project Transfer version is incompatible.');throw Error('Unsupported Project Transfer protocol on this FM1.');}
-  if(!info[3]){reportDiagnostic('STORAGE DISABLED','The firmware replies to Project Transfer V1 but project flash storage is disabled.');throw Error('The connected firmware has Project Transfer V1 but no available BEETLE project storage.');}
-  deviceSchema=info[2];
+  if(info.length<4||(info[0]!==1&&info[0]!==2)||info[1]!==12){reportDiagnostic('UNSUPPORTED FIRMWARE','The device replied, but the Project Transfer version is incompatible.');throw Error('Unsupported Project Transfer protocol on this FM1.');}
+  if(!info[3]){reportDiagnostic('STORAGE DISABLED','The firmware replies to Project Transfer firmware but project flash storage is disabled.');throw Error('The connected firmware has Project Transfer but no available BEETLE project storage.');}
+  deviceProtocol=info[0];deviceSchema=info[2];
   await query(0x58,[],0x64,2500,0);
   setConnected(true);
-  reportDiagnostic('PROJECT TRANSFER READY','FM1 confirmed Project Transfer V1. Scanning its 12 project slots.');
+  reportDiagnostic('PROJECT TRANSFER READY','FM1 confirmed Project Transfer V'+deviceProtocol+'. Scanning its 12 project slots.');
   await refresh();
-  reportDiagnostic('CONNECTED · 12 SLOTS','Project Transfer V1 is active. The slot list was read successfully.');
+  reportDiagnostic('CONNECTED · 12 SLOTS','Project Transfer V'+deviceProtocol+' is active. The slot list was read successfully.'+(deviceProtocol<2?' Physical DELETE requires V2 firmware.':''));
   log('Connected. Select one of the 12 slots to export or import.');
  }catch(e){await disconnect();throw e;}
 }
@@ -240,7 +240,59 @@ function download(blob,filename){const url=URL.createObjectURL(blob);const a=doc
 function filename(name,slot){return (name||'UNTITLED').replace(/[^a-z0-9_-]/gi,'_').slice(0,32)+'-SLOT-'+String(slot+1).padStart(2,'0')+'.beetle';}
 async function tryAbort(){try{await query(0x58,[],0x64,2000,0);}catch{}}
 async function exportSlot(slot){if(!connected||slots[slot].state!=='used')throw Error('Choose a filled project slot.');setBusy(true);let opened=false;try{setProgress('READING PROJECT FROM FM1',0);const meta=await query(0x52,[slot],0x62,10000,1);if(meta.length<20||meta[0]!==slot)throw Error('FM1 returned an invalid project header.');opened=true;const length=u16(meta,1),expected=u32(meta,3);if(length<42||length>MAX_PROJECT)throw Error('Device project length exceeds safe limit.');const raw=new Uint8Array(length);for(let at=0;at<length;at+=CHUNK){const len=Math.min(CHUNK,length-at);const v=await query(0x53,[at&255,at>>>8,len],0x63,5500,2);if(v.length!==3+len||u16(v,0)!==at||v[2]!==len)throw Error('Out-of-order FM1 transfer response.');raw.set(v.slice(3),at);setProgress('READING PROJECT FROM FM1',(at+len)/length*.8);}if(crc32(raw)!==expected)throw Error('Export CRC failed; no backup file was created.');const info=validateProject(raw);setProgress('ENCRYPTING PROJECT',.89);const blob=await encryptProject(raw);setProgress('DOWNLOADING ENCRYPTED .BEETLE',1);download(blob,filename(info.name,slot));log('Encrypted backup download started for '+info.name+'. Verify that your browser saved the file.');return {info,blob};}finally{if(opened)await tryAbort();hideProgress();setBusy(false);}}
-async function uploadProject(slot,raw,overwrite){setBusy(true);let initiated=false;let committed=false;try{const fingerprint=crc32(raw);const args=[slot,raw.length&255,raw.length>>>8,...le32(fingerprint),overwrite?1:0,0x42];await query(0x55,args,0x64,14000,0);initiated=true;for(let at=0;at<raw.length;at+=CHUNK){const n=Math.min(CHUNK,raw.length-at);const v=await query(0x56,[at&255,at>>>8,n,...raw.slice(at,at+n)],0x64,5500,2);if(v.length<2||u16(v,0)!==at+n)throw Error('FM1 did not acknowledge the correct upload position.');setProgress('TRANSFERRING PROJECT TO SLOT '+(slot+1),(at+n)/raw.length*.92);}setProgress('VERIFYING & COMMITTING JOURNAL',.96);const done=await query(0x57,[],0x65,60000,0);if(done[0]!==slot)throw Error('Unexpected slot in FM1 commit response.');committed=true;setProgress('PROJECT IMPORTED',1);log('Project imported to slot '+String(slot+1).padStart(2,'0')+'. FM1 journal commit acknowledged.');}catch(e){if(initiated&&!committed)log('Import stopped: '+e.message+' If the commit timed out, refresh the device slots to check the result.',true);throw e;}finally{if(!committed)await tryAbort();hideProgress();setBusy(false);if(committed)await refresh();}}
+async function uploadProject(slot,raw,overwrite,operation='IMPORT'){setBusy(true);let initiated=false;let committed=false;try{const fingerprint=crc32(raw);const args=[slot,raw.length&255,raw.length>>>8,...le32(fingerprint),overwrite?1:0,0x42];await query(0x55,args,0x64,14000,0);initiated=true;for(let at=0;at<raw.length;at+=CHUNK){const n=Math.min(CHUNK,raw.length-at);const v=await query(0x56,[at&255,at>>>8,n,...raw.slice(at,at+n)],0x64,5500,2);if(v.length<2||u16(v,0)!==at+n)throw Error('FM1 did not acknowledge the correct upload position.');setProgress((operation==='CLEAR'?'CLEARING PROJECT CONTENT IN SLOT ':'TRANSFERRING PROJECT TO SLOT ')+(slot+1),(at+n)/raw.length*.92);}setProgress('VERIFYING & COMMITTING JOURNAL',.96);const done=await query(0x57,[],0x65,60000,0);if(done[0]!==slot)throw Error('Unexpected slot in FM1 commit response.');committed=true;setProgress(operation==='CLEAR'?'PROJECT CONTENT CLEARED':'PROJECT IMPORTED',1);log(operation==='CLEAR'?'Project CONTENT cleared in slot '+String(slot+1).padStart(2,'0')+'. This slot remains occupied; original A/B history may still exist.':'Project imported to slot '+String(slot+1).padStart(2,'0')+'. FM1 journal commit acknowledged.');}catch(e){if(initiated&&!committed)log((operation==='CLEAR'?'Clear stopped: ':'Import stopped: ')+e.message+' If the commit timed out, refresh the device slots to check the result.',true);throw e;}finally{if(!committed)await tryAbort();hideProgress();setBusy(false);if(committed)await refresh();}}
+async function verifyClearTarget(slot,expectedName){
+ const reply=await query(0x51,[slot],0x61,7000,1);
+ if(reply.length<14||reply[0]!==slot)throw Error('FM1 slot preflight failed. Nothing was deleted.');
+ const state=reply[1]===1?'used':reply[1]===0?'empty':'bad';
+ const title=ascii(reply.slice(2,14));
+ if(state!=='used'||title!==expectedName){
+  await refresh();throw Error('The selected FM1 slot changed since it was scanned. Refresh and retry. Nothing was deleted.');
+ }
+}
+async function clearSlotWithPrompt(){
+ const target=selected;
+ if(!connected||slots[target].state!=='used')throw Error('Choose an occupied slot to delete.');
+ if(deviceProtocol<2)throw Error('Physical slot deletion requires Project Transfer V2 firmware. Your installed V1 firmware can only overwrite projects. Install the updated firmware using the matching WebInstaller after backing up your projects.');
+ const previousName=slots[target].name;
+ await verifyClearTarget(target,previousName);
+ const choice=await modal('DELETE PROJECT · SLOT '+String(target+1).padStart(2,'0'),
+  'Slot '+String(target+1).padStart(2,'0')+' contains "'+previousName+'".\n\nDELETE physically erases this slot’s two A/B project banks. The other 11 slots are unchanged. After success the FM1 will report [ EMPTY ].\n\nThis cannot be undone in the Project Manager. Export a backup first?',
+  [{label:'CANCEL',value:'cancel'},{label:'EXPORT FIRST',value:'backup'},{label:'DELETE WITHOUT BACKUP',kind:'danger',value:'delete'}]);
+ if(choice==='cancel')return;
+ if(choice==='backup'){
+  await exportSlot(target);
+  const approved=await modal('VERIFY BACKUP SAVED',
+   'The .beetle backup download has started. Check that the file exists on your computer before deleting the stored FM1 project.',
+   [{label:'CANCEL',value:'cancel'},{label:'BACKUP SAVED · CONTINUE',kind:'primary',value:'continue',confirm:true}],
+   'I have checked the backup exists on my computer.');
+  if(approved!=='continue')return;
+ }
+ const confirm=await modal('FINAL CONFIRMATION · DELETE SLOT '+String(target+1).padStart(2,'0'),
+  'You are about to ERASE the saved project "'+previousName+'" from slot '+String(target+1).padStart(2,'0')+'. Both A/B banks will be erased. Do not disconnect USB or power during deletion. The operation will be refused if this project is currently open on the FM1: select NEW or load a different project on the device first.',
+  [{label:'CANCEL',value:'cancel'},{label:'YES · DELETE PROJECT',kind:'danger',value:'delete',confirm:true}],
+  'I understand this will erase BOTH stored A/B copies of this project.');
+ if(confirm!=='delete')return;
+ await verifyClearTarget(target,previousName);
+ setBusy(true);let committed=false;
+ try{
+  setProgress('ERASING SLOT '+String(target+1).padStart(2,'0')+' · DO NOT DISCONNECT',.35);
+  const reply=await query(0x59,[target,0xD3,0x7E],0x66,90000,0);
+  if(reply.length<1||reply[0]!==target)throw Error('Unexpected DELETE acknowledgement. Refresh slots to check what was written.');
+  committed=true;
+  setProgress('VERIFYING [ EMPTY ]',.94);
+  const check=await query(0x51,[target],0x61,12000,1);
+  if(check.length<14||check[0]!==target||check[1]!==0)throw Error('Firmware acknowledged deletion, but slot did not verify as [ EMPTY ]. Refresh slots and check device status before further writes.');
+  log('Slot '+String(target+1).padStart(2,'0')+' physically deleted and verified [ EMPTY ].');
+ }catch(e){
+  if(!committed)log('Delete was not confirmed. USB/power interruption or refusal: refresh slots and inspect the device before retrying. '+e.message,true);
+  throw e;
+ }finally{
+  hideProgress();setBusy(false);
+  if(committed){try{await refresh();}catch(e){log('Delete acknowledged, but slot refresh failed: '+e.message,true);}}
+ }
+ if(slots[target].state!=='empty')throw Error('After refresh, the FM1 slot is not [ EMPTY ]. Do not assume deletion succeeded.');
+}
 function closeModal(){if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();$('backdrop').classList.remove('open');$('modalActions').textContent='';$('modalExtra').textContent='';}
 function modal(title,message,buttons,checkboxText){return new Promise(resolve=>{$('modalTitle').textContent=title;$('modalText').textContent=message;$('modalActions').textContent='';$('modalExtra').textContent='';let check=null;if(checkboxText){const lbl=document.createElement('label');lbl.className='confirm-row';check=document.createElement('input');check.type='checkbox';const txt=document.createElement('span');txt.textContent=checkboxText;lbl.append(check,txt);$('modalExtra').append(lbl);}
 for(const b of buttons){const btn=document.createElement('button');btn.className='button '+(b.kind||'quiet');btn.textContent=b.label;btn.disabled=Boolean(check&&b.confirm);btn.onclick=()=>{closeModal();resolve(b.value);};$('modalActions').append(btn);if(check&&b.confirm)check.addEventListener('change',()=>btn.disabled=!check.checked);}
@@ -260,12 +312,13 @@ if(action==='backup'){
 }}
 $('connect').onclick=()=>safe(async()=>{setBusy(true);try{await connect();}finally{setBusy(false);}});
 $('copyDiagnostics').onclick=async()=>{
- const report='BEETLE PROJECT MANAGER V1.2\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
+ const report='BEETLE PROJECT MANAGER V1.4\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
  try{await navigator.clipboard.writeText(report);log('Connection report copied.');}
  catch{log('Could not copy automatically. Select an HTTPS/localhost page and try again.',true);}
 };
 $('refresh').onclick=()=>safe(async()=>{await refresh();log('FM1 slots refreshed.');});
 $('export').onclick=()=>safe(async()=>{await exportSlot(selected);});
+$('clear').onclick=()=>safe(clearSlotWithPrompt);
 $('import').onclick=()=>safe(async()=>{$('file').value='';$('file').click();});
 $('file').addEventListener('change',()=>{const f=$('file').files&&$('file').files[0];if(f)safe(()=>importWithPrompt(f));});
 

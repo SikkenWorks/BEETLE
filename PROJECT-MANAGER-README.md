@@ -1,4 +1,4 @@
-# BEETLE Project Manager · Project Transfer V1 (experimental)
+# BEETLE Project Manager · Project Transfer V2 (V1 import/export backward compatible) (experimental)
 
 This addition is based on **BEETLE 1.01 RC1**. It provides a standalone BEETLE-themed browser interface with twelve project slots and adds a separate, bounded USB-MIDI SysEx protocol to the firmware source.
 
@@ -90,3 +90,7 @@ Connection diagnostics show the selected MIDI port names, frame counts and a cop
 **Important:** Changing the HTML cannot make stock/standard RC1.01 firmware transfer projects over USB. The existing experimental firmware bundle is **unchanged**; actual FM1 project read/write and device recovery have **not** been hardware-tested here. Do not flash the experimental build merely to dismiss an error without independent full backup and a working recovery route.
 
 Tests: `python source/tests/project_transfer/test_connection_diagnostics.py`, `python source/tests/project_transfer/test_web_browser.py` and `node source/tests/project-manager/test_v2.cjs`. The diagnostics tests emulate healthy, legacy-identity and silent USB-MIDI devices. Physical hardware behaviour is unknown.
+
+## True slot deletion (V2)
+
+The updated `BEETLE-Project-Manager.html` has a DELETE command that erases only the selected slot’s two A/B journal banks; it then verifies the FM1 reports `[ EMPTY ]`. This requires the **new V2 firmware** in the updated `WebInstaller.html`. Project Transfer V1 still supports export/import, but cannot physically delete slots. The currently loaded project on the FM1 must be closed by choosing NEW or loading another project before DELETE. Export a verified backup first; do not remove USB/power during the erase. A power failure during deletion can make the slot unreadable. Real FM1 physical deletion has not been hardware-tested.

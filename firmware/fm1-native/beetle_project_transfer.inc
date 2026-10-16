@@ -7,7 +7,8 @@
  * Wire: stock JieLi packed-7 envelope [00 59 cmd len24 body checksum].
  * First body byte is the matching host transaction sequence (0..127).
  * 0x50 HELLO, 0x51 LIST, 0x52 READ_BEGIN, 0x53 READ,
- * 0x54 FINISH, 0x55 WRITE_BEGIN, 0x56 WRITE, 0x57 COMMIT, 0x58 ABORT.
+ * 0x54 FINISH, 0x55 WRITE_BEGIN, 0x56 WRITE, 0x57 COMMIT, 0x58 ABORT,
+ * 0x59 DELETE_SLOT (V2 only; slot-specific full A/B erase).
  */
 #define BEETLE_XFER_CHUNK 24u
 #define BEETLE_XFER_TTL_MS 120000u
@@ -60,7 +61,7 @@ static uint8_t beetle_xfer_ready(void){
 /* Return 1 when the message was handled (or refused), 0 for OTA frames. */
 static int beetle_transfer_handle(uint32_t d){
  const uint8_t cmd=ota_dec[2];
- if(cmd<0x50u || cmd>0x58u)return 0;
+ if(cmd<0x50u || cmd>0x59u)return 0;
  const uint8_t *arg=ota_dec+6u;
  const uint32_t n=d-7u;
  if(n<1u)return 1;
@@ -68,7 +69,7 @@ static int beetle_transfer_handle(uint32_t d){
  uint8_t out[32]={seq};
  if(cmd==0x50u){
   if(n!=1u){beetle_xfer_error(seq,cmd,BERR_LENGTH);return 1;}
-  out[1]=1u;out[2]=TRACK_JOURNAL_SLOTS;out[3]=TRACK_STORE_VERSION;
+  out[1]=2u;out[2]=TRACK_JOURNAL_SLOTS;out[3]=TRACK_STORE_VERSION;
 #if BEETLE_NATIVE_STORAGE
   out[4]=1u; /* hardware features compiled; actual ownership tested separately */
 #else
@@ -90,9 +91,41 @@ static int beetle_transfer_handle(uint32_t d){
  }
  /* Probe once per command that begins or commits a transaction. Chunk
   * reads must not re-scan the entire ownership marker 500+ times. */
- if((cmd==0x51u||cmd==0x52u||cmd==0x55u||cmd==0x57u) &&
+ if((cmd==0x51u||cmd==0x52u||cmd==0x55u||cmd==0x57u||cmd==0x59u) &&
     beetle_hal_probe_ownership()!=BEETLE_CLAIM_EXISTING){
   beetle_xfer_reset();beetle_xfer_error(seq,cmd,BERR_OWNER);return 1;
+ }
+ if(cmd==0x59u){
+  /* V2 physical DELETE: 0x59, seq, slot, 0xD3, 0x7E.
+   * Never use this command as a way to clear unowned flash. */
+  if(n!=4u||arg[1]>=TRACK_PROJECTS||arg[2]!=0xD3u||arg[3]!=0x7Eu){
+   beetle_xfer_error(seq,cmd,BERR_FORMAT);return 1;
+  }
+  const uint8_t slot=arg[1];
+  /* A live session must be detached via NEW or another LOAD on FM1 first. */
+  if(track_session_saved_slot==slot ||
+     (track_state.dirty&&track_state.project_slot==slot)){
+   beetle_xfer_error(seq,cmd,BERR_BUSY);return 1;
+  }
+  /* Full decode verifies that the slot contains a legitimate project.
+   * The journal DELETE routine independently validates both banks. */
+  int r=track_journal_load(&beetle_hal_journal_io,slot,&beetle_staged,
+             beetle_codec_buffer,sizeof(beetle_codec_buffer),&beetle_last_journal);
+  if(r!=TRACK_JOURNAL_OK){beetle_xfer_error(seq,cmd,
+   r==TRACK_JOURNAL_NO_PROJECT?BERR_EMPTY:
+   r==TRACK_JOURNAL_FOREIGN?BERR_OWNER:BERR_IO);return 1;}
+  native_pause();
+  beetle_write_permit=1u;
+  r=track_journal_delete(&beetle_hal_journal_io,slot);
+  beetle_write_permit=0u;
+  if(r==TRACK_JOURNAL_OK){
+   track_slot_seen[slot]=0u;track_load_status[slot]=2u;
+  }
+  native_start();
+  if(r!=TRACK_JOURNAL_OK){beetle_xfer_error(seq,cmd,
+   r==TRACK_JOURNAL_NO_PROJECT?BERR_EMPTY:
+   r==TRACK_JOURNAL_FOREIGN?BERR_OWNER:BERR_IO);return 1;}
+  out[1]=slot;beetle_xfer_reply(0x66u,out,2u);return 1;
  }
  if(cmd==0x51u){
   if(n!=2u||arg[1]>=TRACK_PROJECTS){beetle_xfer_error(seq,cmd,BERR_SLOT);return 1;}

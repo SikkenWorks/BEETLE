@@ -39,6 +39,10 @@ int track_journal_load(const struct track_journal_io *,uint8_t slot,
  * Titles are provisional; loading still performs the entire CRC validation.
  * Never use preview results to authorize a flash erase/write. */
 int track_journal_preview(const struct track_journal_io *,uint8_t slot,char title[13]);
+/* Destructive slot-only DELETE. Validate both complete A/B banks and full ownership
+ * before erasing. An interrupted erase can leave an unreadable slot; never
+ * treat power loss as successful deletion. No partition-wide erase. */
+int track_journal_delete(const struct track_journal_io *,uint8_t slot);
 /* Host fault-injection and BEETLE-only flash journal. With native storage disabled the FM1 API RETURNS HARDWARE_LOCKED. */
 int track_journal_save(const struct track_journal_io *,uint8_t slot,
  const struct track_store_project *p,uint8_t *scratch,uint32_t scratch_size,
