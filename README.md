@@ -2,7 +2,7 @@
   <img src="BEETLE.png" alt="BEETLE" width="400">
 </p>
 
-## BEETLE 1.01d
+## V1.01d
 
 <div align="center">
   <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html">
@@ -30,12 +30,12 @@
   </a>
 </div>
 
-# BEETLE
+# WHAT IS IT?
 
 **Open-source six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks · Joppe Sikken · Born out of passion.**
 
-**Current development version: 1.01 RC1** · [Changelog](CHANGELOG.md)
+**Current development version: 1.01d RC1** · [Changelog](CHANGELOG.md)
 
 BEETLE public beta builds are tested on a physical FM1 by the project maintainer before GitHub publication. Particular new features still require verification as part of that release process.
 
