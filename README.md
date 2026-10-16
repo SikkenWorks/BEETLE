@@ -23,7 +23,7 @@ CH6 ENV now updates only the focused drum note (NOTE1 or NOTE2). The WebSimulato
     />
   </a>
 </div>
-
+<div>
   <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html">
     <img
       src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_WEB_SIMULATOR-000000?style=for-the-badge&labelColor=000000&logoColor=white"
