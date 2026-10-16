@@ -1,4 +1,8 @@
-## BEETLE
+> **RC1.01 Project Transfer release:** this repository's [`WebInstaller.html`](WebInstaller.html) installs the **Project Manager-compatible** firmware, not the original RC1 package. Use [`BEETLE-Project-Manager.html`](BEETLE-Project-Manager.html) for USB project slots and [`simulator.html`](simulator.html) for the simulator. See [`START-HERE.md`](START-HERE.md) for safety and file details.
+
+> **PROJECT BACKUPS:** `BEETLE-Project-Manager.html` is the 12-slot encrypted backup/restore tool. It requires the Project Transfer firmware **included with this release**. The maintainer reports a working connection after selecting the correct installer; full hardware safety/recovery validation remains pending. See [Project Manager safety/usage](PROJECT-MANAGER-README.md).
+
+## BEETLE 1.01 RC1 — Current candidate
 
 CH6 ENV now updates only the focused drum note (NOTE1 or NOTE2). The WebSimulator also fixes PROJECTS selection overlap and tightens selection frames in other menus. Full history: [CHANGELOG.md](CHANGELOG.md).
 
@@ -20,9 +24,15 @@ CH6 ENV now updates only the focused drum note (NOTE1 or NOTE2). The WebSimulato
   </a>
 </div>
 
-<p align="center">
-  <img src="BEETLE.png" alt="BEETLE" width="400">
-</p>
+  <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html">
+    <img
+      src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_WEB_SIMULATOR-000000?style=for-the-badge&labelColor=000000&logoColor=white"
+      alt="Launch BEETLE Project Manager"
+      width="450"
+    />
+  </a>
+</div>
+# BEETLE
 
 **Open-source six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks · Joppe Sikken · Born out of passion.**
@@ -128,7 +138,7 @@ In the tracker while transport is stopped, hold **SEQ** and press the physical b
 | Tracker | **SEQ + OP2** | Paste that lane, including notes, instruments and step FX, into the current lane/pattern. The clipboard survives changing lanes/patterns. |
 | Mixer | **GLO** | Open/close the mixer. Six black OP keys can mute CH1–CH6; their LEDs indicate mute. |
 | Instrument Edit | **EDIT** | Open instrument parameters; on the next EDIT page access the drum component editor. |
-| Song | **ARP** | Open Song Mode. |
+| Song | **ARP** | Open Song Mode (not GLO double-click). |
 | Master | **LFO** | Open the master EQ/compressor/reverb chain. |
 | Punch-In | **REC / Punch-In screen** | Hold a Punch-In key for an effect; ALGORITHM adjusts that effect's stored setting. |
 | Projects | **SAVE / LOAD menus** | Work with 12 slots. A project stores patterns, instruments, mixer, drums, MASTER settings, song data and five Punch-In ALGORITHM parameters. |
@@ -192,11 +202,7 @@ BEETLE is **not a clean-room firmware**. Parts of its low-level architecture and
 
 Felucca's own attribution document, preserved at **`source/LICENSES/FELUCCA-LICENSING.txt`**, identifies additional third-party projects in the broader upstream repository: **DaisySP** (Electrosmith / Emilie Gillet, MIT), **Rings** (Emilie Gillet, MIT), **msfa/Dexed** (Google / Pascal Gauthier, Apache-2.0), **CrispyZebra**, **Fukiai**, **Inter Tight**, **DotGothic16**, **Versilian Studios VSCO-2**, **klattsch**, and **X0X**. Those are upstream acknowledgments: **this BEETLE target build does not claim to embed all of those engines, fonts, or audio assets**. See Felucca's corresponding source and notices for the actual upstream file-level relationships.
 
-### reSID – Technical Reference
-
-BEETLE's SID-inspired noise generator uses feedback bit positions 22 and 17, matching those used in reSID by Dag Lem.
-
-These feedback positions are derived from the hardware characteristics of the MOS 6581/8580 SID chip's noise generator.
+The enlarged two-frame pink loading artwork is derived from an image **provided by the BEETLE project user**. The firmware draws it in nearest-neighbour pixel scaling without an external icon-font dependency.
 
 ### reSID credits and acknowledgment
 
@@ -238,3 +244,7 @@ If you find a bug, include the firmware version, what you pressed, your exact pr
 - CH6 `ENV` werkt op de geselecteerde NOTE1 of NOTE2 zonder het andere drumveld te wissen; de audiorelease van NOTE1/NOTE2 is nu ook gescheiden.
 - De CREDITS behouden de originele auteurs, zonder de agressief geformuleerde code-ontkenning. Zie [code- en licentieaudit](CODE-PROVENANCE-AUDIT.md).
 - De volledige versiegeschiedenis staat in [CHANGELOG.md](CHANGELOG.md).
+
+## Project Manager V1.1 · Password-free BEETLE files
+
+The included project manager now exports and imports AES-GCM encrypted `.beetle` project files without requiring passwords. A shared key is bundled with the open-source web tools; protection is against casual text inspection and accidental corruption, not against determined decryption. BEETLE 1.01 RC1 WebSimulator can import native TRK1 V12–V17 files as well as its old JSON backup files and export native V17 `.beetle` files. Device transfer requires the **experimental Project Transfer firmware**, and remains physically unverified. See `BEETLE-PROJECT-FORMAT-V2.md`.

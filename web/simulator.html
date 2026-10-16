@@ -36,7 +36,7 @@
 <button type="button" data-edit="block">BLOCK EDIT</button><button data-edit="dynamics">STEP VEL/GATE</button><button data-edit="groove">STEP GROOVE</button><button data-edit="grooveCopy">GROOVE COPY</button><button data-edit="groovePaste">GROOVE PASTE</button><button data-edit="grooveFill">GROOVE FILL</button><button data-edit="grooveClear">GROOVE CLEAR</button><button data-edit="lengthMinus">PAT LEN −</button><button data-edit="lengthPlus">PAT LEN +</button>
 </div><div class="panel-title">WHITE KEYS <small>REC ON: keys trigger/record Punch-In FX · REC OFF: notes/drums</small></div>
 <div class="black-mutes" id="blackMutes"></div><div class="keyboard" id="keyboard"></div><p class="keyhint">REC ON: A S D F G H J K = Punch-In FX (hold). REC OFF: enter notes or drum samples.</p>
-<div class="extra"><button id="masterFxButton">MASTER FX</button><button id="libraryButton">INSTRUMENT LIBRARY</button><button id="songButton">SONG MODE</button><button id="songLoopButton">SONG LOOP: ON</button><button id="patternsButton">PATTERN SELECT</button><button id="snapshotsButton">PERFORMANCE SNAPSHOTS</button><button id="groupsButton">MUTE GROUPS</button><button id="demoButton">LOAD DEMO NOTES</button><button id="editPolyButton" title="Web shortcut for OCT- and OCT+ held together in EDIT">EDIT MONO/POLY</button><button id="backupButton">VERIFIED BACKUP</button><label class="import">RESTORE BACKUP<input type="file" id="importFile" accept=".json,application/json"></label></div>
+<div class="extra"><button id="masterFxButton">MASTER FX</button><button id="libraryButton">INSTRUMENT LIBRARY</button><button id="songButton">SONG MODE</button><button id="songLoopButton">SONG LOOP: ON</button><button id="patternsButton">PATTERN SELECT</button><button id="snapshotsButton">PERFORMANCE SNAPSHOTS</button><button id="groupsButton">MUTE GROUPS</button><button id="demoButton">LOAD DEMO NOTES</button><button id="editPolyButton" title="Web shortcut for OCT- and OCT+ held together in EDIT">EDIT MONO/POLY</button><button id="backupButton" title="Exports native FM1-compatible V17 .beetle project">EXPORT .BEETLE</button><label class="import">IMPORT .BEETLE / JSON<input type="file" id="importFile" accept=".beetle,.json,application/octet-stream,application/json"></label></div>
 </div></section>
 <footer><span id="info">Idle</span><span>Browser simulator, NOT FM1 firmware</span></footer>
 <aside id="beetle-rc-note" style="max-width:1110px;margin:0 auto 20px;padding:12px 18px;color:#eaa3d4;border:1px solid #552543;font:11px ui-monospace,monospace">
@@ -481,7 +481,7 @@ class TrackAudio {
 
 return {TrackAudio};
 })(TRACK_CORE);
-(({CHANNELS,PATTERN_COUNT,PROJECT_COUNT,STEPS,FIELDS,DRUM_FIELDS,DRUM_NAMES,DRUM_SAMPLES,DRUM_PARAMS,DRUM_FACTORY,freshDrumComponents,CHORDS,CHORD_SHORT,STEP_FX,PUNCH_FX,SCALES,NOTE_NAMES,TYPES,pattern,step,stepChange,noteLabel,quantize,freshProject,serialize,parseProject,byteSize},{TrackAudio})=>{
+(({CHANNELS,PATTERN_COUNT,PROJECT_COUNT,STEPS,FIELDS,DRUM_FIELDS,DRUM_NAMES,DRUM_SAMPLES,DRUM_PARAMS,DRUM_FACTORY,freshDrumComponents,CHORDS,CHORD_SHORT,STEP_FX,PUNCH_FX,SCALES,NOTE_NAMES,TYPES,emptyPattern,pattern,step,stepChange,noteLabel,quantize,freshProject,serialize,parseProject,byteSize},{TrackAudio})=>{
 const $=s=>document.querySelector(s), clamp=(v,a,b)=>Math.min(b,Math.max(a,v)), c=$('#screen'),ctx=c.getContext('2d',{alpha:false});ctx.imageSmoothingEnabled=false;
 const model={project:freshProject(),inputInstrument:[0,1,2,3,0,3],inputExplicit:[false,false,false,false,false,false],patchSlotsFull:false,slot:null,dirty:false,ch:0,row:0,col:1,screen:'boot',saveReturn:'tracker',presetFocus:null,drumComponent:0,drumField:0,dynFocus:0,grooveFocus:0,presetLast:60,presetLast2:1,fxRow:0,fxParam:0,fxDrumLane:0,punchEditStep:0,punchEditIndex:0,editPoly:false,keyboardOctave:0,editHeld:new Set(),menuIndex:0,helpOffset:0,loadGuardUntil:0,queuedPattern:null,muteQueue:{},live:{mute:{},solo:{},pendingMute:{},pendingSolo:{},qMute:true,qSolo:true},snapshotRow:0,groupRow:0,groupLane:0,librarySlot:0,libraryAction:0,libraryTarget:0,libraryCopyDest:0,libraryCursor:0,libraryEditingName:"",mixerRow:0,mixerCol:0,masterFocus:0,instRow:0,instBank:0,songRow:0,songCol:0,lfoRow:0,playedRow:0,playing:false,record:false,songMode:false,prePlay:null,punchHeld:new Set(),punchParams:[50,20,50,50,50,50,50,50],punchFocus:-1,toast:'',toastUntil:0};
 // V0.70 unified six-step Undo/Redo for pattern + instrument + mixer + song + master + library.
@@ -1391,6 +1391,208 @@ function route(action){
  }else if(action==='FX'){if(model.screen!=='stepfx'&&model.screen!=='punch')model.fxDrumLane=model.ch===5&&model.col===2?1:0;model.screen=model.screen==='stepfx'?'punch':model.screen==='punch'?'stepfx':'stepfx';}else if(action==='ARP'){model.screen=model.screen==='song'?(model.songMode?'livemixer':'song'):model.screen==='livemixer'?'song':'song';if(model.screen==='song'&&!model.songMode)announce('ENABLE SONG MODE WITH SEL FOR LIVE MIXER');}else if(action==='GLO'){model.screen=model.screen==='mixer'?'tracker':'mixer';}else if(action==='ENV'){if(model.screen==='tracker'){rememberEdit(()=>{const st=step(model.project,model.project.selectedPattern,model.ch,model.row,true);if(model.ch===5&&model.col===2)st.chd=15;else{st.note=254;if(model.ch!==5)st.chd=0;}});}else{model.screen='env';model.instRow=1;}}else if(action==='LFO'){model.screen='masterfx';model.masterFocus=0;}else if(action==='PLAY'){play();return;}else if(action==='LONGREC'){model.screen='punchedit';model.punchEditStep=0;model.punchEditIndex=0;}else if(action==='REC'){if(model.record){for(const i of [...model.punchHeld])punch(i,false);}model.record=!model.record;announce(model.record?'PUNCH REC ARMED · KEYS ARE FX':'PUNCH REC OFF · KEYS ARE NOTES');}else if(action==='SEL'){if(model.screen==='masterfx'){rememberDomain('master',0,()=>{const m=model.project.master;const fx=m.order[model.masterFocus];m.enabled[fx]=!m.enabled[fx];audio.setMasterFX?.(m);mark();});render();return;}if(model.screen==='mixer'){rememberDomain('mixer',0,()=>{model.project.quantizeMutes=!model.project.quantizeMutes;if(!model.project.quantizeMutes){const pending=Object.entries(model.muteQueue);for(const [ch,mute] of pending)model.project.mixer[Number(ch)].mute=!!mute;model.muteQueue={};audio.setMixer(model.project);}mark();});announce('QUANT MUTES '+(model.project.quantizeMutes?'ON':'OFF'));render();return;}if(model.screen==='block'){doBlock();return;}if(model.screen==='dynamics'){rememberEdit(()=>{const s=step(model.project,model.project.selectedPattern,model.ch,model.row,true);s.dyn=model.dynFocus?(s.dyn??0)&240:(s.dyn??0)&15;});render();return;}if(model.screen==='groove'){rememberEdit(()=>{const s=step(model.project,model.project.selectedPattern,model.ch,model.row,true);if(model.grooveFocus===0)s.groove=(s.groove??0)&~7;else if(model.grooveFocus===1)s.groove=(s.groove??0)&~24;else s.groove=(s.groove??0)&~96;});render();return;}yes();}else if((action==='OCT+'||action==='OCT-')&&model.screen==='livemixer'){if(model.songMode){const key=action==='OCT-'?'qMute':'qSolo';model.live[key]=!model.live[key];if(!model.live[key])commitLiveMix();}render();return;}else if((action==='OCT+'||action==='OCT-')&&model.screen==='punchedit'){editPunchAction(action==='OCT+'?'add':'del');return;}else if((action==='OCT+'||action==='OCT-')&&model.screen==='instrument'){return;}else if((action==='OCT+'||action==='OCT-')&&model.screen==='song'){if(!model.playing){if(action==='OCT+'&&model.project.song.length<64){rememberDomain('song',0,()=>{model.project.song.splice(model.songRow+1,0,{...model.project.song[model.songRow]});model.songRow++;mark();});}else if(action==='OCT-'&&model.project.song.length>1){rememberDomain('song',0,()=>{model.project.song.splice(model.songRow,1);model.songRow=clamp(model.songRow,0,model.project.song.length-1);mark();});}}}else if((action==='OCT+'||action==='OCT-')&&!['instrument','tracker'].includes(model.screen)){let s=step(model.project,model.project.selectedPattern,model.ch,model.row,true);if(model.ch===5){announce('DRUM CHANNEL: OCTAVE NOT USED');}else if(s.note!=null){s.note=clamp(s.note+(action==='OCT+'?12:-12),0,127);mark();}else announce('STEP NOTE IS EMPTY');}render();}
 // BEETLE V0.80: exact, verifiable, offline browser-project backups.
 // No FM1 USB/MIDI access, no flash writes, and no assumption of native project compatibility.
+/* BEETLE portable encrypted container V2. Public shared key, not secrecy protection.
+   Binary layout: 8 byte ASCII BEETLE01; 0x02; 12-byte CSPRNG nonce;
+   AES-256-GCM ciphertext plus 16-byte authenticated tag. 21-byte AAD.
+   The compatibility key ships inside both offline HTML apps. */
+const BeetleFileV2=(()=>{
+ const magic=Uint8Array.from([66,69,69,84,76,69,48,49]), version=2;
+ // Distribution-wide compatibility key. NOT a private user secret.
+ const publicKey=Uint8Array.from([0x71,0x12,0xd2,0x3a,0xbe,0x7c,0x81,0x36,0x67,0xa3,0x01,0xdf,0x4e,0x94,0x70,0xc8,0x2d,0x51,0x9f,0x09,0xd5,0x82,0x13,0x4a,0xbf,0x72,0x68,0xec,0x04,0xca,0x3d,0xf9]);
+ let keyPromise;
+ function ready(){if(!globalThis.crypto?.subtle||!globalThis.crypto?.getRandomValues)throw Error('AES encryption needs HTTPS or localhost and WebCrypto.');}
+ function key(){ready();return keyPromise ||= crypto.subtle.importKey('raw',publicKey,{name:'AES-GCM'},false,['encrypt','decrypt']);}
+ function signature(bytes){return bytes.length>=9 && magic.every((v,i)=>bytes[i]===v) ? bytes[8] : -1;}
+ async function encrypt(bytes){ready();if(!(bytes instanceof Uint8Array))bytes=new Uint8Array(bytes);if(bytes.length<1||bytes.length>2097152)throw Error('Project exceeds file limit.');const iv=crypto.getRandomValues(new Uint8Array(12)),head=Uint8Array.from([...magic,version,...iv]);const data=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:head,tagLength:128},await key(),bytes));return new Blob([head,data],{type:'application/octet-stream'});}
+ async function decrypt(file){ready();if(file.size<38||file.size>2097200)throw Error('Invalid .beetle file size.');const bytes=new Uint8Array(await file.arrayBuffer());if(signature(bytes)!==version)throw Error('Not a password-free BEETLE V2 file.');const head=bytes.subarray(0,21);try{return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes.subarray(9,21),additionalData:head,tagLength:128},await key(),bytes.subarray(21)));}catch{throw Error('This .beetle file is damaged or failed integrity verification.');}}
+ return {encrypt,decrypt,signature,version};
+})();
+
+/* Native FM1 TRK1 V12-V17 -> browser simulator model. Based on track_project_store.c.
+   Rejects unknown or truncated data, and validates both native CRC32 fields. */
+const BeetleNative=(()=>{
+ const crc=b=>{let c=0xffffffff;for(const v of b){c^=v;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (~c)>>>0;};
+ const u16=(b,i)=>b[i]|(b[i+1]<<8), u32=(b,i)=>(b[i]|b[i+1]<<8|b[i+2]<<16|b[i+3]<<24)>>>0;
+ const ascii=a=>String.fromCharCode(...a).replace(/\0/g,'').trim();
+ function decode(raw){
+  const b=raw instanceof Uint8Array?raw:new Uint8Array(raw);
+  if(b.length<42||b.length>24576||ascii(b.subarray(0,4))!=='TRK1')throw Error('Not a native FM1 TRK1 project.');
+  const schema=u16(b,4),slot=u16(b,6);
+  if(schema<12||schema>17)throw Error('Native project schema V'+schema+' is not supported by this simulator importer (V12–V17).');
+  if(slot>=12||u32(b,8)!==b.length||u32(b,12)!==crc(b.subarray(24))||u32(b,16)!==crc(b.subarray(0,16)))throw Error('Native project CRC, length, or slot is invalid.');
+  let pos=24;
+  const need=n=>{if(pos+n>b.length)throw Error('Truncated native project.');};
+  const read=()=>{need(1);return b[pos++];};
+  const take=n=>{need(n);const v=b.subarray(pos,pos+n);pos+=n;return v;};
+  const word=()=>{const v=take(2);return u16(v,0);};
+  const signed=x=>x>127?x-256:x;
+  const inRange=(n,max,label)=>{if(n>max)throw Error('Bad '+label+' in native project.');return n;};
+  const name=ascii(take(12)),innerSlot=read();if(innerSlot!==slot)throw Error('Native project slot mismatch.');
+  const root=read(),mode=read(),keylock=read(),bpm=word(),count=read(),songLoop=read(),songMode=read();
+  if(root>=12||mode>=9||keylock>2||bpm<30||bpm>300||count<1||count>64||songLoop>1||songMode>1)throw Error('Invalid native project settings.');
+  const p=freshProject(name);p.nativeSongEnabled=!!songMode;p.bpm=bpm;p.harmony={root,mode,keylock};p.song=[];p.songLoop=!!songLoop;p.nativeSlot=slot;p.nativeSchema=schema;
+  for(let i=0;i<count;i++){const pattern=read(),repeats=read();if(pattern>=48||repeats<1||repeats>16)throw Error('Invalid Song entry.');p.song.push({pattern,repeats});}
+  for(let c=0;c<6;c++){const volume=read(),pan=signed(read()),mute=read(),solo=read(),swing=read();if(volume>120||Math.abs(pan)>100||mute>1||solo>1||swing>100)throw Error('Invalid mixer lane.');p.mixer[c]={volume:volume/100,pan:pan/100,mute:!!mute,solo:!!solo,swing};}
+  for(let r=0;r<48;r++){
+   const len=read();if(len<1||len>16)throw Error('Invalid pattern length.');
+   const mask=take(12),count=Array.from(mask).reduce((n,x)=>n+x.toString(2).replace(/0/g,'').length,0),bitsCount=schema>=12?40:33,packed=take(Math.ceil(count*bitsCount/8));
+   let bit=0;
+   const readBits=n=>{let v=0;for(let j=0;j<n;j++){v|=((packed[bit>>>3]>>>(bit&7))&1)<<j;bit++;}return v;};
+   let pat=null;
+   for(let c=0;c<6;c++)for(let step=0;step<16;step++){
+    const maskBit=c*16+step;if(!(mask[maskBit>>>3]&(1<<(maskBit&7))))continue;
+    const note=readBits(8),inst=readBits(2),chd=readBits(4),fx=readBits(4),amount=readBits(7),dyn=readBits(8),groove=schema>=12?readBits(7):0;
+    if(fx>=12||amount>100||(c===5?!(note===255||note===254||note<14):!(note===255||note===254||note<128)))throw Error('Invalid native step.');
+    if(!pat)pat=emptyPattern();pat.channels[c][step]={note:note===255?null:note,inst,chd,fx,amount,dyn,groove};
+   }
+   const events=read();if(events>64)throw Error('Invalid Punch-In event count.');
+   for(let e=0;e<events;e++){
+    const value=read(),aux=read(),row=value&15,key=(value>>>4)&7;
+    if(!pat)pat=emptyPattern();
+    const obj={row,key,down:!!(value&128)};
+    if(aux&128){obj.down=true;obj.param=aux&127;obj.paramChange=true;}
+    else if(aux!==127)obj.param=aux;
+    pat.punch.push(obj);
+   }
+   if(pat||len!==16){pat??=emptyPattern();pat.length=len;p.patterns[r]=pat;}
+  }
+  const instRead=()=>{
+    const type=read(),attack=read(),decay=read(),sustain=read(),release=read(),duty=read(),volume=read(),cutoff=word();
+    const waveA=read(),waveB=read(),coarse=signed(read()),fine=signed(read()),detune=read(),mix=read(),pulseWidth=read(),morph=read();
+    const coarseB=signed(read()),fineB=signed(read()),pulseWidthB=read(),drive=read(),sub=read(),noise=read(),fmDepth=read();
+    if(type>=12||[attack,decay,sustain,release,duty,volume].some(n=>n>100))throw Error('Invalid native instrument.');
+    return {type,attack:attack/100,decay:decay/100,sustain:sustain/100,release:release/100,duty:duty/100,volume:volume/100,cutoff,waveA,waveB,coarse,fine,detune,mix,pulseWidth,morph,coarseB,fineB,pulseWidthB,drive,sub,noise,fmDepth,lfoRate:5,lfoDepth:0};
+  };
+  for(let i=0;i<4;i++)p.instruments[i]=instRead();
+  p.drumComponents=[];
+  for(let i=0;i<14;i++){const att=read(),dec=read(),sus=read(),rel=read(),low=read(),mid=read(),high=read(),gain=read(),pitch=signed(read());p.drumComponents.push([att,dec,sus,rel,pitch,low,mid,high,gain]);}
+  const master=p.master;for(let k=0;k<4;k++)master['eq'+k]=read();
+  master.eq_freq=Array.from({length:4},read);master.eq_width=Array.from({length:4},read);
+  for(const k of ['comp_threshold','comp_ratio','comp_gain','reverb_wet','reverb_feedback','reverb_tone'])master[k]=read();
+  master.enabled=Array.from({length:3},()=>!!read());master.order=Array.from({length:3},read);
+  p.punchParams=Array.from({length:5},read);
+  if(schema>=10){master.comp_attack=read();master.reverb_spread=read();}
+  if(schema>=13)p.quantizeMutes=!!read();
+  if(schema>=14){const mask=read();p.snapshots=Array.from({length:4},(_,i)=>{const v=read();return mask&(1<<i)?v:null;});}
+  if(schema>=15)p.muteGroups=Array.from({length:4},read);
+  if(schema>=16){const valid=read();p.library=Array.from({length:8},(_,i)=>valid&(1<<i)?{name:ascii(take(8)),patch:instRead()}:null);}
+  if(schema>=17){p.typeBanks=Array.from({length:4},()=>({}));for(let i=0;i<4;i++){const mask=word();if(mask&~((1<<12)-1))throw Error('Unknown native instrument type.');for(let t=0;t<12;t++)if(mask&(1<<t)){const patch=instRead();if(patch.type!==t)throw Error('Corrupted instrument bank.');p.typeBanks[i][t]=patch;}}}
+  if(pos!==b.length)throw Error('Native project has unexpected trailing bytes.');
+  beetleVerifyProjectShape(p);
+  return p;
+ }
+ // Serialize the full editor model into the firmware V17 TRK1 wire format.
+ // No flash activity; the Project Manager handles all subsequent FM1 safety gates.
+ function encode(p){
+  beetleVerifyProjectShape(p);
+  const out=new Uint8Array(12256);let i=24;
+  const byte=n=>{if(!Number.isInteger(n)||n<0||n>255)throw Error('Native byte field out of range.');if(i>=out.length)throw Error('FM1 project exceeds 12 KiB.');out[i++]=n;};
+  const b16=n=>{byte(n&255);byte((n>>>8)&255);};
+  const pct=n=>Math.round(n*100);
+  const u8=n=>Math.round(n||0);
+  const limited=(v,min,max,name)=>{if(!Number.isInteger(v)||v<min||v>max)throw Error('Invalid '+name+' for native FM1 export: '+v);return v;};
+  const bSigned=n=>limited(u8(n),-128,127,'signed byte')&255;
+  const bByte=(n,lo=0,hi=100)=>byte(limited(u8(n),lo,hi,'parameter'));
+  const name=String(p.name||'UNTITLED').toUpperCase().replace(/[^A-Z0-9 _-]/g,' ').slice(0,12).padEnd(12,' ');
+  for(const c of name)byte(c.charCodeAt(0));
+  const slot=limited(Number.isInteger(p.nativeSlot)?p.nativeSlot:0,0,11,'project slot');
+  byte(slot);byte(limited(p.harmony?.root??0,0,11,'root'));byte(limited(p.harmony?.mode??0,0,8,'scale'));byte(limited(p.harmony?.keylock??0,0,2,'keylock'));
+  b16(limited(u8(p.bpm),30,300,'BPM'));byte(p.song.length);byte(p.songLoop===false?0:1);byte(p.nativeSongEnabled?1:0);
+  for(const entry of p.song){byte(limited(entry.pattern,0,47,'song pattern'));byte(limited(entry.repeats,1,16,'song repeats'));}
+  for(const [ch,m] of p.mixer.entries()){
+   bByte(pct(m.volume),0,120);byte(bSigned(pct(m.pan)));byte(m.mute?1:0);byte(m.solo?1:0);bByte(m.swing??0);
+  }
+  for(let r=0;r<48;r++){
+   const pat=p.patterns[r]||emptyPattern();if(!p.patterns[r])for(const st of pat.channels[5])st.inst=3;byte(limited(pat.length,1,16,'pattern length'));
+   const maskAt=i;for(let j=0;j<12;j++)byte(0);
+   const selected=[];
+   for(let ch=0;ch<6;ch++)for(let step=0;step<16;step++){
+    const s=pat.channels[ch][step],note=s.note==null?255:limited(s.note,0,255,'note');
+    const inst=limited(s.inst,0,3,'instrument'),chd=limited(s.chd,0,15,'chord'),fx=limited(s.fx,0,11,'FX');
+    const amount=limited(u8(s.amount),0,100,'effect value'),dyn=limited(s.dyn??0,0,255,'dynamics'),groove=limited(s.groove??0,0,127,'groove');
+    if(ch===5 && note!==254 && note!==255 && note>=14)throw Error('Invalid drum note');
+    if(ch<5 && note!==254 && note!==255 && note>=128)throw Error('Invalid synth note');
+    if(note===255&&inst===(ch===5?3:ch%4)&&chd===0&&fx===0&&amount===50&&dyn===0&&groove===0)continue;
+    const index=ch*16+step;out[maskAt+(index>>>3)]|=1<<(index&7);
+    selected.push([note,inst,chd,fx,amount,dyn,groove]);
+   }
+   // C pack_bits is little-endian at the individual bit level.
+   let bits=0,val=0;
+   const put=(n,count)=>{for(let j=0;j<count;j++){val|=((n>>>j)&1)<<bits;if(++bits===8){byte(val);bits=0;val=0;}}};
+   for(const s of selected){put(s[0],8);put(s[1],2);put(s[2],4);put(s[3],4);put(s[4],7);put(s[5],8);put(s[6],7);}
+   if(bits)byte(val);
+   const events=pat.punch||[];
+   if(events.length>24)throw Error('FM1 only supports 24 Punch-In events per pattern.');
+   byte(events.length);
+   for(const ev of events){
+    const row=limited(u8(ev.row),0,15,'punch row'),key=limited(u8(ev.key),0,7,'punch key');
+    let param=ev.param===undefined?255:limited(u8(ev.param),0,100,'punch parameter');
+    const change=ev.paramChange===true;
+    byte(row|(key<<4)|(ev.down?128:0));
+    byte(change?(param===255?50:param)|128:(param===255?127:param));
+   }
+  }
+  const instr=v=>{
+   if(!v)throw Error('A native instrument patch is missing.');
+   byte(limited(u8(v.type),0,11,'instrument type'));
+   for(const k of ['attack','decay','sustain','release'])bByte(pct(v[k]??0));
+   bByte(pct(v.duty??0.5));bByte(pct(v.volume??0.65));b16(limited(u8(v.cutoff??7000),0,65535,'cutoff'));
+   bByte(v.waveA??0,0,4);bByte(v.waveB??1,0,4);
+   byte(bSigned(v.coarse??0));byte(bSigned(v.fine??0));
+   bByte(v.detune??12);bByte(v.mix??50);bByte(v.pulseWidth??50,5,95);bByte(v.morph??0);
+   byte(bSigned(v.coarseB??v.coarse??0));byte(bSigned(v.fineB??v.fine??0));
+   bByte(v.pulseWidthB??v.pulseWidth??50,5,95);
+   for(const k of ['drive','sub','noise','fmDepth'])bByte(v[k]??0);
+  };
+  for(const v of p.instruments)instr(v);
+  const drums=p.drumComponents||[];
+  if(drums.length!==14)throw Error('Native FM1 export needs 14 drum components.');
+  for(const d of drums){if(!Array.isArray(d)||d.length!==9)throw Error('Invalid drum component.');
+   for(const k of [0,1,2,3,5,6,7,8])bByte(d[k]);byte(bSigned(limited(u8(d[4]),-36,36,'drum pitch')));
+  }
+  const m=p.master||{};
+  for(let j=0;j<4;j++)bByte(m['eq'+j]??50);
+  for(let j=0;j<4;j++)bByte(m.eq_freq?.[j]??50);
+  for(let j=0;j<4;j++)bByte(m.eq_width?.[j]??50);
+  for(const k of ['comp_threshold','comp_ratio','comp_gain','reverb_wet','reverb_feedback','reverb_tone'])bByte(m[k]??50);
+  for(let j=0;j<3;j++)byte(m.enabled?.[j]===false?0:1);
+  const order=m.order||[0,1,2];if([...(new Set(order))].length!==3)throw Error('Invalid MASTER effect order.');
+  for(let j=0;j<3;j++)byte(limited(order[j],0,2,'MASTER effect order'));
+  const punch=p.punchParams||[50,20,50,50,50];for(let j=0;j<5;j++)bByte(punch[j]??50);
+  bByte(m.comp_attack??28);bByte(m.reverb_spread??50);
+  byte(p.quantizeMutes?1:0);
+  const snapshots=p.snapshots||[null,null,null,null];let valid=0;
+  for(let j=0;j<4;j++)if(snapshots[j]!==null&&snapshots[j]!==undefined)valid|=1<<j;
+  byte(valid);for(let j=0;j<4;j++)byte(limited(snapshots[j]??0,0,63,'snapshot mask'));
+  for(let j=0;j<4;j++)byte(limited(p.muteGroups?.[j]??0,0,63,'mute group mask'));
+  const lib=p.library||Array(8).fill(null);let libMask=0;
+  for(let j=0;j<8;j++)if(lib[j])libMask|=1<<j;
+  byte(libMask);
+  for(let j=0;j<8;j++)if(libMask&(1<<j)){
+   const label=String(lib[j].name||'').toUpperCase().replace(/[^A-Z0-9 _-]/g,' ').slice(0,8).padEnd(8,' ');
+   for(const c of label)byte(c.charCodeAt(0));instr(lib[j].patch);
+  }
+  for(let j=0;j<4;j++){
+   const bank=p.typeBanks?.[j]||{};
+   let mask=0;
+   for(let t=0;t<12;t++)if(bank[t])mask|=1<<t;
+   b16(mask);
+   for(let t=0;t<12;t++)if(mask&(1<<t)){
+    if(bank[t].type!==t)throw Error('Instrument bank type mismatch.');instr(bank[t]);
+   }
+  }
+  // The 24-byte inner header is sealed last, exactly like track_store_encode().
+  const len=i;if(len>12256)throw Error('FM1 project does not fit in a 12 KiB slot.');
+  const write16=(at,n)=>{out[at]=n&255;out[at+1]=(n>>>8)&255;};
+  const write32=(at,n)=>{for(let k=0;k<4;k++)out[at+k]=(n>>>(8*k))&255;};
+  out.set(Uint8Array.from([84,82,75,49]),0);write16(4,17);write16(6,slot);write32(8,len);
+  write32(12,crc(out.subarray(24,len)));write32(16,crc(out.subarray(0,16)));
+  return out.slice(0,len);
+ }
+
+ return {decode,encode,crc};
+})();
+
 const BEETLE_BACKUP = Object.freeze({format:'BEETLE_BROWSER_PROJECT_BACKUP',version:1,maxBytes:2097152});
 async function beetleHash(text){
  const bytes=new TextEncoder().encode(text);
@@ -1502,16 +1704,35 @@ async function beetleReadBackup(text){
  return {project:parseProject(parsed),verified:false}; // compatible legacy bare JSON, not cryptographically verifiable
 }
 async function backup(){try{
- const data=await beetleMakeBackup(model.project);
- const filename='BEETLE-'+(model.project.name||'Project 1').replace(/[^a-z0-9_-]/gi,'_')+'-V0.88.beetle-backup.json';
- beetleDownload(JSON.stringify(data,null,2),filename);
- announce('VERIFIED SHA-256 BACKUP EXPORTED');
- }catch(e){alert('Backup failed: '+e.message);}}
+ // Export an actual firmware-compatible TRK1 V17 project before encrypting.
+ // Project Manager V1.1 can import this into any free/approved FM1 slot.
+ const native=BeetleNative.encode({...model.project,punchParams:model.punchParams});
+ const blob=await BeetleFileV2.encrypt(native);
+ const name='BEETLE-'+(model.project.name||'Project').replace(/[^a-z0-9_-]/gi,'_')+'.beetle';
+ const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;
+ document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),45000);
+ announce('NATIVE FM1 V17 .BEETLE BACKUP EXPORTED');
+ }catch(e){alert('Export stopped: '+e.message);}}
 async function beetleImportFile(file){
- const {project,verified}=await beetleReadBackup(await file.text());
- if(!confirm((verified?'SHA-256 VERIFIED BACKUP':'LEGACY JSON (NO CHECKSUM)')+'\nImport in browser memory? Existing unsaved changes will be lost. No FM1 storage is written.'))return;
- stop();model.project=project;audio.drumSettings=model.project.drumComponents;editReset();model.slot=null;model.dirty=true;model.screen='tracker';
- announce(verified?'VERIFIED BACKUP IMPORTED; SAVE TO SLOT':'LEGACY PROJECT IMPORTED; SAVE TO SLOT');render();
+ if(file.size>2097200)throw Error('Backup file exceeds safe size limit.');
+ let project,verified=false,native=false;
+ if(/\.beetle$/i.test(file.name)){
+   const decrypted=await BeetleFileV2.decrypt(file);
+   if(decrypted[0]===84&&decrypted[1]===82&&decrypted[2]===75&&decrypted[3]===49){
+     project=BeetleNative.decode(decrypted);verified=true;native=true;
+   }else{
+     const plain=new TextDecoder('utf-8',{fatal:true}).decode(decrypted);
+     const decoded=await beetleReadBackup(plain);project=decoded.project;verified=decoded.verified;
+   }
+ }else if(/\.json$/i.test(file.name)){
+   const decoded=await beetleReadBackup(await file.text());project=decoded.project;verified=decoded.verified;
+ }else throw Error('Only encrypted .beetle or legacy .json files are supported.');
+ if(!confirm((native?'FM1 PROJECT VERIFIED (TRK1 + CRC32)':verified?'ENCRYPTED PROJECT VERIFIED':'LEGACY JSON (NO CHECKSUM)')+'\nOpen "'+String(project.name||'UNTITLED')+'" in simulator?\nUnsaved changes will be lost. Only browser memory is changed, never FM1 storage.'))return;
+ stop();model.project=project;audio.drumSettings=model.project.drumComponents;
+ if(native&&Array.isArray(project.punchParams)){model.punchParams=[...project.punchParams,50,50,50];model.punchParams.forEach((v,i)=>{if(i<5)audio.setPunchParam(i,v);});}
+ audio.setMixer(model.project);audio.setMasterFX?.(model.project.master);
+ editReset();resetInstrumentFocus();model.slot=null;model.dirty=true;model.screen='tracker';
+ announce(native?'FM1 PROJECT OPENED · SAVE IN SIMULATOR':verified?'ENCRYPTED BACKUP IMPORTED':'LEGACY BACKUP IMPORTED');render();
 }
 
 $('#editPolyButton').onclick=()=>{if(model.screen!=='instrument'){announce('OPEN EDIT FIRST');return;}model.editPoly=!model.editPoly;releaseEditVoices();render();};
@@ -1519,7 +1740,7 @@ $('#demoButton').onclick=()=>{if(!confirm('Replace notes in the selected pattern
  const pat=pattern(model.project,model.project.selectedPattern,true), notes=[[60,64,67,72],[48,48,55,48],[67,72,74,79],[36,null,36,40]];
  for(let ch=0;ch<6;ch++)for(let r=0;r<16;r++){let st=pat.channels[ch][r];st.note=ch===5?([0,null,1,null][r%4]):notes[ch][r%4];st.inst=ch%4;st.chd=ch===5?([7,7,7,9][r%4]):0;st.fx=0;}
  pat.length=16;model.row=0;model.col=1;model.screen='tracker';mark();announce('DEMO NOTES READY: PRESS PLAY');};
-window.__beetleBackupTest={beetleMakeBackup,beetleReadBackup,beetleHash,beetleSha256Portable};
+window.__beetleBackupTest={beetleMakeBackup,beetleReadBackup,beetleHash,beetleSha256Portable,BeetleFileV2,BeetleNative,beetleImportFile,backup};
 $('#libraryButton').onclick=()=>{if(model.ch===5){announce('SELECT SYNTH LANE');return;}model.librarySlot=0;model.libraryTarget=clamp(step(model.project,model.project.selectedPattern,model.ch,model.row,false).inst??0,0,3);model.libraryAction=0;model.libraryNotice='';model.screen='library';render();};$('#snapshotsButton').onclick=()=>{model.screen='snapshots';model.snapshotRow=0;render();};$('#groupsButton').onclick=()=>{model.screen='groups';model.groupRow=model.groupLane=0;render();};$('#backupButton').onclick=backup;$('#songLoopButton').onclick=()=>{rememberDomain('song',0,()=>{model.project.songLoop=!model.project.songLoop;});$('#songLoopButton').textContent='SONG LOOP: '+(model.project.songLoop?'ON':'OFF');mark();};$('#importFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{await beetleImportFile(f);}catch(err){alert('Import refused: '+err.message);}finally{e.target.value='';}};
 $('#masterFxButton').onclick=()=>{model.screen='masterfx';model.masterFocus=0;render();};$('#songButton').onclick=()=>{model.screen='song';render();};$('#patternsButton').onclick=()=>{model.screen='patterns';model.songMode=false;render();};
 const home=$('#homeButton');home.addEventListener('pointerdown',e=>{e.preventDefault();homeLong=false;homeTimer=setTimeout(()=>{homeLong=true;route('LONGHOME');},1500);});const homeUp=()=>{clearTimeout(homeTimer);if(!homeLong)route('HOME');};home.addEventListener('pointerup',homeUp);home.addEventListener('pointercancel',()=>clearTimeout(homeTimer));home.addEventListener('pointerleave',()=>{clearTimeout(homeTimer);});

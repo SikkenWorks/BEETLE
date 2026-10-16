@@ -423,6 +423,10 @@ static uint8_t native_updating;
 #include "beetle_flash_target.inc"
 #endif
 #if ETCH_NATIVE_OTA
+/* BEETLE USB project transfer: called only from the non-ISR OTA event dispatcher. */
+#if defined(TRACK_FIRMWARE)
+static int beetle_transfer_handle(uint32_t decoded_len);
+#endif
 #include "ota.c"
 #include "ota_target.c"
 #else
@@ -2120,6 +2124,9 @@ static void screen(void){
 }
 #ifdef TRACK_FIRMWARE
 #include "track_runtime.h"
+#if ETCH_NATIVE_OTA
+#include "beetle_project_transfer.inc"
+#endif
 #endif
 void fm1_cstart(void){
  uint32_t *s,*d;
@@ -2281,6 +2288,12 @@ void fm1_cstart(void){
   if(usb.uboot_req){etch_boot.pending=0;native_stop();usb_detach();fm1_irq_off();fm1_enter_uboot();}
 #if ETCH_NATIVE_OTA
   ota_service();
+#ifdef TRACK_FIRMWARE
+  if(beetle_transfer_active()){
+   /* Transfer owns the serializer workspace. Physical keys cannot race the upload/download. */
+   continue;
+  }
+#endif
   if(usb.ota_req){
    usb.ota_req=0;
    {

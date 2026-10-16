@@ -1,3 +1,11 @@
+## Project Manager V1.1 / RC1.01 Simulator update (web-only)
+
+- No-password AES-256-GCM binary `.beetle` files, integrity tag and fresh nonce per export. Shared compatibility key is public and not a secrecy mechanism.
+- Project Manager V1.1 exports native project payloads; reads V1 password-protected and V2 password-free files.
+- RC1.01 WebSimulator reads native TRK1 V12–V17 `.beetle` files and legacy JSON backups. It exports FM1-compatible native V17 `.beetle` files via the real C wire layout (CRC32 and bounded format).
+- Regression tests: genuine native V17 fixture, JS-to-C decoder compatibility, encryption integrity, browser markup/JS and simulated MIDI slot discovery.
+- No firmware or `.fwsc` bytes changed. Hardware use remains experimental and unvalidated.
+
 ## BEETLE 1.01 RC1 — Independent drum columns, audio STOP, and simulator menu spacing
 
 - **CH6 NOTE1 + ENV:** inserts `[STP]` into NOTE1 without clearing an existing NOTE2 drum hit or NOTE2 `[STP]`.
@@ -133,7 +141,7 @@
 
 # BEETLE V0.76 — Offline dump inspection and guarded project salvage (pre-RC)
 
-Full V0.75 source retained. No changes to project codec V16, firmware flash layout, DSP, normal strict A/B LOAD/SAVE policy or protected OTA bootloader.
+**2026-10-15.** Full V0.75 source retained. No changes to project codec V16, firmware flash layout, DSP, normal strict A/B LOAD/SAVE policy or protected OTA bootloader.
 
 - `source/tools/beetle_v071_backup_audit.py` can scan an independent exact 1MiB dump (`scan-dump`) and classify all twelve A/B project pairs with ownership-marker warnings.
 - `salvage-dump` can write a **new local CRC-checked TRK1 extract**, with an explicit acknowledgement option, from a valid bank even when the companion bank is foreign. Never writes to FM1; refusing overwrites and ambiguous equal generation split-brain states; output does not imply native semantic decode or device restore.
@@ -144,7 +152,7 @@ Full V0.75 source retained. No changes to project codec V16, firmware flash layo
 
 # BEETLE V0.75 — Final RC Hardening (pre-RC)
 
-Based on complete V0.74. No features removed; V16 project
+**2026-10-15.** Based on complete V0.74. No features removed; V16 project
 serialization and the 12-slot physical flash layout remain unchanged.
 
 1. `track_journal.c`: verify the nested 24-byte TRK1 project header, version,
@@ -172,7 +180,7 @@ hardware audio test, MIDI clock and physical flash ownership. **NOT RC1.**
 
 # BEETLE V0.74 — Stability & Recovery (pre-RC)
 
-Complete V0.73 source retained. No musical features removed;
+**2026-10-15.** Complete V0.73 source retained. No musical features removed;
 project schema **V16**, 12 slots, 48 patterns and protected loader unchanged.
 
 - **Fail-closed native project preflight:** reject BPM outside 30–300, invalid
@@ -199,7 +207,7 @@ independently tested recovery route and verified full-flash backup.
 
 # BEETLE V0.73 — Hardware Diagnostics & Performance (pre-RC)
 
-**All existing six-lane tracker features and V16 project compatibility preserved.**
+**2026-10-15. All existing six-lane tracker features and V16 project compatibility preserved.**
 
 ## Native FM1, read-only diagnostics
 
@@ -223,7 +231,7 @@ independently tested recovery route and verified full-flash backup.
 
 # BEETLE Changelog
 
-## V0.72 — RC Hardening: MASTER FX Guardrails & Native Audio Stress
+## V0.72 — RC Hardening: MASTER FX Guardrails & Native Audio Stress (15 October 2026)
 
 - **MASTER FX state recovery:** validate the eight fixed-point EQ filter states and two reverb low-pass states before arithmetic. Bad RAM values now trigger the pre-existing bounded dry recovery path and reset all crossover accumulators; this prevents signed-overflow cascades from a damaged DSP state without touching user instrument/project data.
 - **Conservative parameter clamping:** even an unexpected 101–255 value reaching audio processing is capped at 100, once per processing block, for EQ gains/frequencies/widths, compressor threshold/ratio/makeup/attack, and reverb wet/feedback/tone/spread. Valid project values 0–100 preserve the original DSP parameter calculations.
@@ -232,7 +240,7 @@ independently tested recovery route and verified full-flash backup.
 - **OTA/package checks:** new V0.72 `.fwsc` checksum/embedded installer pairing validated; the protected ETCH V1.37 loader and first 16 KiB are byte-for-byte unchanged. Source-level simulated update/identity/corruption tests pass. Physical FM1 installation, flash wear/power loss, fallback boot/USB recovery, sustained audio timing and analogue output **have not been validated**.
 - **RC decision:** this is **V0.72 experimental / pre-RC**, not RC1. The attached `RC-HARDWARE-CHECKLIST.md` defines mandatory evidence before promoting any firmware to RC1.
 
-## V0.71 — Backup Integrity & A/B Recovery Qualification
+## V0.71 — Backup Integrity & A/B Recovery Qualification (15 October 2026)
 
 - **WebSimulator verified backups:** EXPORT PROJECT becomes VERIFIED BACKUP with a self-contained `.beetle-backup.json` envelope, SHA-256 over the complete JSON project, a byte-length bound and explicit format/version metadata. RESTORE BACKUP checks integrity and project structure **before** replacing browser working memory; damaged, unknown or oversized backups are refused. Older plain browser JSON project files can still be imported, explicitly marked unverified. This is **browser-side only**, not a native FM1 backup transport or flash restore.
 - **Offline TRKJ read-only audit:** new `source/tools/beetle_v071_backup_audit.py` validates user-supplied individual A/B bank images, ownership markers, bank CRC32, project header CRC32, generation, and slot identifiers. It can extract the newest valid TRK1 project record to a new `.trk1` file without overwrite. It **cannot acquire** these bank images from the FM1 and **never writes** to a device; verifying structural CRC is not a substitute for semantic firmware decoding or hardware recovery.
@@ -240,7 +248,7 @@ independently tested recovery route and verified full-flash backup.
 - **Compatibility:** V16 project format, six-lane engine, instruments, Mute Groups, Snapshots, performance modes, MASTER FX and V0.70 Extended Undo/Redo retained unchanged. Native three build variants use the V0.71 identity. Updater/experimental storage package continues to require proven hardware recovery and explicit destructive confirmation on first use.
 - **Limits:** there is no verified physical FM1 project extraction path, no independent recovery proof, and no certified on-device storage safety. A cryptographically verified browser JSON backup cannot be directly flashed into the native firmware.
 
-## V0.70 — Unified Extended Undo/Redo
+## V0.70 — Unified Extended Undo/Redo (15 October 2026)
 
 - **One chronological six-action Undo/Redo history** across tracker patterns (including Punch-In events), synth instrument parameters, mixer parameters, Song Mode arrangement, MASTER FX, and instrument library STORE/LOAD/COPY/RENAME.
 - **SEQ + OP5** Undo and **SEQ + OP6** Redo now work from TRACKER, EDIT, MIXER, SONG, MASTER, and LIBRARY screens while playback is stopped; in the WebSimulator use the existing Undo/Redo buttons or Ctrl+Z / Ctrl+Y.
@@ -270,7 +278,7 @@ independently tested recovery route and verified full-flash backup.
 - Added GROUPS display, HELP instructions, WebSimulator controls and tests. The audio voice engine, V0.58 moon/Beetle boot animation and protected OTA loader are unchanged.
 - **Validation:** three JieLi native builds, bounded host tests (including V14/V13 migrations, group queue and snapshot interactions), simulator browser interaction, and software-only OTA integrity simulation. Physical FM1 behaviour remains unverified; storage and firmware updates are experimental and can cause data loss or an unbootable device.
 
-## V0.67 — Performance Snapshots: Four Live Mute Scenes
+## V0.67 — Performance Snapshots: Four Live Mute Scenes (2026-10-15)
 
 - **Four performance snapshots:** the MIXER now opens a dedicated PERFORMANCE screen with **SEQ + SEL**. Each slot stores an independent six-channel mute combination. **K1** selects a slot, **K2** stores the currently active mute mask, **K3 or SEL** recalls it, **HOME/GLO** returns to MIXER, and **SEQ** returns to TRACKER.
 - **Visual display:** all four snapshot rows fit the FM1's native 240×240 screen, with six blocks per saved snapshot. **Pink means muted; white means unmuted.** Empty slots are identified as `EMPTY` and cannot accidentally overwrite existing channel states when recalled.
@@ -282,7 +290,7 @@ independently tested recovery route and verified full-flash backup.
 
 **Safety:** the physical storage-enabled firmware is still an experimental build. Do not format or flash without an independent verified backup and recovery route; an app build and simulated OTA test are not proof of safe recovery.
 
-## V0.66 — Mixer Quantized Mutes ON/OFF
+## V0.66 — Mixer Quantized Mutes ON/OFF (2026-10-15)
 
 - **MIXER SEL toggle:** GLO opens MIXER; press **SEL** to switch **QUANTIZED MUTES ON/OFF**, clearly shown at the bottom of the 240×240 screen. K1/K2/K3 mixer editing and the six black-key mutes are preserved.
 - **ON (default):** during PLAY, a changed lane mute is queued to the next pattern boundary. `Q1` and `Q0` show pending mute/unmute. During STOP, mute changes apply immediately.
@@ -294,7 +302,7 @@ independently tested recovery route and verified full-flash backup.
 
 **Safety:** experimental FM1 update/storage can brick the device or erase user data. Flash only with independent verified backup/recovery. Firmware/software tests do not establish on-device safety.
 
-## V0.65 — Live Performance: Quantized Lane Mutes
+## V0.65 — Live Performance: Quantized Lane Mutes (2026-10-15)
 
 - **Quantized mutes:** while PLAY is running, changing a MUTE field in MIXER with K3 or using the six hardware black-key lane toggles arms a mute/unmute to be applied exactly at the **next pattern boundary**. Other mixer controls (volume, pan, solo and swing) retain their existing editing behavior.
 - **Clear pending state:** `Q1` means a mute is queued and `Q0` means an unmute is queued; `ON`/`--` indicate committed state. Toggling a pending lane back to its original state cancels that lane's pending change. Queues are cleared on STOP, project loading, or NEW. Changes committed at the next boundary are persisted by the existing project SAVE; the transient queue is never serialized.
@@ -304,7 +312,7 @@ independently tested recovery route and verified full-flash backup.
 
 **Safety:** all OTA and persistent flash writes remain experimental; a complete flash backup and independent recovery route are still required for device testing.
 
-## V0.64 — Groove Copy/Paste, Lane Fill & Clear
+## V0.64 — Groove Copy/Paste, Lane Fill & Clear (2026-10-15)
 
 - **STEP GROOVE tools:** on STEP GROOVE (SEQ+ENV), hold SEQ and press OP1 to copy the selected step's MICRO/RATCHET/PROB settings, OP2 to paste those settings to the selected step, OP3 to fill every *active step in the current lane* with the current step's groove, or OP4 to reset all active steps in the current lane to defaults. The shortcuts are page-local; the tracker retains its original lane and full-pattern copy/paste shortcuts.
 - **Non-destructive:** these actions edit only the existing 7-bit groove value; note, drum NOTE2, instrument, chord, step FX and velocity/gate remain untouched. Fill/Clear respect pattern length (1–16) and do not alter stored events in hidden steps.
@@ -314,7 +322,7 @@ independently tested recovery route and verified full-flash backup.
 - **Regression tests:** bounded 1–16 fill, empty clipboard, repeated paste, preserving musical step fields, plus existing V0.63 groove/legacy project migration fixture.
 - **Build status:** no performance claim for physical FM1. The JieLi toolchain and OTA package are still experimental and require independent hardware recovery validation.
 
-## V0.63 — Sequencer 2.0: microtiming, ratchets, probability + drum NOTE2 PRESET
+## V0.63 — Sequencer 2.0: microtiming, ratchets, probability + drum NOTE2 PRESET (2026-10-15)
 
 - **STEP GROOVE editor:** hold **SEQ** and press **ENV** while stopped to open a separate BEETLE-styled editor. K1 chooses the step; K2 switches MICRO/RATCHET/PROBABILITY; K3 adjusts; SEL resets the selected parameter; SEQ/HOME return to the tracker. Existing NOTE/INST/CHD/FX columns remain unchanged.
 - **Microtiming:** 0–7 positive offsets, each exactly **1/64 of a step**. Sample-clock scheduling within the step avoids LCD/encoder timing dependence. V0.63 does not support negative (early) offsets; no potentially incorrect pattern-boundary lookahead was introduced.
@@ -328,7 +336,7 @@ independently tested recovery route and verified full-flash backup.
 
 **Safety:** firmware and persistent flash remain experimental; dense projects may exceed the safe A/B journal size. No physical device recovery is proven. Flash only with a verified backup and independent recovery capability.
 
-## V0.62 — Pattern-length-aware cursor navigation
+## V0.62 — Pattern-length-aware cursor navigation (2026-10-14)
 
 - **Tracker K1 cursor:** navigation stops at the current pattern's last active step. Example: length 8 allows steps 00–07 and never focuses steps 08–15. Increasing length makes previously hidden steps selectable again without deleting their data.
 - **Dynamics K1 and Block Editor K1/K4:** use the same pattern-length limit. Pasting a block stops at the last active step, preserving hidden content.
@@ -338,7 +346,7 @@ independently tested recovery route and verified full-flash backup.
 - **Safety:** software validation is not physical FM1 validation. Experimental flash storage and OTA still carry risks.
 
 
-## V0.61 — HELP K1-only + SEQ/K4 pattern-length correction
+## V0.61 — HELP K1-only + SEQ/K4 pattern-length correction (2026-10-14)
 
 - **HELP controls:** K1 is the sole scrolling encoder. K4 has no effect while HELP is displayed, including no BPM change. Removed the on-screen K4 heading/page hints in both native FM1 firmware and WebSimulator.
 - **SEQ + K4 fixed:** the physical encoder combination is handled before the normal BPM path in the native tracker. While stopped and not recording, it changes the selected pattern length by one step per encoder detent (bounded 1–16), with the change recorded by the existing six-step Undo/Redo history. Turning K4 while SEQ is held can never change BPM, even when playback prevents editing.
@@ -350,7 +358,7 @@ Release notes for documented BEETLE firmware versions, newest first.
 
 For current features, controls, safety information, and licence credits, see [README.md](README.md).
 
-## V0.60 — Sequencer 2.0 & Project LOAD Input Safety
+## V0.60 — Sequencer 2.0 & Project LOAD Input Safety (14 October 2026)
 
 - **HELP K4 chapter navigation:** K4 jumps to the next/previous actual section heading, while K1 still scrolls one line. The native FM1 HELP control already had a chapter-search helper; the WebSimulator's outdated three-line K4 paging was corrected. Simulator HELP content now derives from the native `beetle_help.h` section list, including the new Sequencer controls. Scroll limits stay inside the 240×240 frame.
 - **SEL after project LOAD:** fixes buffered SEL input from a blocking flash read being interpreted as `CLEAR STEP` once the tracker reappears. A release-aware post-load input barrier consumes the stale SEL edge and requires the button to be released and a minimum 320 ms quiet interval before a new deliberate SEL press can edit notes. LOAD itself retains CRC checking and no unwanted flash writes. The WebSimulator prevents immediate repeated SEL action for the same navigation transition.
@@ -359,7 +367,7 @@ For current features, controls, safety information, and licence credits, see [RE
 - **Stability:** native selectors, display and settings are not rewritten during blocking LOAD. A focused host test covers stuck/queued SEL, held-then-released SEL, timer wrapping, HELP section jumps, pattern-length bounds and boundary switching; Chromium checks the WebSimulator flow. V0.59 project format V11 and existing audio engine are unchanged.
 - **Validation:** all three experimental JieLi builds compiled, the V0.59 project migration/CRC regression passed, the new V0.60 host/browser tests passed, and simulated stock/previous-firmware OTA routes passed with `FM-1_2060` and matching SHA-256. **No physical FM1 validation, independent ROM recovery or proven safe flash ownership.**
 
-## V0.59 — Per-step Velocity & Gate / Dynamics
+## V0.59 — Per-step Velocity & Gate / Dynamics (14 October 2026)
 
 - **Per-step dynamics:** `SEQ + FX` opens **STEP DYNAMICS**. K1 selects a step, K2 switches between velocity and gate, K3 changes the selected value, SEL restores its default; SEQ/HOME returns to the tracker.
 - **Velocity:** 16 settings including a legacy default, mapped to a bounded note-on velocity. Synth and drum notes receive velocity at the step trigger; it does not silently change mixer faders or existing pattern notes.
@@ -369,7 +377,7 @@ For current features, controls, safety information, and licence credits, see [RE
 - **WebSimulator:** matching DYNAMICS screen, step controls, copy/paste preservation, instrument playback approximation and corrected lane-6 drum routing. Browser rendering and timing remain simulations, not bit-identical native FM1 audio.
 - **Validation:** three JieLi native builds, focused ASan/UBSan project compatibility tests, WebSimulator browser test and simulated OTA integrity checks passed. Physical FM1 audio timing, write safety and recovery remain unverified.
 
-## V0.58 — Moon loading screen, original Beetle animation retained
+## V0.58 — Moon loading screen, original Beetle animation retained (14 October 2026)
 
 - **Static background updated:** replaced only the original tree backdrop with the user-provided `LoadingScreen-background2.png` (240×240) showing the moon in the upper-left and the same tree. The displayed background is not scaled, filtered or animated.
 - **Original Beetle unchanged:** the exact two magenta 240×240 sprite masks from the original animation remain in their original position and alternate every 100 ms. The splash loops until the tracker screen is ready. The audio IRQ and bootloader are unchanged.
@@ -377,14 +385,14 @@ For current features, controls, safety information, and licence credits, see [RE
 - **Release packaging:** firmware ID `FM-1_2058`, rebuilt application variants, experimental `.fwsc` and embedded WebInstaller with matching hashes. No project-file/DSP/shortcut changes.
 - **Validation:** software-only compile, per-pixel framebuffer tests and OTA simulations. No proof of physical FM1 timing, flash safety or independent recovery.
 
-## V0.57 — BEETLE Block Editor UI & HELP clarification
+## V0.57 — BEETLE Block Editor UI & HELP clarification (14 October 2026)
 
 - **Native Block Editor page guard:** corrected the screen-state validator to accept page 20. Previously it could reset the active Block Editor to the tracker.
 - **Block Editor styling:** use BEETLE's existing black/white/magenta pixel UI. Added lane/pattern context, 16-step range visualization, magenta selection frame and visible step occupancy. No PICO-8 styling or external artwork. Native FM1 and WebSimulator use the same 240×240 layout.
 - **HELP clarifications:** `SEQ+OP1/OP2` copy/paste **only one selected lane**. `SEQ+OP3/OP4` copy/paste the **entire six-lane pattern plus recorded Punch-In events**. Existing `SEQ+OP5/OP6` Undo/Redo and `SEQ+SEL` Block Editor remain unchanged.
 - **No DSP or project format changes:** native firmware recompiled and WebSimulator refreshed. UI is software-tested, not physically validated on an FM1.
 
-## V0.56 — Professional Pattern Editing
+## V0.56 — Professional Pattern Editing (14 October 2026)
 
 ### Added
 - **Full Pattern Copy/Paste:** `SEQ + OP3` copies all six tracker lanes **and** the current pattern's recorded Punch-In events (virtual FX lane). `SEQ + OP4` pastes this entire pattern to the destination pattern. Existing per-lane `SEQ + OP1/OP2` remains available. Pasting is undoable.

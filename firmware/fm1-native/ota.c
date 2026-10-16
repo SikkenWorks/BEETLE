@@ -160,6 +160,9 @@ static uint32_t ota_take(void)
 static void ota_service(void)
 {
     uint32_t d = ota_take();
+#if defined(TRACK_FIRMWARE)
+    if (d && beetle_transfer_handle(d)) return;
+#endif
     if (d == 7u && ota_dec[2] == 0x11)
         ota_reply_identity();
 }
