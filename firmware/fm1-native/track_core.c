@@ -80,9 +80,69 @@ void track_stop(struct track_engine *e){
  e->punch_mask=0u;
 }
 int track_tick(struct track_engine *e){if(!e||!e->transport.playing)return 0;uint8_t length=e->active.length?bounded(e->active.length,TRACK_STEPS+1u):TRACK_STEPS;e->transport.play_step=(uint8_t)((e->transport.play_step+1u)%length);return 1;}
+/* Scale membership is shared by edit-scrolling and playback harmony. */
 static uint8_t in_scale(uint8_t n,const struct track_harmony *h){for(uint8_t k=0;k<7u;k++)if(((h->root+scale[h->mode][k])%12u)==n%12u)return 1u;return 0u;}
 uint8_t track_quantize(uint8_t note,const struct track_harmony *h){if(!h||note>127u||h->mode>8u||h->root>11u||h->keylock!=2u)return note;if(in_scale(note,h))return note;for(uint8_t d=1u;d<=6u;d++){if(note>=d && in_scale((uint8_t)(note-d),h))return (uint8_t)(note-d);if((uint16_t)note+d<=127u && in_scale((uint8_t)(note+d),h))return (uint8_t)(note+d);}return note;}
 uint8_t track_chord(uint8_t root,uint8_t type,uint8_t out[5]){if(!out||root>127u||type>=TRACK_CHORD_COUNT)return 0u;uint8_t n=chord[type][0];for(uint8_t k=0;k<n;k++){uint16_t note=(uint16_t)root+(uint16_t)chord[type][k+1u];out[k]=note>127u?127u:(uint8_t)note;}return n;}
+/* Advance by SCALE DEGREES, not semitones. Both special tracker values
+ * remain part of the cycle. This function is only used when LOCK is active;
+ * GUIDE/OFF, and both drum note fields, preserve their old scroll order. */
+uint8_t track_note_scroll_keylocked(uint8_t value,int32_t detents,uint8_t drum,const struct track_harmony *h){
+ if(!detents||drum||!h||h->keylock!=2u||h->root>11u||h->mode>8u)
+  return track_note_scroll(value,detents,drum);
+ int32_t total=2;
+ for(uint16_t n=0u;n<128u;n++)if(in_scale((uint8_t)n,h))total++;
+ int32_t turns=detents%total;
+ if(!turns)return value;
+ uint8_t cursor=value;
+ while(turns){
+  int dir=turns>0?1:-1;
+  /* 0..127 -> EMPTY -> STP -> 0; off-scale stored legacy notes are
+   * skipped in the requested direction without altering saved patterns. */
+  do{
+   if(dir>0)cursor=cursor==TRACK_NOTE_STOP?0u:cursor==TRACK_NOTE_EMPTY?TRACK_NOTE_STOP:
+     cursor>=127u?TRACK_NOTE_EMPTY:(uint8_t)(cursor+1u);
+   else cursor=cursor==0u?TRACK_NOTE_STOP:cursor==TRACK_NOTE_STOP?TRACK_NOTE_EMPTY:
+     cursor==TRACK_NOTE_EMPTY?127u:(uint8_t)(cursor-1u);
+  }while(cursor<128u&&!in_scale(cursor,h));
+  turns-=dir;
+ }
+ return cursor;
+}
+/* Chord voicing follows the selected root, preserving the requested chord
+ * interval as closely as the scale permits. Prefer a lower note on ties
+ * (same as track_quantize). Keep ascending voices whenever MIDI range allows.
+ * At the top of the MIDI range, repeat the last in-key pitch rather than
+ * emitting a note outside the scale. Never mutate stored CHD or NOTE data. */
+uint8_t track_chord_keylocked(uint8_t root,uint8_t type,const struct track_harmony *h,uint8_t out[5]){
+ if(!out||root>127u||type>=TRACK_CHORD_COUNT)return 0u;
+ if(!h||h->keylock!=2u||h->root>11u||h->mode>8u)return track_chord(root,type,out);
+ uint8_t base=track_quantize(root,h);
+ uint8_t count=chord[type][0];
+ out[0]=base;
+ for(uint8_t i=1u;i<count;i++){
+  uint16_t intended=(uint16_t)base+chord[type][i+1u];
+  if(intended>127u)intended=127u;
+  uint16_t minimum=(uint16_t)out[i-1u]+1u;
+  int best=-1;
+  /* At most 12 semitone pairs inspected per chord voice, even at high
+   * BPM. Run inside the 44.1kHz step callback without unbounded scans. */
+  if(minimum<=127u){
+   uint16_t target=intended<minimum?minimum:intended;
+   for(uint16_t distance=0u;distance<=12u;distance++){
+    if(target>=minimum+distance && in_scale((uint8_t)(target-distance),h)){
+     best=(int)(target-distance);break;
+    }
+    if(distance && target+distance<=127u && in_scale((uint8_t)(target+distance),h)){
+     best=(int)(target+distance);break;
+    }
+   }
+  }
+  out[i]=best>=0?(uint8_t)best:out[i-1u];
+ }
+ return count;
+}
+
 void track_punch(struct track_engine *e,uint8_t fx,uint8_t held){if(!e||fx>=TRACK_PUNCH_COUNT)return;if(held)e->punch_mask|=(uint8_t)(1u<<fx);else e->punch_mask&=(uint8_t)~(1u<<fx);}
 int track_is_lit(uint8_t button){return button>=2u&&button<14u&&button!=10u;}
 uint32_t track_home_action(uint32_t held_ms,uint8_t released){if(held_ms>=1500u)return 2u;return released?1u:0u;}

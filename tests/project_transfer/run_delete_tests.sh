@@ -5,3 +5,5 @@ cc -std=c11 -O1 -g -fsanitize=undefined -fno-omit-frame-pointer -I firmware/fm1-
 /tmp/beetle-v2-delete-test
 node tests/project_transfer/test_web_crypto.cjs
 python tests/project_transfer/test_delete_browser.py
+
+python tests/project_transfer/test_rc104_marker_browser.py

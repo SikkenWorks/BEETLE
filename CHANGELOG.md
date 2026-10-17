@@ -1,3 +1,41 @@
+# BEETLE 1.01 RC1.0.4 – Reverse Search / Corrupt Storage Diagnostics
+
+- Fixed Reverse Key Search immediately returning to Tracker. Page 32 is a valid modal page and is no longer rejected by the old >30 validator. Page 31 remains invalid.
+- Project Transfer V4: read-only audit of the global BEETLE storage marker, every A/B bank and marker sector; optional, double-confirmed marker-only restoration when independently verified BEETLE-owned and safe. It does not remove corruption of unknown origin.
+- Refuses marker repair for foreign or unreadable flash, no owned project bank, or a marker with unknown bytes. Physical slot recovery V3 remains protected and can be retried only after the marker is verified.
+- WebSimulator and WebInstaller display RC1.0.4; Project Manager V1.7 uses the same firmware protocol version.
+- Firmware binaries have not been validated on real hardware. Before installing or performing marker repair, obtain a verified full-flash backup and independently working recovery route. OTA/stock compatibility policies are unchanged.
+
+# BEETLE 1.01 RC1.0.3 — LED ripple cleanup and consistent version labels
+
+# BEETLE 1.01 RC1.0.3
+
+## Wijzigingen
+
+- Opstartanimatie op de fysieke FM1-LEDs is nu **eenmalig**, niet herhalend.
+- De ripple krijgt de volledige tijd om door alle 41 LEDs te lopen (1320 ms splash; 1200 ms eenmalige animatie), inclusief de buitenste functietoetsen.
+- Bij de overgang naar de tracker worden alle resterende dim-, mid- en breath-LED-lagen gewist. De normale toets-, mute-, octaaf- en KEYLOCK-indicatoren werken daarna weer.
+- De WebSimulator hanteert dezelfde niet-herhalende animatie en verwijdert alle CSS-wave-statussen bij het afsluiten.
+- Zichtbare versienamen in WebInstaller, WebSimulator, Project Manager en releasebestanden zijn bijgewerkt naar **1.01 RC1.0.3**. De Project Manager blijft protocol V3 gebruiken; zijn UI heet V1.6.
+- Project Transfer V3, echte DELETE, `[READ ERROR]`-recovery, reverse key search, KEYLOCK en het `.beetle`-formaat zijn behouden.
+
+
+---
+
+## RC1.02 — Reverse KEY/SCALE search, boot LED ripple, READ ERROR recovery
+
+- Reverse analyzer checks every saved melodic note and full original chord tones across 48 patterns, presents ranked keys/modes with fit and ambiguity indication.
+- Central two musical keys trigger a spreading boot LED ripple over all 41 physical key/button LEDs.
+- Project Manager V1.5 and USB Project Transfer V3: explicit CRC-damaged, BEETLE-owned project slot recovery; protected foreign flash stays locked. Normal import/export and physical DELETE preserved.
+- Project schema, protected bootloader and user file encryption unchanged. Experimental: hardware not independently validated.
+
+## BEETLE RC1.01 · KEYLOCK note and linked-chord scroll correction
+
+- LOCK scroll steps through in-key pitches only; OFF/GUIDE stay chromatic.
+- Chord voices attached to a root are fitted to the selected scale under LOCK.
+- Simulator behavior matches native code. Project Manager V1.4, true DELETE and format unchanged.
+- Experimental firmware: no independent physical FM1 validation.
+
 ## BEETLE 1.01 RC1.01 · Project Transfer V2 TRUE DELETE
 
 - New Project Manager V1.4: physically delete one occupied slot to `[ EMPTY ]` via USB MIDI V2; optional `.beetle` backup and double confirmation.

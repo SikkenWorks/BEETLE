@@ -56,6 +56,8 @@ struct track_transport {uint16_t bpm;uint8_t playing,play_step,edit_step,edit_co
 struct track_engine {struct track_pattern active;struct track_harmony harmony;struct track_transport transport;uint8_t project_slot,pattern_slot,record_armed,punch_mask,dirty;};
 /* MIDI 0..127 notes, 254 STP and 255 ---; no sentinels ever reach DSP pitch arrays. */
 uint8_t track_note_scroll(uint8_t value,int32_t detents,uint8_t drum);
+/* LOCK scrolls only through the selected scale; OFF/GUIDE preserve chromatic editing. */
+uint8_t track_note_scroll_keylocked(uint8_t value,int32_t detents,uint8_t drum,const struct track_harmony *h);
 void track_init(struct track_engine *e);
 int track_enter_note(struct track_engine *e,uint8_t note);
 /* Drum NOTE2 uses chord encoding: 0=empty, 1..14=pad, 15=STP.
@@ -76,6 +78,8 @@ void track_stop(struct track_engine *e);
 int track_tick(struct track_engine *e); /* 1 on next step, 0 if stopped */
 uint8_t track_quantize(uint8_t note,const struct track_harmony *h);
 uint8_t track_chord(uint8_t root,uint8_t chord,uint8_t result[5]);
+/* Under LOCK, root and every generated chord tone remain within the scale. */
+uint8_t track_chord_keylocked(uint8_t root,uint8_t chord,const struct track_harmony *h,uint8_t result[5]);
 void track_punch(struct track_engine *e,uint8_t effect,uint8_t held);
 int track_is_lit(uint8_t button); /* FN indices 2..13; ARP=10 remains off */
 uint32_t track_home_action(uint32_t held_ms,uint8_t released); /* 1 HOME short, 2 GUIDE long */

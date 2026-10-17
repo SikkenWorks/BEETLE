@@ -26,4 +26,7 @@ typedef int (*beetle_flash_read_fn)(void *,uint32_t,uint8_t *,uint32_t);
 enum beetle_claim_result {BEETLE_CLAIM_FOREIGN=-3,BEETLE_CLAIM_IO=-2,BEETLE_CLAIM_INVALID=-1,BEETLE_CLAIM_BLANK=0,BEETLE_CLAIM_EXISTING=1};
 int beetle_flash_claim_probe(beetle_flash_read_fn read,void *ctx);
 void beetle_flash_make_marker(uint8_t out[32]);
+/* Read-only marker recovery audit. 1=repairable candidate, 0=foreign/unsafe, -1=I/O.
+ * A candidate alone NEVER authorizes writes: audit all A/B banks separately. */
+int beetle_flash_marker_repairable(beetle_flash_read_fn read,void *ctx);
 #endif

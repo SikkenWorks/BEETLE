@@ -28,8 +28,13 @@ static int inspect(const struct track_journal_io *i,uint8_t slot,uint8_t bank,st
   }
   return 0;
  }
+ /* An intact BEETLE magic, format, exact slot and inverse-slot pair
+  * establish ownership even if a torn write damaged the header CRC.
+  * A CRC-damaged header is NEVER considered committed, nor reusable by
+  * ordinary SAVE/DELETE. The explicit recovery opcode may remove it after
+  * a full bank/tail scan. Anything with an unknown owner stays foreign. */
  if(rd32(h)!=TRACK_JOURNAL_MAGIC||rd16(h+4u)!=1u||h[6]!=slot||
-    h[7]!=(uint8_t)(slot^0xFFu)||rd32(h+24u)!=track_store_crc32(h,20u)||
+    h[7]!=(uint8_t)(slot^0xFFu)||
     (h[20]!=0x00u&&h[20]!=0xFFu)){
   s->kind=3;return 0;
  }
@@ -48,7 +53,7 @@ static int inspect(const struct track_journal_io *i,uint8_t slot,uint8_t bank,st
   pos+=len;
  }
  s->kind=2;
- if(h[20]!=0u)return 0;
+ if(h[20]!=0u||rd32(h+24u)!=track_store_crc32(h,20u))return 0;
  /* V0.75: the outer CRC alone does not mean an old bank contains a valid
   * TRACK project. If the inner TRK1 header is bad but the outer CRC is
   * intact, treating this as "committed" could erase the sole decodable
@@ -178,6 +183,53 @@ int track_journal_delete(const struct track_journal_io *i,uint8_t slot){
   struct bank_status verify;
   if((r=inspect(i,slot,k,&verify))!=0)return r;
   if(verify.kind!=0u)return TRACK_JOURNAL_IO;
+ }
+ return TRACK_JOURNAL_OK;
+#endif
+}
+/* Explicit RC1.02 recovery for [READ ERROR] banks. Unlike regular DELETE,
+ * the caller must confirm data loss and own the BEETLE volume. Only banks
+ * whose FULL header/sector inspection proves BEETLE ownership (kind 1 or 2)
+ * are eligible. A foreign bank (kind 3) is never erased, even if its sibling
+ * is valid BEETLE data. This is deliberately NOT a general flash formatter. */
+int track_journal_audit_owned_volume(const struct track_journal_io *i){
+ if(!valid_io(i,0u))return TRACK_JOURNAL_INVALID;
+ uint8_t owned=0u;
+ for(uint8_t slot=0u;slot<TRACK_JOURNAL_SLOTS;slot++){
+  for(uint8_t bank=0u;bank<2u;bank++){
+   struct bank_status state;
+   int rc=inspect(i,slot,bank,&state);
+   if(rc)return rc;
+   if(state.kind==3u)return TRACK_JOURNAL_FOREIGN;
+   if(state.kind==1u||state.kind==2u)owned=1u;
+  }
+ }
+ return owned?TRACK_JOURNAL_OK:TRACK_JOURNAL_NO_PROJECT;
+}
+int track_journal_delete_corrupt(const struct track_journal_io *i,uint8_t slot){
+#if defined(TRACK_FIRMWARE) && !BEETLE_NATIVE_STORAGE
+ (void)i;(void)slot;return TRACK_JOURNAL_HARDWARE_LOCKED;
+#else
+ if(!valid_io(i,slot))return TRACK_JOURNAL_INVALID;
+ struct bank_status b[2];int r;
+ for(uint8_t bank=0u;bank<2u;bank++)if((r=inspect(i,slot,bank,&b[bank]))!=0)return r;
+ if(b[0].kind==3u||b[1].kind==3u)return TRACK_JOURNAL_FOREIGN;
+ if(b[0].kind==0u&&b[1].kind==0u)return TRACK_JOURNAL_NO_PROJECT;
+ /* Require an owned damaged bank; otherwise use ordinary DELETE. */
+ if(b[0].kind!=2u&&b[1].kind!=2u)return TRACK_JOURNAL_INVALID;
+ /* Damaged banks FIRST; surviving valid copies LAST. */
+ for(uint8_t pass=0u;pass<2u;pass++)for(uint8_t bank=0u;bank<2u;bank++){
+  const uint8_t kind=b[bank].kind;
+  if((pass==0u&&kind!=2u)||(pass==1u&&kind!=1u))continue;
+  if(i->erase(i->ctx,slot,bank))return TRACK_JOURNAL_IO;
+  struct bank_status verified;
+  if((r=inspect(i,slot,bank,&verified))!=0)return r;
+  if(verified.kind!=0u)return TRACK_JOURNAL_IO;
+ }
+ for(uint8_t bank=0u;bank<2u;bank++){
+  struct bank_status verified;
+  if((r=inspect(i,slot,bank,&verified))!=0)return r;
+  if(verified.kind!=0u)return TRACK_JOURNAL_IO;
  }
  return TRACK_JOURNAL_OK;
 #endif

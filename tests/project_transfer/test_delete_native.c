@@ -41,6 +41,25 @@ int main(void){
   if(s==2u||s==7u)continue;
   mk(s);int q=track_journal_save(&io,s,&p,scratch,sizeof(scratch),0);if(q)fprintf(stderr,"save slot %u rc=%d\n",s,q);CHECK(q==TRACK_JOURNAL_OK);
  }
+ /* RC1.0.4: marker cannot be restored on faith alone; the journal must
+  * independently prove ownership across every A/B bank. */
+ CHECK(track_journal_audit_owned_volume(&io)==TRACK_JOURNAL_OK);
+ CHECK(beetle_flash_marker_repairable(rd,0)==1); /* fully blank marker sector */
+ uint8_t owner_marker[32];beetle_flash_make_marker(owner_marker);
+ memcpy(flash+BEETLE_FLASH_MARKER,owner_marker,sizeof(owner_marker));
+ CHECK(beetle_flash_claim_probe(rd,0)==BEETLE_CLAIM_EXISTING);
+ CHECK(beetle_flash_marker_repairable(rd,0)==0);
+ flash[BEETLE_FLASH_MARKER+24u]^=1u; /* damage CRC, not BEETLE identity */
+ CHECK(beetle_flash_claim_probe(rd,0)==BEETLE_CLAIM_FOREIGN);
+ CHECK(beetle_flash_marker_repairable(rd,0)==1);
+ flash[BEETLE_FLASH_MARKER+4u]^=1u; /* destroyed layout/signature = unsafe */
+ CHECK(beetle_flash_marker_repairable(rd,0)==0);
+ flash[BEETLE_FLASH_MARKER+4u]^=1u;
+ flash[BEETLE_FLASH_MARKER+100u]=0x01u; /* foreign marker-sector tail */
+ CHECK(beetle_flash_marker_repairable(rd,0)==0);
+ flash[BEETLE_FLASH_MARKER+100u]=0xFFu;
+ memcpy(flash+BEETLE_FLASH_MARKER,owner_marker,sizeof(owner_marker));
+ CHECK(beetle_flash_claim_probe(rd,0)==BEETLE_CLAIM_EXISTING);
  /* Both banks in slot 0 contain valid project versions; delete should erase both. */
  mk(0u);p.bpm=188u;CHECK(track_journal_save(&io,0u,&p,scratch,sizeof(scratch),0)==TRACK_JOURNAL_OK);
  uint8_t untouched[TRACK_JOURNAL_BANK_BYTES*2u];
@@ -74,6 +93,43 @@ int main(void){
  CHECK(track_journal_delete(&io,11u)==TRACK_JOURNAL_OK);
  CHECK(track_journal_preview(&io,11u,title)==TRACK_JOURNAL_NO_PROJECT);
  CHECK(track_journal_load(&io,1u,&out,scratch,sizeof(scratch),0)==TRACK_JOURNAL_OK);
+ /* RC1.02: CRC-damaged BEETLE bank is recoverable by EXPLICIT command
+  * without allowing regular deletion/overwrite or any foreign erase. */
+ uint32_t ownedaddr;CHECK(!beetle_flash_map(6u,0u,0u,TRACK_JOURNAL_BANK_BYTES,&ownedaddr));
+ flash[ownedaddr+TRACK_JOURNAL_HEADER_BYTES+51u]^=0x01u;
+ before=erases;
+ CHECK(track_journal_load(&io,6u,&out,scratch,sizeof(scratch),0)==TRACK_JOURNAL_FOREIGN);
+ CHECK(track_journal_delete(&io,6u)==TRACK_JOURNAL_FOREIGN);
+ CHECK(erases==before);
+ CHECK(track_journal_delete_corrupt(&io,6u)==TRACK_JOURNAL_OK);
+ CHECK(erases==before+3u);
+ CHECK(track_journal_load(&io,6u,&out,scratch,sizeof(scratch),0)==TRACK_JOURNAL_NO_PROJECT);
+ CHECK(track_journal_preview(&io,6u,title)==TRACK_JOURNAL_NO_PROJECT);
+ CHECK(track_journal_load(&io,1u,&out,scratch,sizeof(scratch),0)==TRACK_JOURNAL_OK);
+ /* Header CRC corruption with intact BEETLE slot signature is
+  * positively owned; do not mistake it for arbitrary foreign material. */
+ uint32_t hdraddr;CHECK(!beetle_flash_map(5u,0u,0u,TRACK_JOURNAL_BANK_BYTES,&hdraddr));
+ flash[hdraddr+24u]^=0x01u;
+ CHECK(track_journal_delete(&io,5u)==TRACK_JOURNAL_FOREIGN);
+ CHECK(track_journal_delete_corrupt(&io,5u)==TRACK_JOURNAL_OK);
+ CHECK(track_journal_preview(&io,5u,title)==TRACK_JOURNAL_NO_PROJECT);
+ /* Corrupt secondary bank with good primary: ordinary LOAD can recover,
+  * explicit recovery still asks to erase BOTH copies. */
+ mk(8u);p.bpm=192u;CHECK(track_journal_save(&io,8u,&p,scratch,sizeof(scratch),0)==TRACK_JOURNAL_OK);
+ uint32_t secondaddr;CHECK(!beetle_flash_map(8u,1u,0u,TRACK_JOURNAL_BANK_BYTES,&secondaddr));
+ flash[secondaddr+TRACK_JOURNAL_HEADER_BYTES+51u]^=0x01u;
+ CHECK(track_journal_load(&io,8u,&out,scratch,sizeof(scratch),0)==TRACK_JOURNAL_OK);
+ CHECK(track_journal_delete(&io,8u)==TRACK_JOURNAL_FOREIGN);
+ CHECK(track_journal_delete_corrupt(&io,8u)==TRACK_JOURNAL_OK);
+ CHECK(track_journal_load(&io,8u,&out,scratch,sizeof(scratch),0)==TRACK_JOURNAL_NO_PROJECT);
+ /* Corrupt own + foreign sibling MUST refuse even explicit recovery. */
+ CHECK(track_journal_delete_corrupt(&io,2u)==TRACK_JOURNAL_FOREIGN);
+ CHECK(track_journal_audit_owned_volume(&io)==TRACK_JOURNAL_FOREIGN);
+ /* Do not use the recovery opcode to delete an ordinary valid project. */
+ CHECK(track_journal_delete_corrupt(&io,4u)==TRACK_JOURNAL_INVALID);
+ CHECK(track_journal_load(&io,4u,&out,scratch,sizeof(scratch),0)==TRACK_JOURNAL_OK);
+ /* A fully missing slot remains missing, not a false recovery. */
+ CHECK(track_journal_delete_corrupt(&io,6u)==TRACK_JOURNAL_NO_PROJECT);
  if(fail_count)return 1;
- printf("PASS true DELETE: dual A/B erased, 11 other slots isolated, foreign rejected, failure safe\n");return 0;
+ printf("PASS true DELETE + explicit corrupt recovery: unrelated slots intact, foreign rejected, error-safe\n");return 0;
 }

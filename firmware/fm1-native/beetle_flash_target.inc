@@ -60,6 +60,38 @@ static int beetle_hal_journal_program(void *ctx,uint8_t slot,uint8_t bank,
 static const struct track_journal_io beetle_hal_journal_io={
  0,beetle_hal_journal_read,beetle_hal_journal_erase,beetle_hal_journal_program
 };
+/* Explicitly repair ONLY a missing/CRC-corrupt marker, NEVER a foreign one.
+ * The ENTIRE A/B area must first be audited read-only for ownership. */
+static int beetle_hal_marker_audit(void){
+ int ownership=beetle_hal_probe_ownership();
+ if(ownership==BEETLE_CLAIM_EXISTING)return 0; /* nothing to repair */
+ if(ownership==BEETLE_CLAIM_IO)return -2;
+ int marker=beetle_flash_marker_repairable(beetle_hal_abs_read,0);
+ if(marker<0)return -2;
+ if(marker!=1)return -1;
+ int banks=track_journal_audit_owned_volume(&beetle_hal_journal_io);
+ if(banks==TRACK_JOURNAL_IO)return -2;
+ if(banks==TRACK_JOURNAL_NO_PROJECT)return -3;
+ if(banks!=TRACK_JOURNAL_OK)return -1;
+ return 1; /* repair is eligible, but still requires explicit MIDI consent */
+}
+static int beetle_hal_restore_marker(void){
+ if(!beetle_write_permit||native_safe||native_tripped||native_updating)return -1;
+ if(beetle_hal_marker_audit()!=1)return -1;
+ uint32_t took=0u;
+ fm1_irq_off();int rc=FL_FAR(fl_erase4k_ram)(BEETLE_FLASH_MARKER,&took);fm1_irq_enable_all();
+ fm1_wdt_feed();if(rc)return -2;
+ uint8_t block[256];
+ for(uint32_t at=BEETLE_FLASH_MARKER;at<BEETLE_FLASH_MARKER_END;at+=sizeof(block)){
+  if(beetle_hal_abs_read(0,at,block,sizeof(block)))return -2;
+  for(uint16_t j=0;j<sizeof(block);j++)if(block[j]!=0xFFu)return -2;
+ }
+ uint8_t marker[32];beetle_flash_make_marker(marker);
+ fm1_irq_off();rc=FL_FAR(fl_prog_ram)(BEETLE_FLASH_MARKER,marker,sizeof(marker),&took);fm1_irq_enable_all();
+ fm1_wdt_feed();if(rc)return -2;
+ return beetle_hal_probe_ownership()==BEETLE_CLAIM_EXISTING?0:-2;
+}
+
 /* Destructive provisioning allowed ONLY from TRACK's explicit five-second
  * SELECT+SAVE consent screen. The mark is written LAST, so any interrupted
  * formatting stays unowned and can never accidentally enable journal writes.

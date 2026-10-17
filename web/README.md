@@ -1,3 +1,5 @@
+> **RC1.02 update:** Reverse key/scale search, center-out startup LED ripple, Project Transfer V3 recovery for corrupted BEETLE-owned slots. See [RC1.02-README.md](../../RC1.02-README.md). Experimental hardware operation is not independently validated.
+
 # BEETLE 1.01 RC1.01 web tools
 
 The complete web tools are also available at the GitHub Pages repository root:

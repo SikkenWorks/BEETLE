@@ -25,6 +25,8 @@
 #include "beetle_mute_groups.h"
 #include "track_punch_events.h"
 #include "track_song.h"
+#include "beetle_reverse_key.h"
+#include "beetle_led_ripple.h"
 #include "track_drum.h"
 #include "track_master_fx.h"
 #include "track_project_store.h"
@@ -83,6 +85,13 @@ static uint32_t track_old_note_mask;
 static struct track_name_editor track_editor;
 static char track_title[TRACK_NAME_MAX+1u];
 static uint8_t track_named,track_page,track_menu_index,track_fx_cursor,track_osc_cursor,track_osc_bank;
+/* Reverse scale search is transient UI state. No new project fields/schema. */
+static struct beetle_reverse_report track_reverse_report __attribute__((section(".pool"),aligned(4)));
+static uint8_t track_reverse_index;
+static void track_reverse_open(void){
+ beetle_reverse_analyse(&track_song,&track_state,&track_reverse_report);
+ track_reverse_index=0u;track_page=32u;
+}
 /* V0.81: boot-only chooser, save origin, and non-destructive first-free allocation. */
 static uint8_t track_boot_menu_choice,track_save_return_page,track_new_project_full,track_load_from_boot;
 /* The original pitch belongs to the currently focused cell, not a global
@@ -493,7 +502,8 @@ static void track_runtime_validate(void){
   }
   track_state.active.length=16u;faulty=1u;
  }
- if(track_page>30u){track_page=0u;faulty=1u;}
+ /* RC1.0.4: reverse-key search is page 32. Do not mistake it for corrupt state. */
+ if(track_page>30u && track_page!=32u){track_page=0u;faulty=1u;}
  /* Live Mixer is exclusively a Song Mode performance page. If a project
   * transition disables SONG, return before processing any mixer key. */
  if(!track_song.enabled){if(track_page==30u)track_page=9u;
@@ -528,7 +538,7 @@ static void track_wheel_value(int32_t detents){
  int32_t v;
  switch(track_state.transport.edit_column){
  case 0:
-  st->note=track_note_scroll(st->note,detents,track_state.transport.edit_channel==TRACK_DRUM_CHANNEL);
+  st->note=track_note_scroll_keylocked(st->note,detents,track_state.transport.edit_channel==TRACK_DRUM_CHANNEL,&track_state.harmony);
   break;
  case 1:
   if(track_state.transport.edit_channel==TRACK_DRUM_CHANNEL){
@@ -579,7 +589,7 @@ static void track_fm1_boot(void){
  track_audio_clock=0u;track_audio_started=0u;track_swing_pending_mask=0u;for(uint8_t ci=0;ci<TRACK_CHANNELS;ci++)track_swing_pending_at[ci]=0u;track_preview_mask=0u;
  for(uint8_t k=0u;k<27u;k++){track_preview_channel[k]=255u;track_preview_note[k]=255u;track_edit_last_onset_ms[k]=0u;}
  track_type_queued=0;track_rec_since=0u;track_rec_long=0u;track_punch_edit_row=0u;track_punch_edit_index=0u;
- track_preset_last_note=60u;track_preset_last_note2=1u;beetle_groove_reset(&track_groove_clock);track_drum_note1_serial=track_drum_note2_serial=0u;track_boot_splash_until=etch_ms+900u;
+ track_preset_last_note=60u;track_preset_last_note2=1u;beetle_groove_reset(&track_groove_clock);track_drum_note1_serial=track_drum_note2_serial=0u;track_boot_splash_until=etch_ms+1320u;
  track_fx_drum_lane=0u;track_edit_poly=0u;track_key_oct_chord.last=0u;track_key_oct_chord.combo_latched=0u;
  native_controls.octave=0;track_edit_prev_keys=0u;track_edit_serial=0u;track_overwrite_wait=0u;
  for(uint8_t i=0u;i<TRACK_PROJECTS;i++)track_slot_seen[i]=0u;
@@ -732,7 +742,7 @@ static void track_audio_fire(struct etch_native_audio *audio,uint8_t lane_mask){
    if(TRACK_GROOVE_RATCHET(s)>1u && track_gate_remaining[c]>=track_groove_clock.lane[c].spacing)
     track_gate_remaining[c]=track_groove_clock.lane[c].spacing>1u?track_groove_clock.lane[c].spacing-1u:1u;
   }
-  lengths[c]=track_chord(track_quantize((uint8_t)note,&track_state.harmony),s->chord,pitches[c]);
+  lengths[c]=track_chord_keylocked((uint8_t)note,s->chord,&track_state.harmony,pitches[c]);
  }
  /* First guarantee each channel its root, then share the remaining four
   * voices with chord tones. Never let CH1 consume all eight voices. */
@@ -848,7 +858,29 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
  }
 }
 static void track_fm1_leds(void){
+ /* Animation planes are NOT normal TRACK LED state. The original splash
+  * handed full-brightness LEDs back but forgot the dim/mid planes, so a
+  * trailing ripple could remain lit indefinitely on several physical keys.
+  * Clear those planes on EVERY normal refresh, including boot-to-tracker.
+  * Unlike a cosmetic delay, this also handles an interrupted boot wave. */
+ /* Splash/ripple LEDs own every key and every function button until the
+  * startup screen ends; normal mute/guide lights must not overwrite them. */
+ if((int32_t)(track_boot_splash_until-etch_ms)>0){
+  fm1_irq_off();
+  for(uint8_t id=0u;id<41u;id++){
+   uint8_t light=beetle_ripple_level(etch_ms-beetle_ripple_start_ms,id);
+   fm1_led_key(id,light==2u);
+   native_seq_led_dim(id,light==1u);
+   native_seq_led_mid(id,0u);
+  }
+  fm1_irq_enable_all();return;
+ }
  fm1_irq_off();
+ for(uint8_t col=0u;col<FM1_NCOL;col++){
+  fm1_led_dim[col]=0u;
+  fm1_led_mid[col]=0u;
+  fm1_led_breath[col]=0u;
+ }
  for(uint8_t b=2u;b<14u;b++)fm1_led_key(b,1u);
  struct etch_harmony_settings h={track_state.harmony.root,track_state.harmony.mode,track_state.harmony.keylock,0u};
  uint32_t guide=etch_led_scale_guide_targets(native_controls.octave,&h);
@@ -1668,10 +1700,45 @@ static void track_fm1_paint(void){
   const char *v=etch_note_name(track_state.harmony.root);uint8_t i=8u;while(*v&&i<29u)root[i++]=*v++;root[i]=0;
   v=etch_mode_name(track_state.harmony.mode);i=8u;while(*v&&i<29u)scale[i++]=*v++;scale[i]=0;
   static const char *const modes[]={"OFF","GUIDE","LOCK"};v=modes[track_state.harmony.keylock%3u];i=8u;while(*v&&i<29u)lock[i++]=*v++;lock[i]=0;
-  const char *const entries[]={root,scale,lock};track_web_list(entries,3u,track_menu_index%3u,62u,35u);
-  track_pix_text("GUIDE: ILLUMINATE SCALE KEYS",10u,192u,TRACK_PINK);
-  track_pix_text("LOCK: QUANTIZE NOTES",10u,207u,TRACK_WHITE);
-  track_pix_text("K1 SELECT K3 SET MODE",10u,220u,TRACK_BRIGHT);return;
+  const char *const entries[]={root,scale,lock,"REVERSE KEY SEARCH >"};
+  track_web_list(entries,4u,3u,54u,33u);
+  track_pix_text("ANALYSE 48 PATS + CHORD TONES",8u,190u,TRACK_PINK);
+  track_pix_text("K1 ROOT K2 SCALE K3 LOCK",9u,205u,TRACK_WHITE);
+  track_pix_text("SEL SEARCH / HOME BACK",14u,220u,TRACK_BRIGHT);return;
+ }
+ if(track_page==32u){
+  track_page_header("REVERSE KEY / SCALE",43u);
+  if(!track_reverse_report.events){
+   track_pix_center("NO MELODIC NOTES FOUND",120u,96u,TRACK_PINK);
+   track_pix_center("ENTER NOTES OR CHORDS FIRST",120u,122u,TRACK_WHITE);
+   track_pix_text("K4 RESCAN   HOME BACK",12u,218u,TRACK_BRIGHT);return;
+  }
+  uint8_t first=(uint8_t)(track_reverse_index/5u*5u);
+  char num[12];char row[35];
+  for(uint8_t i=0u;i<5u&&first+i<BEETLE_REVERSE_CANDIDATES;i++){
+   uint8_t index=(uint8_t)(first+i);
+   const struct beetle_reverse_candidate *c=&track_reverse_report.ranked[index];
+   uint8_t at=0u;const char *v=etch_note_name(c->root);
+   row[at++]=index==track_reverse_index?'>':' ';
+   while(*v&&at<6u)row[at++]=*v++;
+   while(at<6u)row[at++]=' ';
+   v=etch_mode_name(c->mode);
+   while(*v&&at<23u)row[at++]=*v++;
+   while(at<24u)row[at++]=' ';
+   track_fmt_int(num,c->fit);v=num;
+   while(*v&&at<29u)row[at++]=*v++;
+   row[at++]='%';row[at]=0;
+   if(index==track_reverse_index)lcd_fill(7u,(uint16_t)(56u+i*27u),227u,21u,0x4807u);
+   track_pix_text(row,11u,(uint16_t)(59u+i*27u),index==track_reverse_index?TRACK_WHITE:TRACK_BRIGHT);
+  }
+  const struct beetle_reverse_candidate *selected=&track_reverse_report.ranked[track_reverse_index];
+  if(selected->outside==0u){
+   track_pix_text("EXACT MATCH (NOT UNIQUE)",11u,196u,TRACK_PINK);
+  }else{
+   track_pix_text("CLOSEST FIT - OUTSIDE TONES",9u,196u,TRACK_PINK);
+  }
+  track_pix_text("K1 RESULTS SEL APPLY KEY/SCALE",4u,211u,TRACK_WHITE);
+  track_pix_text("HOME BACK  K4 RESCAN",11u,225u,TRACK_BRIGHT);return;
  }
  if(track_page==14u){
   track_page_header("LOAD PROJECT",43u);
@@ -1969,6 +2036,30 @@ static void track_fm1_poll(void){
   for(uint8_t j=0u;j<6u;j++)if(values[j]){
    track_last_encoder_id=j;track_last_encoder_delta=values[j];track_last_encoder_ms=now;
   }
+ }
+ /* Reverse key finder is a modal, read-only analyzer until SEL applies
+  * a candidate. No accidental edits, note triggers or project writes. */
+ if(track_page==32u){
+  if(k1){int32_t next=(int32_t)track_reverse_index+k1;
+   if(next<0)next=0;if(next>=BEETLE_REVERSE_CANDIDATES)next=BEETLE_REVERSE_CANDIDATES-1;
+   track_reverse_index=(uint8_t)next;changed=1u;}
+  if(k4){beetle_reverse_analyse(&track_song,&track_state,&track_reverse_report);
+   track_reverse_index=0u;changed=1u;}
+  if((pressed&(1u<<3))&&track_reverse_report.events){
+   const struct beetle_reverse_candidate *selected=&track_reverse_report.ranked[track_reverse_index];
+   fm1_irq_off();
+   track_state.harmony.root=selected->root;
+   track_state.harmony.mode=selected->mode;
+   track_state.dirty=1u;
+   fm1_irq_enable_all();
+   track_page=7u;changed=1u;
+  }else if(pressed&(1u<<8)){
+   track_page=7u;track_home_fired=1u;track_home_since=now;changed=1u;
+  }else if(pressed&(1u<<11)){track_page=0u;track_seq_fired=1u;changed=1u;}
+  if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
+  (void)fm1_input_note_edges();
+  if(changed||now-track_last_paint>=650u){screen();track_last_paint=now;}
+  return;
  }
  /* Shared keyboard octave: octaves shift LIVE keyboard notes in both
   * EDIT and TRACKER, never existing pattern cells. A simultaneous OCT chord
@@ -3055,6 +3146,7 @@ static void track_fm1_poll(void){
     }
    }
    if(track_page==7u){
+    if(pressed&(1u<<3)){track_reverse_open();changed=1u;}
     if(k1)track_state.harmony.root=(uint8_t)(((int32_t)track_state.harmony.root+k1%12+12)%12);
     if(k2)track_state.harmony.mode=(uint8_t)(((int32_t)track_state.harmony.mode+k2%9+9)%9);
     if(k3)track_state.harmony.keylock=(uint8_t)(((int32_t)track_state.harmony.keylock+k3%3+3)%3);

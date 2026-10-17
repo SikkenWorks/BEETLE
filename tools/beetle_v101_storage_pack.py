@@ -27,8 +27,8 @@ def main():
     opts=json.loads((a.app.parent/'native-build-options.json').read_text())
     audit,errs=fw.validate_app_audit(a.app,Path(str(a.app)+'.audit.json'))
     if not audit or fw.validate_app_binary(app):ap.error('App audit failed '+repr(errs))
-    if not(opts.get('version')=='BEETLE-1.01-RC1' and opts.get('app_sha256')==sha(app) and opts.get('beetle_storage_experimental') is True and opts.get('storage_requires_destructive_user_consent') is True and opts.get('ota_writes') is True):
-        ap.error('Only audited BEETLE 1.01 RC1 standalone project storage build is allowed')
+    if not(opts.get('version')=='BEETLE-1.01-RC1.0.4' and opts.get('app_sha256')==sha(app) and opts.get('beetle_storage_experimental') is True and opts.get('storage_requires_destructive_user_consent') is True and opts.get('ota_writes') is True):
+        ap.error('Only audited BEETLE 1.01 RC1.0.4 standalone project storage build is allowed')
     assets=fw.extract_stock_assets(a.reference);ref_pkg=fw.parse_ufw(ref_raw)
     ref_flash=next(x['data'] for x in ref_pkg['entries'] if x['name']=='flash.bin')
     built=bytearray(fw.build_flash_image_from_assets(app,assets['uboot'],assets['cfg_tool'],assets['eq_cfg'],assets['key'],isd_config=assets['isd_config'],flash_header_payload=assets['flash_header_payload']))
@@ -57,13 +57,13 @@ def main():
     }
     if not all(checks.values()):
       a.output.unlink(missing_ok=True);ap.error('FAILED: '+repr(checks))
-    m={'name':'BEETLE','version':'1.01 RC1','kind':'EXPERIMENTAL_STORAGE_TEST',
+    m={'name':'BEETLE','version':'1.01 RC1.0.4','kind':'EXPERIMENTAL_STORAGE_TEST',
        'hardware_tested_by_maintainer': 'Each public beta is hardware-tested by the maintainer; this build is pending their release sign-off','independent_ROM_recovery_proven':False,'brick_risk':'NONZERO',
        'image_product':ID,'package_file':a.output.name,'package_bytes':len(data),'package_sha256':sha(data),
        'app_bytes':len(app),'app_sha256':sha(app),'reference_firmware':'ETCH V1.37',
        'reference_product':REF_ID,'reference_fwsc_sha256':REF_SHA,'checks':checks,
        'ota_write_capable':True,'project_flash_writes_enabled':True,'explicit_format_required':True,'erases_prior_ETCH_Felucca_data':True,
        'note':'First-install risk remains; manual format destroys prior ETCH/Felucca data in 0x97000..0xDFFFF; cannot guarantee rollback from a nonbooting app.'}
-    a.output.with_name('BEETLE-1.01-RC1-STORAGE-EXPERIMENTAL-MANIFEST.json').write_text(json.dumps(m,indent=2)+'\n')
+    a.output.with_name('BEETLE-1.01-RC1.0.4-STORAGE-EXPERIMENTAL-MANIFEST.json').write_text(json.dumps(m,indent=2)+'\n')
     print(json.dumps(m,indent=2))
 if __name__=='__main__':main()

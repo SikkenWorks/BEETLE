@@ -8,7 +8,8 @@
  * First body byte is the matching host transaction sequence (0..127).
  * 0x50 HELLO, 0x51 LIST, 0x52 READ_BEGIN, 0x53 READ,
  * 0x54 FINISH, 0x55 WRITE_BEGIN, 0x56 WRITE, 0x57 COMMIT, 0x58 ABORT,
- * 0x59 DELETE_SLOT (V2 only; slot-specific full A/B erase).
+ * 0x59 DELETE_SLOT (V2); 0x5A RECOVER_CORRUPT_SLOT (V3);
+ * 0x5B READ-ONLY MARKER AUDIT, 0x5C EXPLICIT MARKER REPAIR (V4).
  */
 #define BEETLE_XFER_CHUNK 24u
 #define BEETLE_XFER_TTL_MS 120000u
@@ -61,7 +62,7 @@ static uint8_t beetle_xfer_ready(void){
 /* Return 1 when the message was handled (or refused), 0 for OTA frames. */
 static int beetle_transfer_handle(uint32_t d){
  const uint8_t cmd=ota_dec[2];
- if(cmd<0x50u || cmd>0x59u)return 0;
+ if(cmd<0x50u || cmd>0x5Cu)return 0;
  const uint8_t *arg=ota_dec+6u;
  const uint32_t n=d-7u;
  if(n<1u)return 1;
@@ -69,13 +70,29 @@ static int beetle_transfer_handle(uint32_t d){
  uint8_t out[32]={seq};
  if(cmd==0x50u){
   if(n!=1u){beetle_xfer_error(seq,cmd,BERR_LENGTH);return 1;}
-  out[1]=2u;out[2]=TRACK_JOURNAL_SLOTS;out[3]=TRACK_STORE_VERSION;
+  out[1]=4u;out[2]=TRACK_JOURNAL_SLOTS;out[3]=TRACK_STORE_VERSION;
 #if BEETLE_NATIVE_STORAGE
   out[4]=1u; /* hardware features compiled; actual ownership tested separately */
 #else
   out[4]=0u;
 #endif
   beetle_xfer_reply(0x60u,out,5u);return 1;
+ }
+ /* V4: READ-ONLY audit works even when global marker is missing/corrupt.
+  * Status 0=owned, 1=can repair after explicit consent, 2=foreign/unknown,
+  * 3=no provably BEETLE-owned banks, 4=physical read error. */
+ if(cmd==0x5Bu){
+  if(n!=1u){beetle_xfer_error(seq,cmd,BERR_LENGTH);return 1;}
+#if BEETLE_NATIVE_STORAGE
+  if(beetle_transfer_active()||!beetle_xfer_ready()){
+   beetle_xfer_error(seq,cmd,BERR_BUSY);return 1;
+  }
+  int audit=beetle_hal_marker_audit();
+  out[1]=(uint8_t)(audit==0?0:audit==1?1:audit==-3?3:audit==-2?4:2);
+#else
+  out[1]=4u;
+#endif
+  beetle_xfer_reply(0x6Bu,out,2u);return 1;
  }
  if(cmd==0x58u || cmd==0x54u){
   beetle_xfer_reset();beetle_xfer_reply(0x64u,out,1u);return 1;
@@ -91,9 +108,45 @@ static int beetle_transfer_handle(uint32_t d){
  }
  /* Probe once per command that begins or commits a transaction. Chunk
   * reads must not re-scan the entire ownership marker 500+ times. */
- if((cmd==0x51u||cmd==0x52u||cmd==0x55u||cmd==0x57u||cmd==0x59u) &&
+ if(cmd==0x5Cu){
+  if(n!=7u||arg[1]!=0xB4u||arg[2]!=0x19u||arg[3]!=0xA7u||
+     arg[4]!=0x5Cu||arg[5]!=0xE2u||arg[6]!=0x08u){
+   beetle_xfer_error(seq,cmd,BERR_FORMAT);return 1;
+  }
+  if(beetle_hal_marker_audit()!=1){beetle_xfer_error(seq,cmd,BERR_OWNER);return 1;}
+  native_pause();beetle_write_permit=1u;
+  int restored=beetle_hal_restore_marker();
+  beetle_write_permit=0u;native_start();
+  if(restored){beetle_xfer_error(seq,cmd,restored==-2?BERR_IO:BERR_OWNER);return 1;}
+  out[1]=1u;beetle_xfer_reply(0x6Cu,out,2u);return 1;
+ }
+ if((cmd==0x51u||cmd==0x52u||cmd==0x55u||cmd==0x57u||cmd==0x59u||cmd==0x5Au) &&
     beetle_hal_probe_ownership()!=BEETLE_CLAIM_EXISTING){
   beetle_xfer_reset();beetle_xfer_error(seq,cmd,BERR_OWNER);return 1;
+ }
+ if(cmd==0x5Au){
+  /* V3 RECOVER: explicit six-byte confirmation, no live project, verified
+   * BEETLE ownership marker and both physical banks individually audited. */
+  if(n!=6u||arg[1]>=TRACK_PROJECTS||arg[2]!=0xD3u||arg[3]!=0x7Eu||
+     arg[4]!=0xC9u||arg[5]!=0x34u){
+   beetle_xfer_error(seq,cmd,BERR_FORMAT);return 1;
+  }
+  const uint8_t slot=arg[1];
+  if(track_session_saved_slot==slot||
+     (track_state.dirty&&track_state.project_slot==slot)){
+   beetle_xfer_error(seq,cmd,BERR_BUSY);return 1;
+  }
+  native_pause();
+  beetle_write_permit=1u;
+  int r=track_journal_delete_corrupt(&beetle_hal_journal_io,slot);
+  beetle_write_permit=0u;
+  if(r==TRACK_JOURNAL_OK){track_slot_seen[slot]=0u;track_load_status[slot]=2u;}
+  native_start();
+  if(r!=TRACK_JOURNAL_OK){
+   beetle_xfer_error(seq,cmd,r==TRACK_JOURNAL_NO_PROJECT?BERR_EMPTY:
+    r==TRACK_JOURNAL_FOREIGN?BERR_OWNER:r==TRACK_JOURNAL_INVALID?BERR_FORMAT:BERR_IO);return 1;
+  }
+  out[1]=slot;beetle_xfer_reply(0x66u,out,2u);return 1;
  }
  if(cmd==0x59u){
   /* V2 physical DELETE: 0x59, seq, slot, 0xD3, 0x7E.

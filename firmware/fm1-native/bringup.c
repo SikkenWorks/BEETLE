@@ -9,6 +9,7 @@
 #include "hal/fm1_irq.h"
 #include "hal/fm1_guard.h"
 #include "hal/fm1_input.h"
+#include "beetle_led_ripple.h"
 #include "hal/fm1_timer.h"
 #include "hal/fm1_audio.h"
 #include "hal/fm1_adc.h"
@@ -278,9 +279,43 @@ static void label_large(const char *text,uint32_t x,uint32_t y,uint16_t color){
 static uint32_t beetle_boot_next_ms;
 static uint8_t beetle_boot_frame;
 static uint8_t beetle_boot_active;
+static uint32_t beetle_ripple_start_ms,beetle_boot_led_next_ms;
+static void native_seq_led_dim(uint32_t id,uint8_t on);
+static void native_seq_led_mid(uint32_t id,uint8_t on);
+/* Keep this control-thread LED animation separate from LCD refresh. */
+static void beetle_boot_ripple_leds(void){
+ if((int32_t)(etch_ms-beetle_boot_led_next_ms)<0)return;
+ beetle_boot_led_next_ms=etch_ms+22u;
+ fm1_irq_off();
+ for(uint8_t id=0u;id<41u;id++){
+  uint8_t l=beetle_ripple_level(etch_ms-beetle_ripple_start_ms,id);
+  fm1_led_key(id,l==2u);
+  native_seq_led_dim(id,l==1u);
+  native_seq_led_mid(id,0u);
+ }
+ fm1_irq_enable_all();
+}
+/* Safe Mode / audio-fault interruptions can occur before the tracker owns the
+ * LEDs. Stop the animation and clear the whole matrix rather than leaving a
+ * half-completed ripple frozen on several buttons. Normal handoff clears just
+ * the glow planes, because track_fm1_leds() will set the solid key indicators. */
+static void beetle_boot_led_release(uint8_t interrupted){
+ if(!beetle_boot_active)return;
+ beetle_boot_active=0u;
+ fm1_irq_off();
+ for(uint8_t col=0u;col<FM1_NCOL;col++){
+  if(interrupted)fm1_led[col]=0u;
+  fm1_led_dim[col]=0u;
+  fm1_led_mid[col]=0u;
+  fm1_led_breath[col]=0u;
+ }
+ fm1_irq_enable_all();
+}
 /* Keep compositing bounded to the main/UI thread. No sleeps or drawing in ISR. */
 static void beetle_boot_advance(void){
- if(!beetle_boot_active || native_safe || native_tripped)return;
+ if(!beetle_boot_active)return;
+ if(native_safe||native_tripped){beetle_boot_led_release(1u);return;}
+ beetle_boot_ripple_leds();
  if((int32_t)(etch_ms-beetle_boot_next_ms)<0)return;
  beetle_boot_frame^=1u;
  beetle_boot_art(beetle_boot_frame);lcd_sync();fm1_wdt_feed();
@@ -292,6 +327,9 @@ static void etch_boot_splash(void){
 #ifdef TRACK_FIRMWARE
  beetle_boot_frame=0u;
  beetle_boot_active=1u;
+ beetle_ripple_start_ms=etch_ms;
+ beetle_boot_led_next_ms=0u;
+ beetle_boot_ripple_leds();
  beetle_boot_art(0u);lcd_sync();fm1_wdt_feed();
  beetle_boot_next_ms=etch_ms+100u;
 #else
@@ -2238,7 +2276,8 @@ void fm1_cstart(void){
   /* The splash is retained until the tracker can be painted. */
   if(!safe && !native_updating && !native_tripped && !native_screen_gate.ready)
    beetle_boot_advance();
-  else if(native_screen_gate.ready)beetle_boot_active=0u;
+  else if(native_safe || native_tripped)beetle_boot_led_release(1u);
+  else if(native_screen_gate.ready)beetle_boot_led_release(0u);
 #endif
   usb_retry(etch_ms);
   /* MASTER is a performance control, not an LCD refresh event.

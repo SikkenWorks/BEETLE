@@ -1,3 +1,17 @@
+# BEETLE 1.01 RC1.0.4
+
+Open `simulator.html` for the tracker simulator, `BEETLE-Project-Manager.html` for encrypted .beetle project backup/restore, and `WebInstaller.html` for the firmware installer.
+
+**Project Manager V1.7:** To investigate "FM1 storage is not owned or verified by BEETLE", connect an FM1 running Project Transfer V4 and select **DIAGNOSE STORAGE**. This is read-only. **REPAIR BEETLE MARKER** is enabled only after all 24 banks and the marker sector pass the strict ownership audit. Repair must be explicitly confirmed and requires a verified complete flash backup and a recovery route. If storage is foreign/unrecognized, repair is blocked.
+
+**Reverse Key Search:** Open SCALE GUIDE / KEYLOCK and press SEL to inspect keys/scales. In RC1.0.3 this new page was mistakenly classified as invalid; fixed in RC1.0.4.
+
+Firmware remains experimental. Read `RC1.0.4-README.md`, `RC1.0.4-VALIDATION.md`, and `RC-HARDWARE-CHECKLIST.md` before installing.
+
+**Current update: BEETLE 1.01 RC1.0.4** · See [RC1.0.4 notes](RC1.0.4-README.md) for the LED animation fix and firmware compatibility limits.
+
+> **RC1.02 update:** Reverse key/scale search, center-out startup LED ripple, Project Transfer V4 recovery for corrupted BEETLE-owned slots. See [RC1.02-README.md](RC1.02-README.md). Experimental hardware operation is not independently validated.
+
 # BEETLE 1.01 RC1.01 · Project Manager compatible
 
 **SikkenWorks · Clean project release**

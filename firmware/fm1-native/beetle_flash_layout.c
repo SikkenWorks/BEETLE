@@ -48,3 +48,25 @@ int beetle_flash_claim_probe(beetle_flash_read_fn read,void *ctx){
  }
  return BEETLE_CLAIM_BLANK;
 }
+
+/* RC1.0.4: Recognize only an erased marker or a damaged CRC in an otherwise
+ * EXACT BEETLE layout marker. The rest of the marker sector must be erased.
+ * A foreign/partially overwritten marker is NEVER recovered automatically. */
+int beetle_flash_marker_repairable(beetle_flash_read_fn read,void *ctx){
+ if(!read)return -1;
+ uint8_t expected[32],marker[32],block[256];
+ beetle_flash_make_marker(expected);
+ if(read(ctx,BEETLE_FLASH_MARKER,marker,32u))return -1;
+ uint8_t blank=1,header_matches=1;
+ for(uint8_t n=0;n<32u;n++){
+  if(marker[n]!=0xFFu)blank=0;
+  if((n<24u||n>=28u) && marker[n]!=expected[n])header_matches=0;
+ }
+ if(!blank&&!header_matches)return 0;
+ if(!blank&&!memcmp(marker,expected,32u))return 0; /* already owned */
+ for(uint32_t at=BEETLE_FLASH_MARKER+32u;at<BEETLE_FLASH_MARKER_END;at+=sizeof(block)){
+  if(read(ctx,at,block,sizeof(block)))return -1;
+  for(uint16_t k=0;k<sizeof(block);k++)if(block[k]!=0xFFu)return 0;
+ }
+ return 1;
+}
