@@ -61,8 +61,8 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 <div class="selection-panel"><section class="box"><div class="box-title">03 / SELECTED SLOT <small>PROJECT ACTIONS</small></div>
 <div class="selection-title"><div class="selection-index" id="selectIndex">01</div><div class="selection-summary" id="selectState">NOT SCANNED</div></div>
 <div class="selection-name" id="selectName">NO DEVICE</div>
-<div class="button-stack"><button class="button primary" id="export" disabled>↓ EXPORT .BEETLE</button><button class="button" id="import" disabled>↑ IMPORT TO THIS SLOT</button><button class="button danger" id="clear" disabled>× DELETE PROJECT · EMPTY SLOT</button></div>
-<div class="help">Export reads the full, CRC-verified project. Import assigns it to this slot. <strong>DELETE</strong> erases both A/B project banks of the selected slot so it becomes <strong>[ EMPTY ]</strong>. Requires Project Transfer V2 firmware. Export first if you want a backup.</div>
+<div class="button-stack"><button class="button primary" id="export" disabled>↓ EXPORT .BEETLE</button><button class="button" id="import" disabled>↑ IMPORT TO THIS SLOT</button><button class="button danger" id="clear" disabled>× DELETE PROJECT · EMPTY SLOT</button><button class="button danger" id="recover" disabled>! RECOVER [READ ERROR] SLOT</button></div>
+<div class="help">Export reads the full, CRC-verified project. Import assigns it to this slot. <strong>DELETE</strong> erases both A/B project banks of the selected slot so it becomes <strong>[ EMPTY ]</strong>. Requires Project Transfer V2 firmware. <strong>RECOVER</strong> with V3 firmware can delete a damaged BEETLE-owned project that fails CRC verification. It cannot erase foreign/unrecognized flash. Recovery is destructive and may be impossible to back up.</div>
 </section>
 <section class="box"><div class="box-title">04 / FILE FORMAT <small>AES-256-GCM · NO PASSWORD</small></div>
 <div class="label">AUTOMATIC .BEETLE ENCRYPTION</div>
@@ -145,7 +145,7 @@ async function query(cmd,args=[],expected,timeout=4500,retries=1){if(!portOut||!
 function log(msg,error=false){$('activity').className='activity'+(error?' error':'');$('activity').lastElementChild.textContent=msg;}
 function setProgress(label,fraction){$('progressPanel').hidden=false;$('progressText').textContent=label;let pct=Math.max(0,Math.min(100,Math.round(fraction*100)));$('progressCount').textContent=pct+'%';$('progressFill').style.width=pct+'%';}
 function hideProgress(){$('progressPanel').hidden=true;}
-function setBusy(value){busy=value;$('connect').disabled=value;$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
+function setBusy(value){busy=value;$('connect').disabled=value;$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('recover').disabled=value||!connected||deviceProtocol<3||!['bad','used'].includes(slots[selected].state);$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
 function draw(){const root=$('slots');root.textContent='';let count=0;for(let k=0;k<12;k++){
  const s=slots[k];if(s.state==='used')count++;const b=document.createElement('button');b.type='button';b.className='slot '+(k===selected?'selected ':'')+(s.state==='empty'?'empty ':s.state==='bad'?'unavailable':'');b.setAttribute('aria-pressed',String(k===selected));
  const head=document.createElement('div');head.className='slot-head';const num=document.createElement('span');num.className='slot-number';num.textContent='SLOT '+String(k+1).padStart(2,'0');const status=document.createElement('span');status.className='slot-state';status.textContent=s.state==='used'?'● SAVED':s.state==='empty'?'○ EMPTY':s.state==='bad'?'! ERROR':'— UNKNOWN';head.append(num,status);
@@ -176,7 +176,7 @@ async function connect(){
  const inp=midi.inputs.get($('inPort').value),out=midi.outputs.get($('outPort').value);
  if(!inp||!out){reportDiagnostic('NO PORTS','No complete USB MIDI input/output pair found. Verify USB data cable and MIDI permissions.');throw Error('No FM1 MIDI input/output pair found.');}
  portIn=inp;portOut=out;receivedMidi=0;validFrames=0;
- reportDiagnostic('PROBING','Probing the selected ports for BEETLE Project Transfer V1/V2 (read-only)...');
+ reportDiagnostic('PROBING','Probing the selected ports for BEETLE Project Transfer V1/V2/V3 (read-only)...');
  try{
   await portIn.open();await portOut.open();portIn.onmidimessage=onMidiMessage;
   let info;
@@ -193,14 +193,14 @@ async function connect(){
    const msg='No Project Transfer or firmware identity reply from the selected MIDI ports. Confirm FM1 is powered on, USB DATA cable is used, correct input AND output are selected, and no other MIDI application is holding the device. The installed firmware may also lack the protocol.';
    reportDiagnostic('NO USB REPLY',msg);throw Error(msg);
   }
-  if(info.length<4||(info[0]!==1&&info[0]!==2)||info[1]!==12){reportDiagnostic('UNSUPPORTED FIRMWARE','The device replied, but the Project Transfer version is incompatible.');throw Error('Unsupported Project Transfer protocol on this FM1.');}
+  if(info.length<4||(info[0]!==1&&info[0]!==2&&info[0]!==3)||info[1]!==12){reportDiagnostic('UNSUPPORTED FIRMWARE','The device replied, but the Project Transfer version is incompatible.');throw Error('Unsupported Project Transfer protocol on this FM1.');}
   if(!info[3]){reportDiagnostic('STORAGE DISABLED','The firmware replies to Project Transfer firmware but project flash storage is disabled.');throw Error('The connected firmware has Project Transfer but no available BEETLE project storage.');}
   deviceProtocol=info[0];deviceSchema=info[2];
   await query(0x58,[],0x64,2500,0);
   setConnected(true);
   reportDiagnostic('PROJECT TRANSFER READY','FM1 confirmed Project Transfer V'+deviceProtocol+'. Scanning its 12 project slots.');
   await refresh();
-  reportDiagnostic('CONNECTED · 12 SLOTS','Project Transfer V'+deviceProtocol+' is active. The slot list was read successfully.'+(deviceProtocol<2?' Physical DELETE requires V2 firmware.':''));
+  reportDiagnostic('CONNECTED · 12 SLOTS','Project Transfer V'+deviceProtocol+' is active. The slot list was read successfully.'+(deviceProtocol<2?' Physical DELETE requires V2 firmware.':deviceProtocol<3?' Corrupted-slot recovery requires V3 firmware.':' Corrupted-slot recovery available (owned BEETLE data only).'));
   log('Connected. Select one of the 12 slots to export or import.');
  }catch(e){await disconnect();throw e;}
 }
@@ -293,6 +293,54 @@ async function clearSlotWithPrompt(){
  }
  if(slots[target].state!=='empty')throw Error('After refresh, the FM1 slot is not [ EMPTY ]. Do not assume deletion succeeded.');
 }
+/* RC1.02 dedicated, explicit recovery. A known damaged owned bank can be
+   deleted without successful project decode. A foreign/unowned bank CANNOT.
+   Unlike ordinary DELETE this never claims a backup exists. */
+async function recoverCorruptSlot(){
+ const target=selected,state=slots[target].state;
+ if(!connected||deviceProtocol<3)throw Error('RECOVER requires RC1.02 Project Transfer V3 firmware.');
+ if(state!=='bad'&&state!=='used')throw Error('Select the damaged project slot first.');
+ /* Detect a changed slot without relying on reading corrupt TRK1 data. */
+ const scan=await query(0x51,[target],0x61,7000,1);
+ if(scan.length<14||scan[0]!==target)throw Error('Could not verify the target slot. No erase was requested.');
+ const newState=scan[1]===1?'used':scan[1]===0?'empty':'bad';
+ const newName=ascii(scan.slice(2,14));
+ if(newState!==state||(state==='used'&&newName!==slots[target].name)){
+  await refresh();throw Error('Slot changed since selection. Refresh and choose it again.');
+ }
+ const choice=await modal('CORRUPT PROJECT RECOVERY · SLOT '+String(target+1).padStart(2,'0'),
+  'This special operation is for a damaged BEETLE project that cannot pass its CRC check. It physically erases BOTH A/B banks in SLOT '+String(target+1).padStart(2,'0')+'.\n\nA normal .beetle export may not be possible. If there is one still-valid older A/B copy, it will also be destroyed. Foreign/unrecognized flash remains protected.\n\nThis cannot be undone. Continue only if you no longer need this project.',
+  [{label:'CANCEL',value:'cancel'},{label:'CONTINUE TO FINAL CONFIRMATION',kind:'danger',value:'yes'}]);
+ if(choice!=='yes')return;
+ const confirm=await modal('FINAL CONFIRMATION · RECOVER SLOT '+String(target+1).padStart(2,'0'),
+  'Delete the unreadable project in slot '+String(target+1).padStart(2,'0')+'? No backup is guaranteed. Keep USB and FM1 power connected. Load NEW or another project on your FM1 first if this slot is currently open.',
+  [{label:'CANCEL',value:'cancel'},{label:'ERASE CORRUPT SLOT',kind:'danger',value:'erase',confirm:true}],
+  'I understand this destroys both copies of the selected slot even if one is recoverable.');
+ if(confirm!=='erase')return;
+ /* Last read-only check immediately before sending the destructive command. */
+ const last=await query(0x51,[target],0x61,7000,1);
+ if(last.length<14||last[0]!==target||(last[1]===1?'used':last[1]===0?'empty':'bad')!==state ||
+    (state==='used'&&ascii(last.slice(2,14))!==slots[target].name))
+  throw Error('Slot changed. Recovery cancelled. Refresh the project list.');
+ setBusy(true);let acknowledged=false;
+ try{
+  setProgress('RECOVERING CORRUPT SLOT '+String(target+1).padStart(2,'0')+' · DO NOT DISCONNECT',.40);
+  const reply=await query(0x5a,[target,0xD3,0x7E,0xC9,0x34],0x66,90000,0);
+  if(reply.length<1||reply[0]!==target)throw Error('Unexpected recovery acknowledgement. Refresh slot before retrying.');
+  acknowledged=true;setProgress('VERIFYING PHYSICAL [ EMPTY ]',.94);
+  const checked=await query(0x51,[target],0x61,12000,1);
+  if(checked.length<14||checked[0]!==target||checked[1]!==0)
+    throw Error('Recovery acknowledged but slot not verified [ EMPTY ]. Refresh and inspect device.');
+  log('Corrupted BEETLE project in slot '+String(target+1).padStart(2,'0')+' removed. Device reports [ EMPTY ].');
+ }catch(e){
+  log('Corrupt recovery could not be verified: '+e.message+' Do not disconnect during a pending erase; refresh slots first.',true);
+  throw e;
+ }finally{
+  hideProgress();setBusy(false);
+  if(acknowledged){try{await refresh();}catch(e){log('Erase acknowledged, but refresh failed: '+e.message,true);}}
+ }
+ if(slots[target].state!=='empty')throw Error('FM1 has not confirmed the slot as [ EMPTY ].');
+}
 function closeModal(){if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();$('backdrop').classList.remove('open');$('modalActions').textContent='';$('modalExtra').textContent='';}
 function modal(title,message,buttons,checkboxText){return new Promise(resolve=>{$('modalTitle').textContent=title;$('modalText').textContent=message;$('modalActions').textContent='';$('modalExtra').textContent='';let check=null;if(checkboxText){const lbl=document.createElement('label');lbl.className='confirm-row';check=document.createElement('input');check.type='checkbox';const txt=document.createElement('span');txt.textContent=checkboxText;lbl.append(check,txt);$('modalExtra').append(lbl);}
 for(const b of buttons){const btn=document.createElement('button');btn.className='button '+(b.kind||'quiet');btn.textContent=b.label;btn.disabled=Boolean(check&&b.confirm);btn.onclick=()=>{closeModal();resolve(b.value);};$('modalActions').append(btn);if(check&&b.confirm)check.addEventListener('change',()=>btn.disabled=!check.checked);}
@@ -312,13 +360,14 @@ if(action==='backup'){
 }}
 $('connect').onclick=()=>safe(async()=>{setBusy(true);try{await connect();}finally{setBusy(false);}});
 $('copyDiagnostics').onclick=async()=>{
- const report='BEETLE PROJECT MANAGER V1.4\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
+ const report='BEETLE PROJECT MANAGER V1.5\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
  try{await navigator.clipboard.writeText(report);log('Connection report copied.');}
  catch{log('Could not copy automatically. Select an HTTPS/localhost page and try again.',true);}
 };
 $('refresh').onclick=()=>safe(async()=>{await refresh();log('FM1 slots refreshed.');});
 $('export').onclick=()=>safe(async()=>{await exportSlot(selected);});
 $('clear').onclick=()=>safe(clearSlotWithPrompt);
+$('recover').onclick=()=>safe(recoverCorruptSlot);
 $('import').onclick=()=>safe(async()=>{$('file').value='';$('file').click();});
 $('file').addEventListener('change',()=>{const f=$('file').files&&$('file').files[0];if(f)safe(()=>importWithPrompt(f));});
 
