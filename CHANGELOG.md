@@ -1,3 +1,14 @@
+# RC1.0.5 — Double-Confirmed BEETLE Project Storage Wipe
+
+- FM1 PROJECTS adds **WIPE ALL STORAGE**; K1 choose NO/YES, SEL, two independent dialogs **ARE YOU SURE?** and **REALLY?** with default NO.
+- Explicitly erases/verifies the 288KiB BEETLE project banks and reinitializes its 4KiB marker only after owner/marker audit; all 12 slots become `[EMPTY]`.
+- Explicit double-YES permits recovery of damaged/unknown marker in the fixed project region, including destruction of any legacy ETCH/Felucca user data there; SAFE/OTA/playback gates; sector/marker verification. Not a generic whole-chip flash reset.
+- WebSimulator mirrors both dialogs for browser-local projects; firmware/project-file format unchanged.
+- WebInstaller rebundled with the audited RC1.0.5 firmware; Project Manager version label updated.
+- Host NOR-flash test and legacy project-delete/LED/crypto tests pass; physical hardware not validated.
+
+---
+
 # BEETLE 1.01 RC1.0.4 – Reverse Search / Corrupt Storage Diagnostics
 
 - Fixed Reverse Key Search immediately returning to Tracker. Page 32 is a valid modal page and is no longer rejected by the old >30 validator. Page 31 remains invalid.

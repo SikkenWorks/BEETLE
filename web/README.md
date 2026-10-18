@@ -1,3 +1,7 @@
+**Current release: BEETLE 1.01 RC1.0.5.** Project menu now includes double-confirmation full BEETLE project-storage wipe (12 slots), strictly limited to verified BEETLE-owned storage. This is experimental hardware functionality. See [`RC1.0.5-README.md`](../../RC1.0.5-README.md) before attempting it.
+
+> **RC1.0.4 installer custom-source patch:** The WebInstaller accepts previously unlisted running numeric FM-1 firmware identities for the verified BEETLE package only, after explicit confirmation and the normal two-stage CHECK/OTA-loader flow. Unrecognized loaders or incompatible firmware remain unsupported; no blanket compatibility claim. The firmware `.fwsc` is unchanged. See `../../RC1.0.4-CUSTOM-SOURCE-INSTALLER-FIX.md`.
+
 > **RC1.02 update:** Reverse key/scale search, center-out startup LED ripple, Project Transfer V3 recovery for corrupted BEETLE-owned slots. See [RC1.02-README.md](../../RC1.02-README.md). Experimental hardware operation is not independently validated.
 
 # BEETLE 1.01 RC1.01 web tools

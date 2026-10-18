@@ -1,8 +1,12 @@
-<p align="center">
-  <img src="BEETLE.png" alt="BEETLE" width="400">
-</p>
+**Current release: BEETLE 1.01 RC1.0.5.** Project menu now includes double-confirmation full BEETLE project-storage wipe (12 slots), strictly limited to verified BEETLE-owned storage. This is experimental hardware functionality. See [`RC1.0.5-README.md`](RC1.0.5-README.md) before attempting it.
 
-## V1.01d
+**Current update: BEETLE 1.01 RC1.0.4.** See `RC1.0.4-README.md`.
+
+> **RC1.02 update:** Reverse key/scale search, center-out startup LED ripple, Project Transfer V4 recovery for corrupted BEETLE-owned slots. See [RC1.02-README.md](../RC1.02-README.md). Experimental hardware operation is not independently validated.
+
+## BEETLE 1.01 RC1 — Current candidate
+
+CH6 ENV now updates only the focused drum note (NOTE1 or NOTE2). The WebSimulator also fixes PROJECTS selection overlap and tightens selection frames in other menus. Full history: [CHANGELOG.md](CHANGELOG.md).
 
 <div align="center">
   <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html">
@@ -20,22 +24,14 @@
       width="450"
     />
   </a>
-
-  <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html">
-    <img
-      src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_PROJECT_MANAGER-000000?style=for-the-badge&labelColor=000000&logoColor=white"
-      alt="Launch BEETLE Project Manager"
-      width="450"
-    />
-  </a>
 </div>
 
-# WHAT IS IT?
+# BEETLE
 
 **Open-source six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks · Joppe Sikken · Born out of passion.**
 
-**Current development version: 1.01d RC1** · [Changelog](CHANGELOG.md)
+**Current development version: 1.01 RC1** · [Changelog](CHANGELOG.md)
 
 BEETLE public beta builds are tested on a physical FM1 by the project maintainer before GitHub publication. Particular new features still require verification as part of that release process.
 
@@ -242,7 +238,3 @@ If you find a bug, include the firmware version, what you pressed, your exact pr
 - CH6 `ENV` werkt op de geselecteerde NOTE1 of NOTE2 zonder het andere drumveld te wissen; de audiorelease van NOTE1/NOTE2 is nu ook gescheiden.
 - De CREDITS behouden de originele auteurs, zonder de agressief geformuleerde code-ontkenning. Zie [code- en licentieaudit](CODE-PROVENANCE-AUDIT.md).
 - De volledige versiegeschiedenis staat in [CHANGELOG.md](CHANGELOG.md).
-
-## Project Manager V1.1 · Password-free BEETLE files
-
-The included project manager now exports and imports AES-GCM encrypted `.beetle` project files without requiring passwords. A shared key is bundled with the open-source web tools; protection is against casual text inspection and accidental corruption, not against determined decryption. BEETLE 1.01 RC1 WebSimulator can import native TRK1 V12–V17 files as well as its old JSON backup files and export native V17 `.beetle` files. Device transfer requires the **experimental Project Transfer firmware**, and remains physically unverified. See `BEETLE-PROJECT-FORMAT-V2.md`.

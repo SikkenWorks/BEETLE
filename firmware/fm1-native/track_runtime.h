@@ -198,6 +198,10 @@ static uint8_t track_edit_prepare_patch(uint8_t channel){
  return 0u;
 }
 static uint32_t track_storage_confirm_since;
+/* RC1.0.5 full-project-volume reset: default answer NO on both screens. */
+static uint8_t track_wipe_yes;
+static int track_wipe_result;
+
 /* V0.34: defer LOAD/NEW until unsaved work has been explicitly confirmed. */
 /* 1 = open LOAD browser, 2 = NEW session, 3 = load browser-selected slot. */
 static uint8_t track_unsaved_action;
@@ -503,7 +507,7 @@ static void track_runtime_validate(void){
   track_state.active.length=16u;faulty=1u;
  }
  /* RC1.0.4: reverse-key search is page 32. Do not mistake it for corrupt state. */
- if(track_page>30u && track_page!=32u){track_page=0u;faulty=1u;}
+ if(track_page>30u && track_page!=32u && (track_page<33u || track_page>36u)){track_page=0u;faulty=1u;}
  /* Live Mixer is exclusively a Song Mode performance page. If a project
   * transition disables SONG, return before processing any mixer key. */
  if(!track_song.enabled){if(track_page==30u)track_page=9u;
@@ -1685,10 +1689,36 @@ static void track_fm1_paint(void){
   track_pix_text("HOME MENU  SEQ TRACKER",9u,217u,TRACK_BRIGHT);
   return;
  }
+ if(track_page==33u || track_page==34u){
+  track_page_header("WIPE ALL STORAGE",43u);
+  track_pix_center(track_page==33u?"ARE YOU SURE?":"REALLY?",120u,80u,TRACK_PINK);
+  track_pix_center("DELETE ALL 12 PROJECTS",120u,113u,TRACK_WHITE);
+  track_pix_center(track_page==33u?"NO UNDO - BACKUP FIRST":"ETCH/FELUCCA DATA TOO",120u,136u,TRACK_BRIGHT);
+  track_pix_center(track_wipe_yes?"NO     > YES <":"> NO <     YES",120u,170u,TRACK_PINK);
+  track_pix_center("K1 CHOOSE  SEL CONFIRM",120u,203u,TRACK_WHITE);
+  track_pix_center("HOME CANCEL",120u,219u,TRACK_BRIGHT);return;
+ }
+ if(track_page==35u){
+  track_page_header("INITIALIZING STORAGE",43u);
+  track_pix_center("ERASE + VERIFY 12 SLOTS",120u,88u,TRACK_PINK);
+  char progress[32]="SECTORS ";char val[12];track_fmt_int(val,track_storage_progress_done);
+  uint8_t x=8u,j=0u;while(val[j]&&x<22u)progress[x++]=val[j++];progress[x++]='/';
+  track_fmt_int(val,track_storage_progress_total);j=0u;while(val[j]&&x<29u)progress[x++]=val[j++];progress[x]=0;
+  track_pix_center(progress,120u,125u,TRACK_WHITE);
+  track_pix_center("DO NOT POWER OFF",120u,174u,TRACK_PINK);return;
+ }
+ if(track_page==36u){
+  track_page_header(track_wipe_result==0?"STORAGE READY":"WIPE NOT COMPLETED",43u);
+  track_pix_center(track_wipe_result==0?"ALL 12 SLOTS [EMPTY]":
+    track_wipe_result==-1?"UNKNOWN / FOREIGN STORAGE":"ERASE OR VERIFY ERROR",120u,108u,TRACK_PINK);
+  track_pix_center(track_wipe_result==0?"BEETLE MARKER RECREATED":
+    "CHECK STORAGE / RECOVERY",120u,142u,TRACK_WHITE);
+  track_pix_center("HOME: PROJECT MENU",120u,202u,TRACK_BRIGHT);return;
+ }
  if(track_page==1u){
   track_page_header("PROJECTS",43u);
-  const char *const entries[]={"SAVE","SAVE AS","LOAD PROJECT","NEW PROJECT","HELP","CREDITS","DIAGNOSTICS"};
-  track_web_list(entries,7u,track_menu_index,52u,19u);
+  const char *const entries[]={"SAVE","SAVE AS","LOAD PROJECT","NEW PROJECT","HELP","CREDITS","DIAGNOSTICS","WIPE ALL STORAGE"};
+  track_web_list(entries,8u,track_menu_index,50u,17u);
   char status[24]="SLOT ";track_fmt_int(status+5u,(uint32_t)track_state.project_slot+1u);
   track_pix_text(status,20u,188u,TRACK_PINK);
   track_pix_text("K1 MENU K4 SLOT",20u,203u,TRACK_WHITE);
@@ -1980,6 +2010,10 @@ static void beetle_project_scan_one(void){
  while(track_load_scan<TRACK_PROJECTS && track_load_status[track_load_scan])track_load_scan++;
  if(track_load_scan<TRACK_PROJECTS)beetle_project_scan_slot(track_load_scan++);
 }
+static void beetle_wipe_erase_progress(uint8_t done,uint8_t total){
+ track_storage_progress_done=done;track_storage_progress_total=total;
+ screen();
+}
 static void beetle_storage_erase_progress(uint8_t done,uint8_t total){
  track_storage_progress_done=done;track_storage_progress_total=total;
  screen();
@@ -2153,6 +2187,49 @@ static void track_fm1_poll(void){
    else if(action==3u)beetle_project_load_selected();
   }
   if(changed||now-track_last_paint>=((track_state.transport.playing||(int32_t)(track_boot_splash_until-now)>0)?90u:850u)){screen();track_last_paint=now;}
+  return;
+ }
+ if(track_page==33u || track_page==34u){
+  /* These menus consume every key and encoder input, including SAVE. */
+  track_preview_release(0u);(void)fm1_input_note_edges();
+  if(k1||k2||sel)track_wipe_yes=(uint8_t)((track_wipe_yes+((k1+k2+sel)>0?1u:1u))&1u);
+  if(pressed&(1u<<8)){track_wipe_yes=0u;track_page=1u;track_home_fired=1u;}
+  else if(pressed&(1u<<3)){
+   if(!track_wipe_yes){track_page=1u;}
+   else if(track_page==33u){track_page=34u;track_wipe_yes=0u;}
+   else{
+    track_wipe_yes=0u;
+    track_page=35u;track_storage_progress_done=0u;
+    track_storage_progress_total=(uint8_t)((BEETLE_FLASH_MARKER_END-BEETLE_FLASH_BASE)/BEETLE_FLASH_SECTOR);
+    screen();
+#if BEETLE_NATIVE_STORAGE
+    native_pause();beetle_write_permit=1u;beetle_full_wipe_confirmed=1u;
+    track_wipe_result=beetle_hal_wipe_projects(beetle_wipe_erase_progress);
+    beetle_full_wipe_confirmed=0u;beetle_write_permit=0u;native_start();
+    if(track_wipe_result==0){
+     for(uint8_t s=0u;s<TRACK_PROJECTS;s++){
+      track_slot_seen[s]=0u;track_load_status[s]=2u;track_load_titles[s][0]=0;
+     }
+     beetle_project_new_session(); /* detach previously loaded project */
+     track_menu_index=0u;
+    }
+#else
+    track_wipe_result=-1;
+#endif
+    beetle_load_input_arm(&track_load_input_guard,etch_ms);
+    track_sel_tracker_ready=0u;
+    track_page=36u;
+   }
+  }
+  if(changed||now-track_last_paint>=800u){screen();track_last_paint=now;}
+  return;
+ }
+ if(track_page==35u || track_page==36u){
+  track_preview_release(0u);(void)fm1_input_note_edges();
+  if(track_page==36u && ((pressed&(1u<<8))||(pressed&(1u<<3)))){
+   track_page=1u;track_home_fired=1u;track_menu_index=7u;
+  }
+  if(changed||now-track_last_paint>=850u){screen();track_last_paint=now;}
   return;
  }
  if(track_page==12u){
@@ -3122,10 +3199,12 @@ static void track_fm1_poll(void){
     if(v<0)v=0;if(v>=(int32_t)TRACK_PROJECTS)v=TRACK_PROJECTS-1;track_state.project_slot=(uint8_t)v;
    }
    if(track_page==1u && k1){
-    int32_t m=(int32_t)track_menu_index+k1;if(m<0)m=0;if(m>6)m=6;track_menu_index=(uint8_t)m;
+    int32_t m=(int32_t)track_menu_index+k1;if(m<0)m=0;if(m>7)m=7;track_menu_index=(uint8_t)m;
    }
    if(track_page==1u && (pressed&(1u<<3))){
-    if(track_menu_index==0u){
+    if(track_menu_index==7u){
+     track_wipe_yes=0u;track_page=33u;changed=1u;
+    }else if(track_menu_index==0u){
      if(track_named){track_save_return_page=track_page;track_name_begin(&track_editor,track_title);track_complete_save();}
      else track_begin_save();
     }else if(track_menu_index==1u){
