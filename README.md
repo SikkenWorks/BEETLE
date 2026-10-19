@@ -33,7 +33,7 @@
 **Open-source six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks · Joppe Sikken · Born out of passion.**
 
-**Current development version: 1.07 RC1** · [Changelog](CHANGELOG.md)
+**Current development version: 1.01 RC1.0.8** · [Changelog](CHANGELOG.md)
 
 BEETLE public beta builds are tested on a physical FM1 by the project maintainer before GitHub publication. Particular new features still require verification as part of that release process.
 
@@ -46,7 +46,7 @@ BEETLE public beta builds are tested on a physical FM1 by the project maintainer
 - **Punch-In FX:** hold an effect key and turn **K1** to adjust its parameter. **ALGORITHM** selects patterns when no Punch-In key is held. **Ring Mod** starts at **20** intensity, **Stutter** starts at **×1**, and the current tempo drives Stutter divisions.
 - **Normal MIXER and Live Mixer:** the six mapped **black keys mute** lanes CH1–CH6; the six adjacent **white keys SOLO** those lanes. Active SOLO and MUTE illuminate the corresponding FM1 key LEDs. Live Mixer mute/solo each follow their own OCT-selectable quantization preference.
 - **MASTER FX:** turn **SELECT** to choose EQ/Compressor/Reverb, adjust all four knobs with **K1–K4**, press **SEL** to enable/disable the selected effect.
-- **EDIT:** waveform TYPE preferences have independent ADSR, cutoff, oscillator and other synth parameter settings in each patch slot. New saves use **project format V17**, while supported older V16 projects migrate without losing their current active patches.
+- **EDIT:** waveform TYPE preferences have independent ADSR, cutoff, oscillator and other synth parameter settings in each patch slot. New saves use **project format V18**, while supported older V16 projects migrate without losing their current active patches.
 - **HELP:** its final page now shows a complete end-of-list counter rather than an unreachable row range.
 
 ## Mixer and channel volume
@@ -115,8 +115,13 @@ In the tracker while transport is stopped, hold **SEQ** and press the physical b
 | Tracker | **PRESET rotary** | Cycle the selected note cell through its note, **[---]** (empty), and **[STP]**. |
 | Tracker | **ENV** | Insert **[STP]** directly. |
 | Tracker | **OCT− / OCT+** | With the cursor on an instrument cell, decrease/increase the instrument number (0–3). Otherwise use the normal synth octave controls. |
-| Tracker | **SEQ + OP1** | Copy the current pattern's entire selected lane. |
-| Tracker | **SEQ + OP2** | Paste that lane, including notes, instruments and step FX, into the current lane/pattern. The clipboard survives changing lanes/patterns. |
+| Tracker | **SEQ + OP1** | Copy the selected inclusive step range when active; otherwise copy the current pattern lane. |
+| Tracker | **SEQ + OP2** | Paste the copied range at the cursor, or paste the full copied lane. Keeps instrument, chord, note and FX data together, including drum NOTE2 FX. |
+| Tracker | **SEQ + rightmost black key (F#5)** | Open **CLEAR CURRENT LANE** for the selected channel and current pattern only. K1 selects YES/NO, SEL confirms, HOME cancels. Starts at NO; only available with playback stopped. Erases all 16 rows including notes, chords, instruments, FX, dynamics, groove and independent drum NOTE2 FX. Undo is supported. |
+| Tracker | **SEL (hold) + K1** | Select a step range including the starting step; **SEQ + OP1** then copies only the selection. |
+| Tracker | **SEQ + ALGORITHM** | Shift the active channel by one step per detent: left moves up, right moves down. Synth notes/chords/FX stay together; CH6 NOTE1 and NOTE2 shift independently with their FX. |
+| Tracker | **SEQ + OP3 / OP4** | Copy/paste the complete pattern including all six channels and Punch-In FX. |
+| Tracker | **SEQ + OP5 / OP6** | Undo / redo tracker edits. |
 | Mixer | **GLO** | Open/close the mixer. Six black OP keys can mute CH1–CH6; their LEDs indicate mute. |
 | Instrument Edit | **EDIT** | Open instrument parameters; on the next EDIT page access the drum component editor. |
 | Song | **ARP** | Open Song Mode (not GLO double-click). |
@@ -147,7 +152,7 @@ BEETLE boots with a **preconfigured digital kit**, not fourteen identical generi
 ## Projects, compatibility and storage safety
 
 - **12 project slots**, with journalled A/B storage where the experimental storage backend is enabled.
-- **Current project schema: V16.** Newly saved projects include per-step velocity and gate as well as the earlier MASTER parameters (compressor Attack and reverb Width). Supported older projects, including V10, V9 and earlier formats, remain readable; missing settings are initialized to defaults and old project data are not silently rewritten. V8 previously added the five Punch-In values; V6/V7/V8 compatibility was included in earlier regression tests.
+- **Current project schema: V18.** Newly saved projects include per-step velocity and gate as well as the earlier MASTER parameters (compressor Attack and reverb Width). Supported older projects, including V10, V9 and earlier formats, remain readable; missing settings are initialized to defaults and old project data are not silently rewritten. V8 previously added the five Punch-In values; V6/V7/V8 compatibility was included in earlier regression tests.
 - The physical project record has a **finite capacity**. A fully populated project may not fit. An oversized project is rejected *before* any flash erase; do not assume all 48 six-lane patterns can be filled to capacity simultaneously.
 - **WARNING:** the storage-enabled build requires explicit first-use setup. The experimental storage region can overwrite legacy user data at addresses **`0x97000–0xDFFFF`**. Never initialize it without a verified full-flash backup and an independently working recovery path. Project writes are *disabled* in the pilot build.
 - The WebInstaller does not make a complete backup. Even a verified OTA transfer does not guarantee that the new firmware will boot or that USB recovery will remain available.

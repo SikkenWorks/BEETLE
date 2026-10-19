@@ -40,6 +40,20 @@ int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step){
  s->note=TRACK_NOTE_EMPTY;s->instrument=(uint8_t)(channel==TRACK_DRUM_CHANNEL?3u:(channel&3u));
  s->chord=0u;s->effect=0u;s->value=50u;s->dynamics=0u;s->groove=0u;e->dirty=1u;return 0;
 }
+/* Clear a complete lane including inactive rows, to prevent notes returning when
+ * pattern length is increased. Do not modify other channels, metadata, or song. */
+int track_clear_lane(struct track_engine *e,uint8_t channel){
+ if(!e||channel>=TRACK_CHANNELS)return -1;
+ for(uint8_t row=0u;row<TRACK_STEPS;row++){
+  (void)track_clear_step(e,channel,row);
+  if(channel==TRACK_DRUM_CHANNEL){
+   e->active.note2_fx[row].effect=0u;
+   e->active.note2_fx[row].value=0u;
+  }
+ }
+ e->dirty=1u;
+ return 0;
+}
 /* Hardware keyboard note entry ALWAYS targets NOTE, regardless of the selected
  * INST/CHD/FX edit column, preserving those other cell values. Advance once
  * per accepted note; on the last active row wrap to 00. */

@@ -72,6 +72,7 @@ static uint8_t track_punch_focus=255u; /* most recently depressed FX key */
 static uint32_t track_seq_since;
 static uint8_t track_seq_fired;
 static struct track_lane_clipboard beetle_lane_clip;
+static uint8_t beetle_clear_lane_yes=0u;
 static uint8_t beetle_range_on,beetle_range_anchor,beetle_range_end;
 static uint8_t beetle_sel_defer,beetle_sel_was_range;
 /* Large history records live in pooled RAM, never the ISR stack. */
@@ -510,7 +511,7 @@ static void track_runtime_validate(void){
   track_state.active.length=16u;faulty=1u;
  }
  /* RC1.0.4: reverse-key search is page 32. Do not mistake it for corrupt state. */
- if(track_page>30u && track_page!=32u && (track_page<33u || track_page>36u)){track_page=0u;faulty=1u;}
+ if(track_page>30u && track_page!=32u && (track_page<33u || track_page>37u)){track_page=0u;faulty=1u;}
  /* Live Mixer is exclusively a Song Mode performance page. If a project
   * transition disables SONG, return before processing any mixer key. */
  if(!track_song.enabled){if(track_page==30u)track_page=9u;
@@ -1743,6 +1744,20 @@ static void track_fm1_paint(void){
     "CHECK STORAGE / RECOVERY",120u,142u,TRACK_WHITE);
   track_pix_center("HOME: PROJECT MENU",120u,202u,TRACK_BRIGHT);return;
  }
+ if(track_page==37u){
+  track_page_header("CLEAR CURRENT LANE",43u);
+  track_pix_center("ARE YOU SURE YOU WANT",120u,78u,TRACK_WHITE);
+  track_pix_center("TO CLEAR THIS LANE?",120u,96u,TRACK_WHITE);
+  char msg[16]="PAT 00 / CH 0";
+  msg[4]=(char)('0'+(track_state.pattern_slot+1u)/10u);
+  msg[5]=(char)('0'+(track_state.pattern_slot+1u)%10u);
+  msg[12]=(char)('1'+track_state.transport.edit_channel);
+  track_pix_center(msg,120u,130u,TRACK_BRIGHT);
+  track_pix_center(beetle_clear_lane_yes?"NO      > YES <":"> NO <      YES",120u,167u,TRACK_PINK);
+  track_pix_center("K1 CHOOSE  SEL CONFIRM",120u,204u,TRACK_WHITE);
+  track_pix_center("HOME CANCEL",120u,220u,TRACK_BRIGHT);
+  return;
+ }
  if(track_page==1u){
   track_page_header("PROJECTS",43u);
   const char *const entries[]={"SAVE","SAVE AS","LOAD PROJECT","NEW PROJECT","HELP","CREDITS","DIAGNOSTICS","WIPE ALL STORAGE"};
@@ -2215,6 +2230,28 @@ static void track_fm1_poll(void){
    else if(action==3u)beetle_project_load_selected();
   }
   if(changed||now-track_last_paint>=((track_state.transport.playing||(int32_t)(track_boot_splash_until-now)>0)?90u:850u)){screen();track_last_paint=now;}
+  return;
+ }
+ if(track_page==37u){
+  /* Modal: no notes, pattern changes or other shortcuts may leak into editor. */
+  track_preview_release(0u);(void)fm1_input_note_edges();
+  if(k1||k2||sel){int32_t choice=k1?k1:(k2?k2:sel);beetle_clear_lane_yes=(uint8_t)(choice>0);changed=1u;}
+  if(pressed&(1u<<8)){
+   beetle_clear_lane_yes=0u;track_page=0u;track_home_fired=1u;changed=1u;
+  }else if(pressed&(1u<<3)){
+   if(beetle_clear_lane_yes && !track_state.transport.playing && !track_state.record_armed){
+    fm1_irq_off();
+    beetle_edit_begin(&beetle_ed,&track_song,&track_state);
+    if(track_clear_lane(&track_state,track_state.transport.edit_channel)==0){
+     (void)beetle_edit_commit(&beetle_ed,&track_song,&track_state);
+     track_state.dirty=1u;
+    }else beetle_ed.pending_valid=0u;
+    fm1_irq_enable_all();
+    beetle_range_on=0u;
+   }
+   beetle_clear_lane_yes=0u;track_page=0u;changed=1u;
+  }
+  if(changed||now-track_last_paint>=700u){screen();track_last_paint=now;}
   return;
  }
  if(track_page==33u || track_page==34u){
@@ -2865,6 +2902,12 @@ static void track_fm1_poll(void){
     * selected editor column; no keyboard note gets accidentally entered. */
    if((buttons&(1u<<11)) && !track_state.record_armed){
     uint32_t combo_edges=fm1_input_note_edges();
+    if(beetle_clear_lane_chord((uint8_t)(track_page==0u),1u,
+        track_state.transport.playing,track_state.record_armed,combo_edges)){
+     beetle_clear_lane_yes=0u;track_page=37u;track_seq_fired=1u;
+     track_preview_release(0u);
+     screen();track_last_paint=now;return;
+    }
     uint8_t lane=track_state.transport.edit_channel;
     if(combo_edges&(1u<<1u)){
      fm1_irq_off();if(beetle_range_on){

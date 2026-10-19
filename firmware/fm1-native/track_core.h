@@ -68,6 +68,8 @@ int track_enter_note(struct track_engine *e,uint8_t note);
 int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note);
 int track_set_note(struct track_engine *e,uint8_t channel,uint8_t step,uint8_t note);
 int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step);
+/* Clear only the currently active pattern lane, all 16 rows, including drum NOTE2 FX. */
+int track_clear_lane(struct track_engine *e,uint8_t channel);
 /* True if the current pattern contains any musical event in this lane.
  * Ignore the default instrument and step value: those exist on empty lanes. */
 uint8_t track_lane_has_data(const struct track_pattern *pattern,uint8_t channel);

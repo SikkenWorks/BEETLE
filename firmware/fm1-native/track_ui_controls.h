@@ -5,6 +5,11 @@
 #define BEETLE_TRACK_UI_CONTROLS_H
 #include <stdint.h>
 #define BEETLE_STORAGE_HOLD_MS 5000u
+/* Rightmost physical BLACK key: F#5 at FM1 semitone index 25 of 0..26. */
+#define BEETLE_CLEAR_LANE_KEY 25u
+static inline uint8_t beetle_clear_lane_chord(uint8_t tracker,uint8_t seq_held,uint8_t playing,uint8_t recording,uint32_t note_edges){
+ return (uint8_t)(tracker&&seq_held&&!playing&&!recording&&((note_edges&(1ul<<BEETLE_CLEAR_LANE_KEY))!=0ul));
+}
 static inline int8_t beetle_black_mute_lane(uint8_t note_index){
  static const uint8_t black_keys[6]={1u,3u,5u,8u,10u,13u};
  for(uint8_t i=0;i<6u;i++)if(black_keys[i]==note_index)return (int8_t)i;

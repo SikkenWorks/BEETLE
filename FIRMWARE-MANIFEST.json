@@ -1,0 +1,16 @@
+{
+  "firmware": "BEETLE 1.01 RC1.0.8",
+  "identity": "FM-1_2108",
+  "target": "M-VAVE FM1 / JieLi AC791N",
+  "bytes": 610086,
+  "sha256": "f75dffb4633c2b05bac1cd2c0a027c17a9ea64c15a266158ca5317c3744f6deb",
+  "app_sha256": "1d52cbc09faf986848d474fe7b30b8c71be390ddf2d24671c46a6dfdaca8c48c",
+  "reference_package": "BEETLE-RC1.0.5-PROTECTED-BOOT-REFERENCE.fwsc.reference",
+  "reference_sha256": "40fa76c5f24fbc3f13c262b59436e2d87ea462f382f2d85ad4bb375f90dab644",
+  "protected_header_sha256": "d9f43191777656de01c7bed4f9e9ba2e34e94832c5d2ed02c3fc7ab7a6d9bd67",
+  "ota_sha256": "d71d1b7c12adede951605e758a3580dacccedc427d49e1fceaf51decccc68a4b",
+  "container_shape_compliant": true,
+  "preserved_reference_16KiB": true,
+  "hardware_tested": false,
+  "independent_recovery_proven": false
+}

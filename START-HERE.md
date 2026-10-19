@@ -1,67 +1,39 @@
-> **RC1.0.6 HF2 package:** See [RC1.0.6-HF2-README.md](RC1.0.6-HF2-README.md). The included experimental firmware and installer have not been validated on physical FM1 hardware.
+# BEETLE 1.01 RC1.0.8
 
-**Current release: BEETLE 1.01 RC1.0.5.** Project menu now includes double-confirmation full BEETLE project-storage wipe (12 slots), strictly limited to verified BEETLE-owned storage. This is experimental hardware functionality. See [`RC1.0.5-README.md`](RC1.0.5-README.md) before attempting it.
+**Complete GitHub-ready source release** · SikkenWorks
 
-# BEETLE 1.01 RC1.0.4
+This archive is based on the supplied `BEETLE-main` repository and includes the full native FM1 firmware source, current HF2 WebInstaller, WebSimulator, Project Manager, tests, GitHub Pages configuration and assets.
 
-Open `simulator.html` for the tracker simulator, `BEETLE-Project-Manager.html` for encrypted .beetle project backup/restore, and `WebInstaller.html` for the firmware installer.
-
-**Project Manager V1.7:** To investigate "FM1 storage is not owned or verified by BEETLE", connect an FM1 running Project Transfer V4 and select **DIAGNOSE STORAGE**. This is read-only. **REPAIR BEETLE MARKER** is enabled only after all 24 banks and the marker sector pass the strict ownership audit. Repair must be explicitly confirmed and requires a verified complete flash backup and a recovery route. If storage is foreign/unrecognized, repair is blocked.
-
-**Reverse Key Search:** Open SCALE GUIDE / KEYLOCK and press SEL to inspect keys/scales. In RC1.0.3 this new page was mistakenly classified as invalid; fixed in RC1.0.4.
-
-Firmware remains experimental. Read `RC1.0.4-README.md`, `RC1.0.4-VALIDATION.md`, and `RC-HARDWARE-CHECKLIST.md` before installing.
-
-**Current update: BEETLE 1.01 RC1.0.4** · See [RC1.0.4 notes](RC1.0.4-README.md) for the LED animation fix and firmware compatibility limits.
-
-> **RC1.02 update:** Reverse key/scale search, center-out startup LED ripple, Project Transfer V4 recovery for corrupted BEETLE-owned slots. See [RC1.02-README.md](RC1.02-README.md). Experimental hardware operation is not independently validated.
-
-# BEETLE 1.01 RC1.01 · Project Manager compatible
-
-**SikkenWorks · Clean project release**
-
-## Files to use
+## Start here
 
 | File | Purpose |
-|---|---|
-| `WebInstaller.html` | Project Transfer-compatible FM1 installer. **This is the correct installer.** |
-| `BEETLE-1.01-RC1.01-TRUE-DELETE-EXPERIMENTAL.fwsc` | The exact `.fwsc` used inside the web installer |
-| `BEETLE-Project-Manager.html` | Project Manager V1.4 with 12-slot scan and connection diagnostics |
-| `simulator.html` | Full RC1.01 simulator with native encrypted `.beetle` import/export |
-| `source/` | Complete RC1.01 firmware source, tools, licences, references and tests |
-| `PROJECT-MANAGER-README.md` | USB protocol, import/export, safeguards and compatibility |
+| --- | --- |
+| `README.md` | Complete BEETLE documentation and controls table |
+| `CHANGELOG.md` | Version history and RC1.0.8 changes |
+| `WebInstaller.html` | Current RC1.0.8 HF2 installer with embedded firmware |
+| `BEETLE-1.01-RC1.0.8-EXPERIMENTAL.fwsc` | Exact firmware package embedded in the installer |
+| `simulator.html` | Current WebSimulator with project import/export and tracker editing |
+| `BEETLE-Project-Manager.html` | Current project-slot manager and backup/restore UI |
+| `firmware/fm1-native/` | Native FM1 firmware and toolchain build script |
+| `tests/` | Regression and focused tests |
+| `RC1.0.8-CLEAR-LANE-VALIDATION.md` | New clear-lane feature and software validation |
 
-Use Chrome/Edge and serve HTML via **HTTPS** (e.g. GitHub Pages) or localhost
-for Web MIDI. The project's GitHub Pages links to `WebInstaller.html`,
-`simulator.html` and `BEETLE-Project-Manager.html`.
+## New tracker control
 
-## What was cleaned
+Hold **SEQ + rightmost black key** in the tracker while stopped to request **CLEAR CURRENT LANE**. The confirmation defaults to NO. Use K1 for YES/NO, SEL to confirm or HOME to cancel. Only the current pattern's active lane is erased, including independent drum NOTE2 FX. Undo remains available. See the unchanged-format controls table in `README.md`.
 
-- Removed the original RC1 WebInstaller that **did not** install Project Transfer.
-- Removed the obsolete standalone non-transfer `.fwsc` and manifest.
-- Removed alternate copies of the installer and simulator at repository root.
-- Made `source/web/` copies identical to the live web tools.
-- Corrected the Project Transfer package manifest (including the old stale SHA value).
-- Kept **all firmware source files and tests**, including the native Project Transfer implementation and AES/project codec.
+## Updating GitHub
 
-## Firmware integrity
+The ZIP has **no additional parent folder**: `README.md`, the three webapps and the source directories sit directly at its root. Extract the ZIP, copy its **contents** to the root of your existing BEETLE repository clone, keeping the local `.git` folder, and commit/push with GitHub Desktop. Alternately run:
 
-- Firmware SHA-256: `185ec2c198199847325fce7240d94dd13575707336421979b9c67426ca96c541`
-- Firmware size: `610086` bytes
-- Installer embeds the **exact same bytes** as the `.fwsc` in this project.
+```bash
+git add -A
+git commit -m "BEETLE 1.01 RC1.0.8"
+git push
+```
 
-## Important limitations
+Copying all contents into a clone and using `git add -A` also removes files that were deliberately deleted from the release. The GitHub browser upload has a per-batch file limit; GitHub Desktop or command-line Git is more reliable for full-folder updates.
 
-The BEETLE Project Manager communication path has been used by the maintainer,
-but hardware-safe flash updates, interrupted project write behaviour and
-independent device recovery have not been certified. Any destructive first-use
-flash-storage provisioning can destroy ETCH/Felucca data. Keep verified backups.
-`.beetle` files use a shared key to conceal data from ordinary text editors;
-this is **not** confidential encryption against an attacker who inspects the app.
+## Firmware caution
 
-**No new firmware was flashed or changed during this cleanup**: the existing
-transfer-enabled binary was retained byte-for-byte.
-
-## True slot deletion (V2)
-
-The updated `BEETLE-Project-Manager.html` has a DELETE command that erases only the selected slot’s two A/B journal banks; it then verifies the FM1 reports `[ EMPTY ]`. This requires the **new V2 firmware** in the updated `WebInstaller.html`. Project Transfer V1 still supports export/import, but cannot physically delete slots. The currently loaded project on the FM1 must be closed by choosing NEW or loading another project before DELETE. Export a verified backup first; do not remove USB/power during the erase. A power failure during deletion can make the slot unreadable. Real FM1 physical deletion has not been hardware-tested.
+Software builds, simulation, CRC/SHA checks and package verification do **not** prove successful physical flashing. Flash storage and OTA recovery remain experimental. A verified full backup and independent recovery path are recommended before installing. The supplied `.fwsc` and `WebInstaller.html` are matched to one another, but physical FM1 operation has not been validated in this release.

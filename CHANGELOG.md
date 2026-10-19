@@ -1,3 +1,10 @@
+## BEETLE 1.01 RC1.0.8 — Confirmed Current Lane Clear
+
+- **SEQ + rightmost black key (F#5)** in TRACKER opens a YES/NO confirmation. NO is default; K1 selects and SEL confirms; HOME cancels. Only while transport and REC are stopped.
+- YES clears all sixteen rows of the selected lane in the current pattern, including synth notes, chords, FX, dynamics and groove, or CH6 NOTE1/NOTE2 and their independent FX. Other lanes/patterns remain unchanged. The operation is undoable.
+- WebSimulator and on-device HELP updated. The existing README layout and controls table have been preserved and extended.
+- Firmware build / OTA package must be verified separately before hardware use; physical testing remains pending.
+
 ## BEETLE 1.01 RC1.0.7 — Inclusive Step Selection
 
 SEL+K1 now includes the original cursor row in every selection, in both directions, and captures the anchor when SEL is pressed. Simulator and HELP updated. The V18 project format and the existing OTA flow are unchanged; target firmware ID is FM-1_2107.
