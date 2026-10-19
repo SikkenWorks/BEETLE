@@ -5,16 +5,16 @@ import sys
 root=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(root/'tools'))
 import fm1_fwsc as fw
-src=(root/'BEETLE-1.01-RC1.0.9-EXPERIMENTAL.fwsc').read_bytes()
+src=(root/'BEETLE-1.01-RC1.0.10-EXPERIMENTAL.fwsc').read_bytes()
 base=fw.parse_ufw(src)
 flash=base['entries'][0]['data'];loader=base['entries'][1]['data']
 out=root/'tests/ota/generated';out.mkdir(exist_ok=True)
 def save(label,f,l):
-  raw=fw.build_fwsc(bytes(f),bytes(l),'FM-1_2109')
+  raw=fw.build_fwsc(bytes(f),bytes(l),'FM-1_2110')
   package=fw.parse_ufw(raw)
   (out/(label+'.logical.bin')).write_bytes(fw.decode_fwsc(raw)[1]);(out/(label+'.fwsc')).write_bytes(raw)
   return package
-save('beetle_rc109',flash,loader)
+save('beetle_rc1010',flash,loader)
 assets=fw.extract_stock_assets(root/'reference/BEETLE-RC1.0.5-PROTECTED-BOOT-REFERENCE.fwsc.reference')
 # Decrypt the packaged padded app. No previously compiled build folder required.
 enc=bytearray(flash[0x4000:0x4000+0x120+fw.APP_SLOT])

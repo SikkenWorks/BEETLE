@@ -136,13 +136,17 @@ int track_journal_preview(const struct track_journal_io *io,uint8_t slot,char ti
 int track_journal_load(const struct track_journal_io *i,uint8_t slot,
  struct track_store_project *out,uint8_t *scratch,uint32_t cap,
  struct track_journal_status *status){
- if(!valid_io(i,slot)||!out||!scratch||cap<TRACK_STORE_MAX)return TRACK_JOURNAL_INVALID;
+ /* The physical FM1 workspace is TRACK_STORE_V4_MAX (12,256 bytes), not
+  * legacy TRACK_STORE_MAX (24,576 bytes).  No physical bank can contain
+  * more than TRACK_JOURNAL_BANK_BYTES - HEADER_BYTES bytes. */
+ if(!valid_io(i,slot)||!out||!scratch||cap<TRACK_STORE_V4_MAX)return TRACK_JOURNAL_INVALID;
  struct bank_status b[2];int r;
  for(uint8_t k=0;k<2;k++)if((r=inspect(i,slot,k,&b[k]))!=0)return r;
  uint8_t sel=0;r=choose(b,&sel);if(r<0)return r;if(r==0)return TRACK_JOURNAL_NO_PROJECT;
  for(uint8_t attempt=0;attempt<2u;attempt++){
   uint8_t which=(uint8_t)(attempt?(sel^1u):sel);
   if(b[which].kind!=1)continue;
+  if(b[which].length>cap)return TRACK_JOURNAL_CAPACITY;
   if(i->read(i->ctx,slot,which,TRACK_JOURNAL_HEADER_BYTES,scratch,b[which].length))return TRACK_JOURNAL_IO;
   if(track_store_decode(out,scratch,b[which].length)==0&&out->slot==slot){
    if(status)*status=(struct track_journal_status){b[which].generation,b[which].length,which,1};
@@ -243,8 +247,10 @@ int track_journal_save(const struct track_journal_io *i,uint8_t slot,
  (void)i;(void)slot;(void)p;(void)scratch;(void)cap;(void)status;
  return TRACK_JOURNAL_HARDWARE_LOCKED;
 #else
- if(!valid_io(i,slot)||!p||!scratch||cap<TRACK_STORE_MAX||p->slot!=slot)return TRACK_JOURNAL_INVALID;
- uint32_t n=0;if(track_store_encode(p,scratch,TRACK_STORE_MAX,&n)!=0)return TRACK_JOURNAL_CAPACITY;
+ if(!valid_io(i,slot)||!p||!scratch||cap<TRACK_STORE_V4_MAX||p->slot!=slot)return TRACK_JOURNAL_INVALID;
+ /* Pass the TRUE buffer capacity to the encoder. Passing TRACK_STORE_MAX
+  * here could silently overwrite adjacent FM1 RAM in a dense project. */
+ uint32_t n=0;if(track_store_encode(p,scratch,cap,&n)!=0)return TRACK_JOURNAL_CAPACITY;
  if(TRACK_JOURNAL_HEADER_BYTES+n>TRACK_JOURNAL_BANK_BYTES)return TRACK_JOURNAL_CAPACITY;
  struct bank_status b[2];int r;
  for(uint8_t k=0;k<2u;k++)if((r=inspect(i,slot,k,&b[k]))!=0)return r;

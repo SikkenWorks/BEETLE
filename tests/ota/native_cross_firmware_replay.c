@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define FELUCCA_ID "FM-1_2109"
+#define FELUCCA_ID "FM-1_2110"
 #include "../../firmware/fm1-native/ota.c"
 
 static uint8_t *host_image;

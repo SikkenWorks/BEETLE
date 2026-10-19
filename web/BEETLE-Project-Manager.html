@@ -37,7 +37,7 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 </head>
 <body>
 <main class="app">
-<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / RC1.0.9 · V1.7</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
+<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / RC1.0.10 · V1.7</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
 <section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites and true slot deletion. No firmware flashing from this page.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
 <section class="box" aria-label="USB-MIDI connection">
 <div class="box-title">01 / DEVICE CONNECTION <small>USB · WEB MIDI SYSEX</small></div>
@@ -67,7 +67,7 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 </section>
 <section class="box"><div class="box-title">04 / FILE FORMAT <small>AES-256-GCM · NO PASSWORD</small></div>
 <div class="label">AUTOMATIC .BEETLE ENCRYPTION</div>
-<p class="secure">Projects download as encrypted binary <em>.beetle</em> files. They are unreadable in text editors and open automatically in the BEETLE Project Manager and updated RC1.0.9 simulator. Each export uses a random nonce and an integrity tag. No password required.</p>
+<p class="secure">Projects download as encrypted binary <em>.beetle</em> files. They are unreadable in text editors and open automatically in the BEETLE Project Manager and updated RC1.0.10 simulator. Each export uses a random nonce and an integrity tag. No password required.</p>
 <div class="note">The shared decryption key is bundled in BEETLE's public web tools. This prevents casual reading in Notepad, <strong>not</strong> determined extraction or secret storage. Older password-protected V1 backups can still be imported using their original password.</div>
 </section></div>
 </section>
@@ -349,12 +349,12 @@ async function clearSlotWithPrompt(){
  }
  if(slots[target].state!=='empty')throw Error('After refresh, the FM1 slot is not [ EMPTY ]. Do not assume deletion succeeded.');
 }
-/* RC1.0.9 dedicated, explicit recovery. A known damaged owned bank can be
+/* RC1.0.10 dedicated, explicit recovery. A known damaged owned bank can be
    deleted without successful project decode. A foreign/unowned bank CANNOT.
    Unlike ordinary DELETE this never claims a backup exists. */
 async function recoverCorruptSlot(){
  const target=selected,state=slots[target].state;
- if(!connected||deviceProtocol<3)throw Error('RECOVER requires RC1.0.9 Project Transfer V3 firmware.');
+ if(!connected||deviceProtocol<3)throw Error('RECOVER requires RC1.0.10 Project Transfer V3 firmware.');
  if(state!=='bad'&&state!=='used')throw Error('Select the damaged project slot first.');
  /* Detect a changed slot without relying on reading corrupt TRK1 data. */
  const scan=await query(0x51,[target],0x61,7000,1);
@@ -417,7 +417,7 @@ if(action==='backup'){
 }}
 $('connect').onclick=()=>safe(async()=>{setBusy(true);try{await connect();}finally{setBusy(false);}});
 $('copyDiagnostics').onclick=async()=>{
- const report='BEETLE PROJECT MANAGER RC1.0.9 V1.7\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
+ const report='BEETLE PROJECT MANAGER RC1.0.10 V1.7\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
  try{await navigator.clipboard.writeText(report);log('Connection report copied.');}
  catch{log('Could not copy automatically. Select an HTTPS/localhost page and try again.',true);}
 };

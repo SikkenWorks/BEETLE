@@ -1853,6 +1853,8 @@ static void track_fm1_paint(void){
    track_storage_result==TRACK_JOURNAL_FOREIGN?"FOREIGN STORAGE":
    track_storage_result==TRACK_JOURNAL_NO_PROJECT?"NO PROJECT":
    track_storage_result==TRACK_JOURNAL_HARDWARE_LOCKED?"FLASH SAVE LOCKED":
+   track_storage_result==TRACK_JOURNAL_INVALID?"PROJECT DATA ERROR":
+   track_storage_result==TRACK_JOURNAL_IO?"FLASH I/O ERROR":
    track_storage_result==TRACK_JOURNAL_CAPACITY?(track_new_project_full?"NO FREE PROJECT SLOT":"PROJECT TOO FULL"):"STORAGE ERROR",120u,109u,TRACK_WHITE);
   track_pix_center(track_storage_result==TRACK_JOURNAL_OK?
    (track_storage_just_initialized?"INITIALIZED + PROJECT SAVED":"CRC VERIFIED"):

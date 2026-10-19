@@ -1,3 +1,12 @@
+## BEETLE 1.01 RC1.0.10 — Project SAVE / LOAD workspace fix
+
+- Fixed native A/B journal SAVE and LOAD rejecting the FM1's actual 12,256-byte project workspace: the validation mistakenly required a 24,576-byte legacy decoder buffer. The defect affected all physical project saves and loads regardless of project data.
+- Fixed project encoder receiving a false 24,576-byte capacity for a 12,256-byte physical workspace; now passes the real capacity to prevent out-of-bounds writes.
+- LOAD verifies the selected project's payload fits the supplied workspace before reading it. Oversized saves are rejected before flash erase.
+- Preserved 12-slot A/B partition, V18 project schema, ownership/foreign-sector protections, project-transfer protocol, OTA loader and original protected boot header.
+- Added regression tests with the actual physical workspace, guard bytes, all 12 slots, repeat save/no-erase, A/B recovery and too-small buffer rejection.
+- New firmware identity: `FM-1_2110`. Software builds/tests are not physical FM1 validation.
+
 ## BEETLE 1.01 RC1.0.9 — Cross-Firmware OTA Native Compatibility Audit
 
 - Fixed the native APP_ONLY OTA CHECK bug that rejected compatible custom packages solely because the unused first 16 KiB protected boot header differed (`-5`).
