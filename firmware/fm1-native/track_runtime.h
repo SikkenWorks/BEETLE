@@ -476,7 +476,7 @@ static void track_sync_punch_params(void){
  for(uint8_t fx=0u;fx<5u;fx++){
   uint8_t value=track_punch_base_param[fx];
   if(!(track_live_punch_mask&(1u<<fx)) && (track_replay_punch_mask&(1u<<fx)))
-   value=track_song_effect_parameter(&track_song,track_state.pattern_slot,
+   value=track_song_effect_parameter(&track_song,track_song_punch_pattern(&track_song,&track_state),
            track_state.transport.play_step,fx,value);
   track_chip.punch_param[fx]=value;
  }
@@ -525,7 +525,7 @@ static void track_runtime_validate(void){
  if(track_state.transport.edit_column>=TRACK_NAV_COLUMNS){track_state.transport.edit_column=0u;faulty=1u;}
  if(track_state.pattern_slot>=TRACK_PATTERNS){track_state.pattern_slot=0u;faulty=1u;}
  if(track_song.count==0u||track_song.count>TRACK_SONG_ENTRIES){
-  track_song.count=1u;track_song.chain[0].pattern=0u;track_song.chain[0].repeats=1u;faulty=1u;
+  track_song.count=1u;track_song.chain[0].pattern=0u;track_song.chain[0].repeats=1u;for(uint8_t c=0u;c<TRACK_CHANNELS;c++)track_song.chain[0].lane[c]=0u;faulty=1u;
  }
  if(track_song.edit_row>=track_song.count)track_song.edit_row=0u;
  if(track_mix.row>=TRACK_CHANNELS){track_mix.row=0u;faulty=1u;}
@@ -802,6 +802,7 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
   render_mix=&live_audio_mix;
  }
  if(!track_state.transport.playing){
+  track_song_restore(&track_song,&track_state);
   if(track_audio_started){track_audio_all_off(audio);track_audio_started=0u;}
   track_audio_clock=0u;track_swing_pending_mask=0u;
   for(uint8_t ci=0u;ci<TRACK_SYNTH_CHANNELS;ci++)track_gate_remaining[ci]=0u;
@@ -811,7 +812,7 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
  }
  if(!track_audio_started){
   track_audio_started=1u;track_audio_clock=0u;
-  track_replay_punch_mask=track_song_effect_mask(&track_song,track_state.pattern_slot,0u);
+  track_replay_punch_mask=track_song_effect_mask(&track_song,track_song_punch_pattern(&track_song,&track_state),0u);
   track_sync_punch_params();
   track_state.punch_mask=(uint8_t)(track_live_punch_mask|track_replay_punch_mask);
   track_chip_begin_step(&track_chip);
@@ -858,7 +859,7 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
      return;
     }
    }
-   track_replay_punch_mask=track_song_effect_mask(&track_song,track_state.pattern_slot,track_state.transport.play_step);
+   track_replay_punch_mask=track_song_effect_mask(&track_song,track_song_punch_pattern(&track_song,&track_state),track_state.transport.play_step);
    track_sync_punch_params();
    track_state.punch_mask=(uint8_t)(track_replay_punch_mask|track_live_punch_mask);
    track_chip_begin_step(&track_chip);
@@ -1175,29 +1176,34 @@ static void track_fm1_live_mixer_screen(void){
 }
 static void track_fm1_song_screen(void){
  lcd_fill(0u,0u,240u,240u,TRACK_DARK);
- track_page_header("SONG MODE",43u);
- track_pix_text("POS",22u,54u,TRACK_PINK);
- track_pix_text("PATTERN",106u,54u,TRACK_PINK);
- track_pix_text("REPEAT",198u,54u,TRACK_PINK);
- /* Same eight 16px rows and same x/y coordinates as the web canvas. */
+ track_page_header("SONG CHAINS",43u);
+ static const char *heads[8]={"POS","CH1","CH2","CH3","CH4","CH5","DR","REP"};
+ static const uint8_t xs[8]={5u,37u,65u,93u,121u,149u,177u,207u};
+ for(uint8_t c=0;c<8u;c++)track_pix_text(heads[c],xs[c],54u,TRACK_PINK);
  const uint8_t focus=(track_song.enabled&&track_state.transport.playing)?track_song.position:track_song.edit_row;
  const uint8_t start=(uint8_t)((focus/8u)*8u);
  for(uint8_t j=0u;j<8u;j++){
   uint8_t r=(uint8_t)(start+j);if(r>=track_song.count)break;
-  uint16_t y=(uint16_t)(71u+16u*j);
+  uint16_t y=(uint16_t)(71u+15u*j);
   uint8_t live=(uint8_t)(track_song.enabled&&track_state.transport.playing&&r==track_song.position);
-  if(live){lcd_fill(15u,y-2u,215u,15u,0xE817u);lcd_fill(17u,y,211u,11u,0x780Bu);}
-  else if(r==track_song.edit_row){
-   lcd_fill(15u,y-2u,215u,16u,0x4007u);
-   lcd_fill(track_song.edit_column==0u?102u:194u,y-2u,30u,16u,0x880Du);
+  if(live){lcd_fill(2u,y-2u,236u,15u,0x780Bu);}
+  else if(r==track_song.edit_row)lcd_fill(2u,y-2u,236u,14u,0x4007u);
+  if(!track_state.transport.playing&&r==track_song.edit_row){
+   uint8_t x=xs[track_song.edit_column+1u];
+   lcd_fill(x-3u,y-2u,28u,14u,0x880Du);
   }
-  char num[4];track_u8(num,r+1u);track_pix_text(num,22u,y,TRACK_WHITE);
-  track_u8(num,track_song.chain[r].pattern+1u);track_pix_text(num,106u,y,TRACK_WHITE);
-  track_u8(num,track_song.chain[r].repeats);track_pix_text(num,198u,y,TRACK_WHITE);
+  char num[4];track_u8(num,r+1u);track_pix_text(num,xs[0],y,TRACK_WHITE);
+  for(uint8_t c=0u;c<TRACK_CHANNELS;c++){
+   uint8_t pat=track_song.chain[r].lane[c];
+   if(pat==TRACK_SONG_SILENT)track_pix_text("--",xs[c+1u],y,TRACK_WHITE);
+   else{track_u8(num,(uint8_t)(pat+1u));track_pix_text(num,xs[c+1u],y,TRACK_WHITE);}
+  }
+  track_u8(num,track_song.chain[r].repeats);track_pix_text(num,xs[7],y,TRACK_WHITE);
  }
- track_pix_text(track_song.enabled?(track_song.loop?"[X] SONG ON  LOOP: ON":"[X] SONG ON  LOOP: OFF"):(track_song.loop?"[ ] SONG OFF  LOOP: ON":"[ ] SONG OFF  LOOP: OFF"),11u,193u,TRACK_PINK);
- track_pix_text("OCT+ ADD  OCT- DELETE",10u,208u,TRACK_BRIGHT);
- track_pix_text("SEL \"TOGGLE ON/OFF\"",10u,219u,TRACK_BRIGHT);
+ track_pix_text(track_song.enabled?(track_song.loop?"[X] SONG ON LOOP ON":"[X] SONG ON LOOP OFF"):(track_song.loop?"[ ] SONG OFF LOOP ON":"[ ] SONG OFF LOOP OFF"),6u,193u,TRACK_PINK);
+ track_pix_text("K1 ROW  K2 LANE  K3 PAT",6u,207u,TRACK_BRIGHT);
+ track_pix_text("OCT+ ADD  OCT- DEL",6u,219u,TRACK_BRIGHT);
+ track_pix_text("SEL SONG ON/OFF",6u,231u,TRACK_BRIGHT);
 }
 static void track_fm1_overlay(const char *title){
  track_fm1_grid(); /* consistent background with the original tracker UI */
@@ -3059,13 +3065,13 @@ static void track_fm1_poll(void){
      track_song.edit_row=(uint8_t)row;
     }
     if(k2){int32_t col=(int32_t)track_song.edit_column+k2;
-     if(col<0)col=0;if(col>1)col=1;track_song.edit_column=(uint8_t)col;}
+     if(col<0)col=0;if(col>6)col=6;track_song.edit_column=(uint8_t)col;}
     if(k3){fm1_irq_off();(void)track_song_change(&track_song,track_song.edit_row,track_song.edit_column,k3);track_state.dirty=1u;fm1_irq_enable_all();}
     if(pressed&2u){fm1_irq_off();(void)track_song_insert(&track_song,track_song.edit_row);track_state.dirty=1u;fm1_irq_enable_all();}
     if(pressed&1u){fm1_irq_off();(void)track_song_delete(&track_song,track_song.edit_row);track_state.dirty=1u;fm1_irq_enable_all();}
     if(pressed&(1u<<3)){
      fm1_irq_off();track_song.enabled^=1u;
-     if(!track_song.enabled)beetle_live_reset();
+     if(!track_song.enabled){track_song_restore(&track_song,&track_state);beetle_live_reset();}
      fm1_irq_enable_all();changed=1u;
     }
     if(!track_state.transport.playing)

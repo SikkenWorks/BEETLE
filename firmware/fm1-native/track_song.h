@@ -12,18 +12,23 @@ struct track_song_clip {
  struct track_song_event data[TRACK_SONG_FX_EVENTS];
  uint8_t count,overflow;
 };
-struct track_song_entry {uint8_t pattern,repeats;};
+/* V19: legacy base pattern/repeats plus six independent lane references.
+ * 255 means silence for a particular lane. */
+#define TRACK_SONG_SILENT 255u
+struct track_song_entry {uint8_t pattern,repeats,lane[TRACK_CHANNELS];};
 struct track_song_bank {
  struct track_pattern patterns[TRACK_PATTERNS];
  struct track_song_clip clips[TRACK_PATTERNS];
  struct track_song_entry chain[TRACK_SONG_ENTRIES];
  uint8_t count,position,repeat_index,loop,enabled;
- uint8_t edit_row,edit_column;
+ uint8_t edit_row,edit_column,composite_active;
 };
 void track_song_init(struct track_song_bank *bank,const struct track_engine *engine);
 /* Switches active pattern without touching persistent flash. On failure active pattern remains unchanged. */
 int track_song_switch(struct track_song_bank *bank,struct track_engine *engine,uint8_t index);
 void track_song_capture(struct track_song_bank *bank,const struct track_engine *engine);
+void track_song_restore(struct track_song_bank *bank,struct track_engine *engine);
+uint8_t track_song_punch_pattern(const struct track_song_bank *bank,const struct track_engine *engine);
 void track_song_start(struct track_song_bank *bank,struct track_engine *engine);
 /* Called only at wrap to step 00 in audio context. Returns 1 when a pattern changed. */
 int track_song_on_wrap(struct track_song_bank *bank,struct track_engine *engine);

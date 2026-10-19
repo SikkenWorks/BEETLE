@@ -1,4 +1,4 @@
-# BEETLE 1.01 RC1.0.8
+# BEETLE 1.01 RC1.0.11
 
 **Complete GitHub-ready source release** · SikkenWorks
 
@@ -9,18 +9,18 @@ This archive is based on the supplied `BEETLE-main` repository and includes the 
 | File | Purpose |
 | --- | --- |
 | `README.md` | Complete BEETLE documentation and controls table |
-| `CHANGELOG.md` | Version history and RC1.0.8 changes |
-| `WebInstaller.html` | Current RC1.0.8 HF2 installer with embedded firmware |
-| `BEETLE-1.01-RC1.0.8-EXPERIMENTAL.fwsc` | Exact firmware package embedded in the installer |
+| `CHANGELOG.md` | Version history and RC1.0.11 changes |
+| `WebInstaller.html` | Current RC1.0.11 HF2 installer with embedded firmware |
+| `BEETLE-1.01-RC1.0.11-EXPERIMENTAL.fwsc` | Exact firmware package embedded in the installer |
 | `simulator.html` | Current WebSimulator with project import/export and tracker editing |
 | `BEETLE-Project-Manager.html` | Current project-slot manager and backup/restore UI |
 | `firmware/fm1-native/` | Native FM1 firmware and toolchain build script |
 | `tests/` | Regression and focused tests |
-| `RC1.0.8-CLEAR-LANE-VALIDATION.md` | New clear-lane feature and software validation |
+| `docs/RC1.0.11-SONG-CHAINS-VALIDATION.md` | New clear-lane feature and software validation |
 
-## New tracker control
+## SONG CHAINS controls
 
-Hold **SEQ + rightmost black key** in the tracker while stopped to request **CLEAR CURRENT LANE**. The confirmation defaults to NO. Use K1 for YES/NO, SEL to confirm or HOME to cancel. Only the current pattern's active lane is erased, including independent drum NOTE2 FX. Undo remains available. See the unchanged-format controls table in `README.md`.
+In Song Mode (ARP), **POS** shows the song position while **CH1 CH2 CH3 CH4 CH5 DR REP** label the independently configurable sources. K1 chooses a row, K2 selects a channel or REP, and K3 chooses a pattern 01–48 (`--` to silence) or repeat count. OCT+ inserts a row whose six channels all default to that position's pattern; existing customized rows remain unchanged. The native V19 schema migrates old V18 songs automatically. All controls are in the existing README table and both HELP screens.
 
 ## Updating GitHub
 
@@ -28,11 +28,21 @@ The ZIP has **no additional parent folder**: `README.md`, the three webapps and 
 
 ```bash
 git add -A
-git commit -m "BEETLE 1.01 RC1.0.8"
+git commit -m "BEETLE 1.01 RC1.0.11"
 git push
 ```
 
 Copying all contents into a clone and using `git add -A` also removes files that were deliberately deleted from the release. The GitHub browser upload has a per-batch file limit; GitHub Desktop or command-line Git is more reliable for full-folder updates.
+
+## Rebuilding the exact experimental package
+
+The matched RC1.0.10 package is stored **only as a build reference** in `reference/BEETLE-RC1.0.10-BOOT-OTA-REFERENCE.fwsc.reference`; do not use it as an installer. After building the storage+OTA app, run:
+
+```bash
+python tools/build_rc1011_fwsc.py reference/BEETLE-RC1.0.10-BOOT-OTA-REFERENCE.fwsc.reference build/track-fm1-native-beetle-storage-lab-updater/app.bin BEETLE-1.01-RC1.0.11-EXPERIMENTAL.fwsc
+```
+
+The packer requires the exact RC1.0.10 reference identity, verifies application SHA-256 and CRC, copies its original protected header and OTA loader, and writes `FIRMWARE-MANIFEST.json`. The WebInstaller's embedded firmware and pinned SHA need to be updated after any recompile. No physical device tests have been performed here.
 
 ## Firmware caution
 

@@ -69,7 +69,7 @@ GPL-3.0-only BEETLE/Felucca/ETCH lineage remains intact; see source/CREDITS-AND-
 
 - New `.beetle` backups use AES-256-GCM with a random nonce, but need **no password**. They are unreadable in text editors, not secret against someone inspecting BEETLE's public bundled key.
 - Legacy password-protected V1 files can still be opened using their original password.
-- Updated RC1.01 WebSimulator can import native firmware projects (TRK1 V12–V17), edit them in browser memory and export native V17 encrypted `.beetle` files again.
+- RC1.0.11 WebSimulator can import compatible historical TRK1 projects, edit them in browser memory and export native V19 encrypted `.beetle` files with SONG CHAINS.
 - In the simulator, preexisting JSON backups remain importable. Project Manager accepts native binary projects, not raw JSON.
 - Firmware binaries and `.fwsc` are unchanged from the experimental Project Transfer release. No new hardware validation has been performed.
 

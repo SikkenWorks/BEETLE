@@ -1,16 +1,23 @@
 {
-  "firmware": "BEETLE 1.01 RC1.0.10",
-  "identity": "FM-1_2110",
-  "target": "M-VAVE FM1 / JieLi AC791N",
+  "firmware": "BEETLE 1.01 RC1.0.11 SONG CHAINS",
+  "identity": "FM-1_2111",
+  "schema": 19,
   "bytes": 610086,
-  "sha256": "68217f412e440be6291e3d3b98e6649f08b3c92e9f009abda66394d3cfec987b",
-  "app_sha256": "843dea9362bd34c256f7bbafd500ebef45efc08cacb8f93496ee850d70e48be8",
-  "reference_package": "BEETLE-RC1.0.5-PROTECTED-BOOT-REFERENCE.fwsc.reference",
-  "reference_sha256": "40fa76c5f24fbc3f13c262b59436e2d87ea462f382f2d85ad4bb375f90dab644",
+  "sha256": "fbdc3898fbd3545fbe441f76ed7b9434bab5529c0ec54369a6b7b4034d71f724",
+  "app_sha256": "19f4784b0a8e26dcc0d350bb164337c71b4e50ec606779b882c3b40c850d8736",
   "protected_header_sha256": "d9f43191777656de01c7bed4f9e9ba2e34e94832c5d2ed02c3fc7ab7a6d9bd67",
   "ota_sha256": "d71d1b7c12adede951605e758a3580dacccedc427d49e1fceaf51decccc68a4b",
-  "container_shape_compliant": true,
-  "preserved_reference_16KiB": true,
+  "source_reference": "reference/BEETLE-RC1.0.10-BOOT-OTA-REFERENCE.fwsc.reference",
+  "source_reference_sha256": "68217f412e440be6291e3d3b98e6649f08b3c92e9f009abda66394d3cfec987b",
+  "checks": {
+    "header_same": true,
+    "loader_same": true,
+    "app_same": true,
+    "container_same": true,
+    "verified": true,
+    "app_audit": true
+  },
   "hardware_tested": false,
-  "independent_recovery_proven": false
+  "recovery_proven": false,
+  "type": "EXPERIMENTAL"
 }

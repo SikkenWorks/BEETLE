@@ -46,8 +46,10 @@ BEETLE public beta builds are tested on a physical FM1 by the project maintainer
 - **Punch-In FX:** hold an effect key and turn **K1** to adjust its parameter. **ALGORITHM** selects patterns when no Punch-In key is held. **Ring Mod** starts at **20** intensity, **Stutter** starts at **×1**, and the current tempo drives Stutter divisions.
 - **Normal MIXER and Live Mixer:** the six mapped **black keys mute** lanes CH1–CH6; the six adjacent **white keys SOLO** those lanes. Active SOLO and MUTE illuminate the corresponding FM1 key LEDs. Live Mixer mute/solo each follow their own OCT-selectable quantization preference.
 - **MASTER FX:** turn **SELECT** to choose EQ/Compressor/Reverb, adjust all four knobs with **K1–K4**, press **SEL** to enable/disable the selected effect.
-- **EDIT:** waveform TYPE preferences have independent ADSR, cutoff, oscillator and other synth parameter settings in each patch slot. New saves use **project format V18**, while supported older V16 projects migrate without losing their current active patches.
+- **EDIT:** waveform TYPE preferences have independent ADSR, cutoff, oscillator and other synth parameter settings in each patch slot. New saves use **project format V19**, while supported older V16 projects migrate without losing their current active patches.
 - **HELP:** its final page now shows a complete end-of-list counter rather than an unreachable row range.
+
+**SONG CHAINS (RC1.0.11):** POS is the song position, not a pattern number. Every row displays its source pattern separately as **CH1 CH2 CH3 CH4 CH5 DR REP**. For example POS 02 with synths P02 and DR P01 plays the drum lane from pattern 01 together with synth lanes from pattern 02. A new POS 03 row starts as P03 on all six channels (not a copy of the previous row), with REP 1. For POS above 48, the default is P48. Edit each column with K2/K3; a value of `--` silences that lane for that row. Individual lane content including CH6 NOTE1/NOTE2 FX is taken from the referenced source pattern. Playback composes data temporarily; it does not modify stored patterns. Recorded global Punch-In automation comes from the CH1 source pattern and is silent when CH1 is `--`. Historical V18 songs automatically map their single pattern number to all six lane sources on load. V19 projects cannot be imported into older V18 firmware.
 
 ## Mixer and channel volume
 
@@ -124,6 +126,11 @@ In the tracker while transport is stopped, hold **SEQ** and press the physical b
 | Tracker | **SEQ + OP5 / OP6** | Undo / redo tracker edits. |
 | Mixer | **GLO** | Open/close the mixer. Six black OP keys can mute CH1–CH6; their LEDs indicate mute. |
 | Instrument Edit | **EDIT** | Open instrument parameters; on the next EDIT page access the drum component editor. |
+| Song Chains | **K1** | Select the song position (POS 01–64). The POS number remains visible alongside every channel heading. |
+| Song Chains | **K2** | Choose the CH1, CH2, CH3, CH4, CH5, DR or REP column. The active cell is outlined in magenta. |
+| Song Chains | **K3** | Choose a pattern independently for the selected channel (01–48, or `--` to silence that lane); on REP, set repeats 1–16. |
+| Song Chains | **OCT+ / OCT−** | Insert/delete a song row. New row defaults all six channels to the pattern matching its displayed POS (positions 49–64 use P48 because only 48 patterns exist); existing customized rows are not rewritten. |
+| Song Chains | **SEL** | Toggle SONG ON/OFF. Playback mixes six channel-specific pattern sources on one clock; shorter lane patterns repeat within a row. |
 | Song | **ARP** | Open Song Mode (not GLO double-click). |
 | Master | **LFO** | Open the master EQ/compressor/reverb chain. |
 | Punch-In | **REC / Punch-In screen** | Hold a Punch-In key for an effect; ALGORITHM adjusts that effect's stored setting. |
@@ -152,7 +159,7 @@ BEETLE boots with a **preconfigured digital kit**, not fourteen identical generi
 ## Projects, compatibility and storage safety
 
 - **12 project slots**, with journalled A/B storage where the experimental storage backend is enabled.
-- **Current project schema: V18.** Newly saved projects include per-step velocity and gate as well as the earlier MASTER parameters (compressor Attack and reverb Width). Supported older projects, including V10, V9 and earlier formats, remain readable; missing settings are initialized to defaults and old project data are not silently rewritten. V8 previously added the five Punch-In values; V6/V7/V8 compatibility was included in earlier regression tests.
+- **Current project schema: V19.** Newly saved projects include per-step velocity and gate as well as the earlier MASTER parameters (compressor Attack and reverb Width). Supported older projects, including V10, V9 and earlier formats, remain readable; missing settings are initialized to defaults and old project data are not silently rewritten. V8 previously added the five Punch-In values; V6/V7/V8 compatibility was included in earlier regression tests.
 - The physical project record has a **finite capacity**. A fully populated project may not fit. An oversized project is rejected *before* any flash erase; do not assume all 48 six-lane patterns can be filled to capacity simultaneously.
 - **WARNING:** the storage-enabled build requires explicit first-use setup. The experimental storage region can overwrite legacy user data at addresses **`0x97000–0xDFFFF`**. Never initialize it without a verified full-flash backup and an independently working recovery path. Project writes are *disabled* in the pilot build.
 - The WebInstaller does not make a complete backup. Even a verified OTA transfer does not guarantee that the new firmware will boot or that USB recovery will remain available.
@@ -192,7 +199,7 @@ If you find a bug, include the firmware version, what you pressed, your exact pr
 
 ## Project Manager V1.1 · Password-free BEETLE files
 
-The included project manager now exports and imports AES-GCM encrypted `.beetle` project files without requiring passwords. A shared key is bundled with the open-source web tools; protection is against casual text inspection and accidental corruption, not against determined decryption. BEETLE 1.01 RC1 WebSimulator can import native TRK1 V12–V17 files as well as its old JSON backup files and export native V17 `.beetle` files. Device transfer requires the **experimental Project Transfer firmware**, and remains physically unverified. See `BEETLE-PROJECT-FORMAT-V2.md`.
+The included project manager now exports and imports AES-GCM encrypted `.beetle` project files without requiring passwords. A shared key is bundled with the open-source web tools; protection is against casual text inspection and accidental corruption, not against determined decryption. BEETLE 1.01 RC1.0.11 WebSimulator can import legacy native TRK1 projects and JSON backups and export native V19 `.beetle` files, including independent SONG CHAINS sources. Device transfer requires the **experimental Project Transfer firmware**, and remains physically unverified. See `BEETLE-PROJECT-FORMAT-V2.md`.
 
 ---
 

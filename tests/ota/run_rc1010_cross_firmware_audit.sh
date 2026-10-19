@@ -22,12 +22,12 @@ from pathlib import Path
 import sys
 sys.path.insert(0,'tools')
 import fm1_fwsc as fw
-p=Path('BEETLE-1.01-RC1.0.10-EXPERIMENTAL.fwsc')
+p=Path('BEETLE-1.01-RC1.0.11-EXPERIMENTAL.fwsc')
 report,errors=fw.verify_fwsc(p)
 assert not errors,errors
-assert report['product']=='FM-1_2110'
+assert report['product']=='FM-1_2111'
 Path('tests/ota/generated/final_installer_image.logical.bin').write_bytes(fw.decode_fwsc(p.read_bytes())[1])
-print('[PACKAGE] RC1.0.10 .fwsc CRC and layout PASS')
+print('[PACKAGE] RC1.0.11 .fwsc CRC and layout PASS')
 PY
 run final_installer_image 0 1
 node tests/ota/test_rc1010_app_only.cjs

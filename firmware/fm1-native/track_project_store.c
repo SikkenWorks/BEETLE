@@ -46,6 +46,8 @@ static uint8_t track_store_preflight(const struct track_store_project *p){
  for(uint8_t k=0u;k<p->song.count;k++)
   if(p->song.chain[k].pattern>=TRACK_PATTERNS ||
      p->song.chain[k].repeats<1u || p->song.chain[k].repeats>16u)return 0u;
+ for(uint8_t k=0u;k<p->song.count;k++)for(uint8_t c=0u;c<TRACK_CHANNELS;c++)
+  if(p->song.chain[k].lane[c]>=TRACK_PATTERNS && p->song.chain[k].lane[c]!=TRACK_SONG_SILENT)return 0u;
  for(uint8_t k=0u;k<TRACK_CHANNELS;k++){
   const struct track_mixer_channel *m=&p->mixer.ch[k];
   if(m->volume>120u || m->pan< -100 || m->pan>100 || m->mute>1u ||
@@ -86,7 +88,8 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
  if(i+2u>cap)return -2;
  wr16(out+i,p->bpm);i+=2;
  PUT1(p->song.count);PUT1(p->song.loop);PUT1(p->song.enabled);
- for(c=0;c<p->song.count;c++){PUT1(p->song.chain[c].pattern);PUT1(p->song.chain[c].repeats);}
+ for(c=0;c<p->song.count;c++){PUT1(p->song.chain[c].pattern);PUT1(p->song.chain[c].repeats);
+  for(uint8_t lane=0u;lane<TRACK_CHANNELS;lane++)PUT1(p->song.chain[c].lane[lane]);}
  for(c=0;c<TRACK_CHANNELS;c++){
   PUT1(p->mixer.ch[c].volume);PUT1((uint8_t)p->mixer.ch[c].pan);
   PUT1(p->mixer.ch[c].mute);PUT1(p->mixer.ch[c].solo);PUT1(p->mixer.ch[c].swing);
@@ -241,7 +244,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -255,6 +258,11 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
  for(c=0;c<p->song.count;c++){
   GET1(p->song.chain[c].pattern);GET1(p->song.chain[c].repeats);
   if(p->song.chain[c].pattern>=TRACK_PATTERNS||p->song.chain[c].repeats<1u||p->song.chain[c].repeats>16u)return -3;
+  for(uint8_t lane=0u;lane<TRACK_CHANNELS;lane++){
+   if(rd16(data+4u)>=19u){GET1(p->song.chain[c].lane[lane]);}
+   else p->song.chain[c].lane[lane]=p->song.chain[c].pattern;
+   if(p->song.chain[c].lane[lane]>=TRACK_PATTERNS&&p->song.chain[c].lane[lane]!=TRACK_SONG_SILENT)return -3;
+  }
  }
  for(c=0;c<TRACK_CHANNELS;c++){p->mixer.ch[c].volume=c==TRACK_DRUM_CHANNEL?80u:50u;p->mixer.ch[c].pan=0u;}
  uint8_t v5=(uint8_t)(rd16(data+4u)>=5u);

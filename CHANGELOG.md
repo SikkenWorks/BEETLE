@@ -1,3 +1,13 @@
+## BEETLE 1.01 RC1.0.11 — SONG CHAINS (per-lane song arrangements)
+
+- Reworked native Song Mode to reference a separate pattern for each of CH1–CH5 and DR per song position (01–64). Columns **POS, CH1, CH2, CH3, CH4, CH5, DR, REP** remain labeled at the top of the song screen.
+- K1 navigates song positions; K2 selects a lane or REP; K3 edits its pattern reference (01–48; `--` mutes that lane) or repeat count 1–16.
+- OCT+ inserts a new row defaulting all lanes to the pattern corresponding to the new displayed position. Positions 49–64 default to P48. Existing rows retain custom lane assignments; OCT- removes a row.
+- Song playback composes six independent lane sources without modifying original 48 patterns; short lanes repeat within longer rows. NOTE2 drum FX are sourced with the drum lane. Global recorded Punch-In automation uses the CH1 source pattern.
+- Native project schema **V19** stores six lane references per song row; native V1–V18 projects remain readable and each legacy row automatically maps its original pattern number to all six channels. V19 must not be imported into pre-V19 firmware.
+- Updated native HELP, browser HELP, README controls table (original layout preserved), simulator and Project Manager. Added C source/codec tests for independent source isolation, V18 migration, row insert defaults, song mute and drum NOTE2 FX; browser tests for the song editor and V19 codec.
+- Experimental firmware ID `FM-1_2111`; unchanged protected 16 KiB bootheader and OTA loader from RC1.0.10. Hardware boot, audio performance, USB storage and recovery **not** yet validated on an actual FM1.
+
 ## BEETLE 1.01 RC1.0.10 — Project SAVE / LOAD workspace fix
 
 - Fixed native A/B journal SAVE and LOAD rejecting the FM1's actual 12,256-byte project workspace: the validation mistakenly required a 24,576-byte legacy decoder buffer. The defect affected all physical project saves and loads regardless of project data.

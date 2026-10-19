@@ -5,7 +5,7 @@ import sys
 root=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(root/'tools'))
 import fm1_fwsc as fw
-src=(root/'BEETLE-1.01-RC1.0.10-EXPERIMENTAL.fwsc').read_bytes()
+src=(root/'reference/BEETLE-RC1.0.10-BOOT-OTA-REFERENCE.fwsc.reference').read_bytes()
 base=fw.parse_ufw(src)
 flash=base['entries'][0]['data'];loader=base['entries'][1]['data']
 out=root/'tests/ota/generated';out.mkdir(exist_ok=True)
