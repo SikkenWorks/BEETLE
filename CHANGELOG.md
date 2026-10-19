@@ -1,3 +1,12 @@
+## BEETLE 1.01 RC1.0.9 — Cross-Firmware OTA Native Compatibility Audit
+
+- Fixed the native APP_ONLY OTA CHECK bug that rejected compatible custom packages solely because the unused first 16 KiB protected boot header differed (`-5`).
+- Native firmware now validates chip key `0x980F`, configuration CRC, `app.bin` at flash `0x4000` / XIP `0x02000120`, the directory, and full app/app-area CRCs BEFORE OTA staging is erased.
+- Improved UFW bounds, duplicate-entry and payload-overlap checks. Unknown OTA-loader bodies are still rejected; the approved, SHA-256-pinned loader and official V15 separate restoration path remain unchanged.
+- The compatible installer applies the same APP_ONLY tests for custom packages rather than requiring an unchanged unused boot header. Source identity alone never permits flashing.
+- Added full native USB-MIDI CHECK replay regression cases using actual BEETLE/ETCH FWSC image bytes, plus corrupted app and altered loader negatives. New runtime firmware identity: `FM-1_2109`.
+- **Hardware status:** real FM1 cross-firmware transitions, especially Felucca originals/stock and repeat reinstallation, remain unverified. This is a software-validated experimental candidate.
+
 ## BEETLE 1.01 RC1.0.8 — Confirmed Current Lane Clear
 
 - **SEQ + rightmost black key (F#5)** in TRACKER opens a YES/NO confirmation. NO is default; K1 selects and SEL confirms; HOME cancels. Only while transport and REC are stopped.

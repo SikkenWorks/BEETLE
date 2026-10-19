@@ -237,18 +237,28 @@ static int ota_stage_head(uint32_t len)
  * flash.bin (entry type 0) and ota.bin (type 100), 0 if absent; -1 read, -2 CRC */
 static int ota_ufw(uint8_t *hdr, uint32_t *fl_off, uint32_t *fl_len, uint32_t *ota_off, uint32_t *ota_len)
 {
-    uint32_t i, nent, seen_flash=0, seen_ota=0;
+    uint32_t i, j, nent, seen_flash=0, seen_ota=0, total, off, size, aligned;
     *fl_off = *fl_len = *ota_off = *ota_len = 0;
     if (ota_read(0, hdr, 512) || ota_read(512, hdr + 512, 512))
         return -1;
     ota_jl_enc(hdr, 0x40);
     nent = ota_rd16(hdr + 8);
+    total = ota_rd32(hdr + 4);
+    if (total<0x400u || total>0x200000u)return -3;
     if (ota_crc16(hdr + 2, 0x3E, 0) != ota_rd16(hdr) || nent == 0 || nent > 11u ||
         ota_crc16(hdr + 0x40, nent * 0x50u, 0) != ota_rd16(hdr + 2))
         return -2;
     for (i = 0; i < nent; i++) {
         uint8_t *e = hdr + 0x40 + i * 0x50u;
         ota_jl_enc(e, 0x50);
+        off=ota_rd32(e+8);size=ota_rd32(e+12);aligned=ota_rd32(e+16);
+        if(size==0u || off<0x400u || off>total || size>total-off ||
+           aligned<size || (aligned&31u))return -3;
+        for(j=0;j<i;j++){
+            uint8_t *prev=hdr+0x40u+j*0x50u;
+            uint32_t po=ota_rd32(prev+8), ps=ota_rd32(prev+12);
+            if(ota_rd16(prev)==ota_rd16(e) || (off<po+ps && po<off+size))return -3;
+        }
         if (ota_rd16(e) == 0) {
             if (seen_flash++) return -3;                             /* flash.bin */
             *fl_off = ota_rd32(e + 8);
@@ -260,6 +270,107 @@ static int ota_ufw(uint8_t *hdr, uint32_t *fl_off, uint32_t *fl_len, uint32_t *o
             *ota_len = ota_rd32(e + 12);
         }
     }
+    if(seen_flash!=1u || seen_ota!=1u)return -3;
+    return 0;
+}
+
+/* RC1.0.9 cross-firmware APP_ONLY audit. The trusted community OTA writer
+ * never programs 0x0000..0x3fff. Do not compare an incoming *unused*
+ * bootheader to installed bytes. Instead prove the incoming encrypted JLFS
+ * app directory and the complete app + area CRCs are compatible first.
+ * Data is read through the normal USB-MIDI read protocol. Nothing is erased
+ * or committed until this has completed successfully. */
+#define OTA_FM1_CHIP_KEY 0x980Fu
+#define OTA_FM1_APP_SLOT 0x8DFBCu
+#define OTA_FM1_APP_OFFSET 0x4000u
+#define OTA_FM1_APP_XIP 0x02000120u
+#define OTA_FM1_APP_REL 0x120u
+
+static int ota_named(const uint8_t *p, const char *name, uint32_t maxlen)
+{
+    uint32_t j;
+    for (j=0; name[j] && j<maxlen; ++j) if (p[j] != (uint8_t)name[j]) return 0;
+    return j<maxlen && p[j]==0;
+}
+static void ota_sfc_decrypt(uint8_t *p, uint32_t off, uint32_t n)
+{
+    uint32_t i, k;
+    for(i=0;i<n;i+=32u){
+        uint32_t z=n-i>32u?32u:n-i;
+        k=OTA_FM1_CHIP_KEY ^ ((off+i)>>2);
+        for(uint32_t j=0;j<z;j++){
+            p[i+j] ^= (uint8_t)k;
+            k=((k<<1) ^ ((k&0x8000u)?0x1021u:0u))&0xffffu;
+        }
+    }
+}
+/* ota_host_app_compatible returns:
+ *   -21 malformed protected flash directory
+ *   -22 wrong chip or damaged ISD config
+ *   -23 incompatible SFC/XIP/app layout
+ *   -24 corrupt app or app-area CRC
+ * No destination header comparison: APP_ONLY writer does not use it. */
+static int ota_host_app_compatible(uint32_t fl_off, uint8_t *b, uint8_t *scratch)
+{
+    uint32_t j, isd_off, isd_len, isd_crc, app_area_len, app_crc, area_crc;
+    uint32_t chip_key=0, threshold=0, rel, n, low, high, isd_seen_crc=0;
+    uint32_t want_area_crc, want_app_crc;
+    if(ota_read(fl_off,scratch,160u))return -4;
+    for(j=0;j<160u;j+=32u)ota_jl_enc(scratch+j,32u);
+    if(ota_rd16(scratch)!=ota_crc16(scratch+2,30u,0) ||
+       ota_rd16(scratch+32)!=ota_crc16(scratch+34,30u,0) ||
+       ota_rd16(scratch+64)!=ota_crc16(scratch+66,30u,0) ||
+       ota_rd16(scratch+96)!=ota_crc16(scratch+98,30u,0) ||
+       ota_rd32(scratch+100)!=OTA_FM1_APP_OFFSET ||
+       scratch[108]!=0x81u || !ota_named(scratch+112,"app_dir_head",16u) ||
+       !ota_named(scratch+80,"isd_config.ini",16u))return -21;
+    isd_off=ota_rd32(scratch+68);
+    isd_len=ota_rd32(scratch+72);
+    isd_crc=ota_rd16(scratch+66);
+    if(isd_off<0xa0u || isd_off>=OTA_FM1_APP_OFFSET ||
+       isd_len<34u || isd_len>2048u || isd_len>OTA_FM1_APP_OFFSET-isd_off)return -22;
+    for(rel=0;rel<isd_len;rel+=n){
+        n=isd_len-rel;
+        if(n>512u)n=512u;
+        if(ota_read(fl_off+isd_off+rel,b,n))return -4;
+        if(rel==0u){
+            for(j=0;j<16u;j++)threshold+=b[j];
+            threshold &= 0xffu;
+            if(threshold>=0xe0u)threshold=0xaau;
+            else if(threshold<=0x10u)threshold=0x55u;
+            for(j=0;j<16u;j++)if(((uint32_t)b[16u+j]^(uint32_t)b[15u-j])<threshold)chip_key|=1u<<j;
+        }
+        isd_seen_crc=ota_crc16(b,n,isd_seen_crc);
+    }
+    if(isd_seen_crc!=isd_crc || chip_key!=OTA_FM1_CHIP_KEY)return -22;
+    if(ota_read(fl_off+OTA_FM1_APP_OFFSET,b,0x120u))return -4;
+    ota_sfc_decrypt(b,0u,0x120u);
+    app_area_len=ota_rd32(b+8u);
+    if(ota_rd16(b)!=ota_crc16(b+2u,30u,0) ||
+       ota_rd32(b+4u)!=OTA_FM1_APP_XIP ||
+       app_area_len<OTA_FM1_APP_REL+OTA_FM1_APP_SLOT ||
+       app_area_len>0x93000u-OTA_FM1_APP_OFFSET ||
+       b[12]!=0x83u || !ota_named(b+16u,"app_area_head",16u) ||
+       ota_rd16(b+0x20u)!=ota_crc16(b+0x22u,30u,0) ||
+       ota_rd32(b+0x24u)!=OTA_FM1_APP_REL ||
+       ota_rd32(b+0x28u)!=OTA_FM1_APP_SLOT ||
+       b[0x2cu]!=0x82u || !ota_named(b+0x30u,"app.bin",16u))return -23;
+    want_area_crc=ota_rd16(b+2u);
+    want_app_crc=ota_rd16(b+0x22u);
+    app_crc=0u;area_crc=0u;
+    for(rel=0x20u;rel<app_area_len;rel+=n){
+        n=app_area_len-rel;
+        if(n>512u)n=512u;
+        if(ota_read(fl_off+OTA_FM1_APP_OFFSET+rel,b,n))return -4;
+        ota_sfc_decrypt(b,rel,n);
+        area_crc=ota_crc16(b,n,area_crc);
+        low=rel>OTA_FM1_APP_REL?rel:OTA_FM1_APP_REL;
+        high=rel+n<OTA_FM1_APP_REL+OTA_FM1_APP_SLOT?rel+n:OTA_FM1_APP_REL+OTA_FM1_APP_SLOT;
+        if(high>low)app_crc=ota_crc16(b+low-rel,high-low,app_crc);
+        ota_idle();
+    }
+    /* CRCs are in the decrypted app area and app.bin descriptors. */
+    if(area_crc!=want_area_crc || app_crc!=want_app_crc)return -24;
     return 0;
 }
 
@@ -339,10 +450,10 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
     }else return -16;
     ota_show(2,0);
     if(!official_stock_restore){
-        for(i=0;i<0x4000u;i+=512u){
-            if(ota_read(fl_off+i,b,512)||ota_fread(i,mine,512))return -4;
-            if(!ota_memeq(b,mine,512))return -5;
-        }
+        /* Native app-only writer preserves installed boot ROM/bootloader.
+         * Validate the *actual* incoming app, not the unused first 16 KiB. */
+        rc=ota_host_app_compatible(fl_off,b,mine);
+        if(rc)return rc;
     }
     if(!etch_ota_available(b))return -15;
     /* 4. stage the package's loader: erase, body, verify, head last */
@@ -402,7 +513,7 @@ static int ota_session(void)
     uint32_t i;
     int rc;
     ota_touched=0;
-    ota_deadline = ota_now_ms() + 120000u;          /* step 1 normally takes ~5 s; a stalled host gives up after 2 min */
+    ota_deadline = ota_now_ms() + 300000u;          /* native CRC replay reads the full app; finite 5-minute session limit */
     rc = ota_stage();
     if (rc) {
         if(ota_unstage())rc=-17;

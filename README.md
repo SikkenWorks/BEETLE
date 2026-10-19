@@ -33,7 +33,7 @@
 **Open-source six-lane tracker and digital drum machine for the M-VAVE FM1.**  
 **SikkenWorks · Joppe Sikken · Born out of passion.**
 
-**Current development version: 1.01 RC1.0.8** · [Changelog](CHANGELOG.md)
+**Current development version: 1.01 RC1.0.9** · [Changelog](CHANGELOG.md)
 
 BEETLE public beta builds are tested on a physical FM1 by the project maintainer before GitHub publication. Particular new features still require verification as part of that release process.
 
