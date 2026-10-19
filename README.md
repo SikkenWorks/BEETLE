@@ -1,239 +1,211 @@
-# BEETLE
-
 <p align="center">
-  <img src="BEETLE.png" alt="BEETLE" width="400">
+  <img src="BEETLE.png" alt="BEETLE" width="320">
 </p>
 
-<div align="center">
-  <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html">
-    <img
-      src="https://img.shields.io/badge/▲_INSTALL-BEETLE_(CHROME%2FEDGE)-000000?style=for-the-badge&labelColor=000000&logoColor=white"
-      alt="Install BEETLE (Chrome/Edge)"
-      width="450"
-    />
-  </a>
+<h1 align="center">BEETLE</h1>
+<p align="center">
+  <strong>An open-source six-lane tracker and digital drum machine for the M-VAVE FM1.</strong><br>
+  SikkenWorks · Born out of passion.
+</p>
 
-  <a href="https://sikkenworks.github.io/BEETLE/simulator.html">
-    <img
-      src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_WEB_SIMULATOR-000000?style=for-the-badge&labelColor=000000&logoColor=white"
-      alt="Launch BEETLE Web Simulator"
-      width="450"
-    />
-  </a>
+<p align="center">
+  <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html"><img src="https://img.shields.io/badge/▲_INSTALL_BEETLE-000000?style=for-the-badge" alt="Install BEETLE"></a>
+  <a href="https://sikkenworks.github.io/BEETLE/simulator.html"><img src="https://img.shields.io/badge/▶_WEB_SIMULATOR-000000?style=for-the-badge" alt="Open BEETLE Web Simulator"></a>
+  <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html"><img src="https://img.shields.io/badge/▶_PROJECT_MANAGER-000000?style=for-the-badge" alt="Open BEETLE Project Manager"></a>
+</p>
 
-  <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html">
-    <img
-      src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_PROJECT_MANAGER-000000?style=for-the-badge&labelColor=000000&logoColor=white"
-      alt="Launch BEETLE Web Simulator"
-      width="450"
-    />
-  </a>
-</div>
-
-**Open-source six-lane tracker and digital drum machine for the M-VAVE FM1.**  
-**SikkenWorks · Joppe Sikken · Born out of passion.**
-
-**Current development version: 1.01 RC1.0.11** · [Changelog](CHANGELOG.md)
-
-BEETLE public beta builds are tested on a physical FM1 by the project maintainer before GitHub publication. Particular new features still require verification as part of that release process.
-
-## Performance, instruments and controls
-
-- **Live Mixer** is available only after enabling SONG in Song Mode with SEL. While SONG is off, pressing ARP again stays in Song Mode. If SONG becomes disabled, Live Mixer closes and its mute keys are ignored.
-- **CH6 NOTE2 keyboard input:** select lane 6 and focus NOTE2 with K2. White keys insert a *second* drum hit (`1..14`) into the selected step without changing NOTE1 or advancing the step cursor. NOTE1 entry on the other columns retains its previous behavior.
-
-
-- **Punch-In FX:** hold an effect key and turn **K1** to adjust its parameter. **ALGORITHM** selects patterns when no Punch-In key is held. **Ring Mod** starts at **20** intensity, **Stutter** starts at **×1**, and the current tempo drives Stutter divisions.
-- **Normal MIXER and Live Mixer:** the six mapped **black keys mute** lanes CH1–CH6; the six adjacent **white keys SOLO** those lanes. Active SOLO and MUTE illuminate the corresponding FM1 key LEDs. Live Mixer mute/solo each follow their own OCT-selectable quantization preference.
-- **MASTER FX:** turn **SELECT** to choose EQ/Compressor/Reverb, adjust all four knobs with **K1–K4**, press **SEL** to enable/disable the selected effect.
-- **EDIT:** waveform TYPE preferences have independent ADSR, cutoff, oscillator and other synth parameter settings in each patch slot. New saves use **project format V19**, while supported older V16 projects migrate without losing their current active patches.
-- **HELP:** its final page now shows a complete end-of-list counter rather than an unreachable row range.
-
-**SONG CHAINS (RC1.0.11):** POS is the song position, not a pattern number. Every row displays its source pattern separately as **CH1 CH2 CH3 CH4 CH5 DR REP**. For example POS 02 with synths P02 and DR P01 plays the drum lane from pattern 01 together with synth lanes from pattern 02. A new POS 03 row starts as P03 on all six channels (not a copy of the previous row), with REP 1. For POS above 48, the default is P48. Edit each column with K2/K3; a value of `--` silences that lane for that row. Individual lane content including CH6 NOTE1/NOTE2 FX is taken from the referenced source pattern. Playback composes data temporarily; it does not modify stored patterns. Recorded global Punch-In automation comes from the CH1 source pattern and is silent when CH1 is `--`. Historical V18 songs automatically map their single pattern number to all six lane sources on load. V19 projects cannot be imported into older V18 firmware.
-
-## Mixer and channel volume
-
-- New projects: synth CH1–CH5 at 50%, drums CH6 at 80%; normal mixer 0–120% with potential clipping above 100%; normal Q MUTES defaults OFF.
-- SONG-only Live Mixer operates on a temporary layer, while the regular Mixer remains persistent in projects. Independent Q MUTE and Q SOLO default ON for the performance page.
-
-## Tracker keyboard and octave controls
-
-- In TRACKER, a musical-key press always enters a note in **NOTE**, no matter whether the highlighted column is NOTE, INS, CHD or FX. Existing column values are preserved. CH6 enters the main drum NOTE.
-- Hold **SEQ** and press **OCT−** or **OCT+** on an existing synth NOTE to shift that saved step by one octave with note preview. This works from any tracker column; empty and stop steps are ignored. Undo/Redo supports the change.
-- OCT− / OCT+ without SEQ changes the live keyboard octave (−4 to +3), never previously saved notes. On hardware, the matching OCT LED remains lit while the keyboard octave is below or above zero.
-
-## Current workflow
-
-- **Live performance:** GLO opens MIXER, then **SEL** toggles QUANT MUTES ON/OFF. Select a lane with K1 and MUTE with K2; K3 changes the state, or use a mapped black key. With ON, changes during PLAY queue to the next pattern boundary; with OFF they apply immediately. Turning OFF applies already queued changes immediately. This setting is saved with the project (V13).
-
-- **Sequencer 2.0:** K1 cannot move past the current pattern length. Stop transport, hold SEQ and turn K4 to adjust current pattern length (1–16), or queue a pattern while playing with ALGORITHM. A queued change starts on the next pattern boundary, not immediately. Song Mode continues to control song sequencing. In the WebSimulator use PAT LEN −/+, hold SEQ while turning K4, or Shift+click a K4 button.
-- **Project LOAD safety:** SEL pressed during project reading will not clear a step upon return to the tracker. Wait until the load finishes and release the key before editing.
-
-- **Step Dynamics (V0.59):** `SEQ + FX` from the tracker opens velocity/gate editing. K1 selects step, K2 selects velocity or gate, K3 edits, SEL resets; SEQ/HOME returns to tracker. Default gate remains legato for older projects.
-
-- **WebSimulator:** six-channel MIXER and 21 240×240 interface screens, with ARP for SONG/LIVE MIXER, GLO for MIXER, SEQ for TRACKER.
-- **PROJECTS → HELP:** scrollable on-device controls; K1 scrolls by one entry; K4 does nothing in HELP, HOME returns to PROJECTS and SEQ to the tracker. Includes the V0.57 editing shortcuts.
-- **MASTER FX:** K1 selects EQ, Compressor or Reverb; SEL toggles the selected effect. SELECT controls parameter 1 and K2–K4 control the remaining parameters. Hold SEQ and turn K4 to change effect order.
-- **Editing:** V0.57 adds full-pattern copy/paste, six-level RAM-only Undo/Redo and a one-lane block editor; see below and [CHANGELOG.md](CHANGELOG.md).
-
-### Performance Snapshots
-
-From MIXER (GLO), hold **SEQ + SEL** to open PERFORMANCE. Four independent snapshots store the six channels' mute configuration. K1 selects a slot; turning K2 saves the current mute state; K3 or SEL recalls; HOME/GLO returns to MIXER and SEQ to TRACKER. With Quantized Mutes ON during playback, recalls wait for the next pattern boundary; when OFF, they apply immediately. Snapshots persist in the V14 project format, and older V13 projects load with empty slots.
-
-V0.71 added SHA-256-verified WebSimulator project backups and a **read-only** native A/B bank audit utility; these do not provide or guarantee physical FM1 recovery. See [CHANGELOG.md](CHANGELOG.md).
-
-## What you can make
-
-- Write independent 1–16-step patterns for **CH1–CH5 (synth)** and **CH6 (digital drums)**; chain them in Song Mode.
-- Play up to **eight shared synth voices**. The drum synthesizer has its own voice pool; this is not a promise that every voice combination can run without glitches on physical hardware.
-- Use the **14-component, sample-ROM digital drum kit**: kick, snare, closed/open hats, three toms, crash, ride, clap, three percussion sounds and rim. Voices have individual editable pitch (−36 to +36 semitones), attack, decay, sustain, tail/release, three-band tonal controls and level.
-- Use shared synth presets, VA oscillators, ADSR, detune, oscillator blending, drive, sub oscillator, noise and FM depth. EDIT offers twelve instrument TYPE options, including five SID-inspired flavors and three NES-inspired types (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`). Since V0.53 the 6581 and 8580 variants have separate filter and saturation character. These are not the original reSID engine.
-- Adjust **volume (0–120%), pan, mute, solo and swing (0–100)** for each lane. CH1–CH5 default to volume 50 and CH6 defaults to mixer volume 80, with increased internal drum source gain.
-- Add tracker step effects, including **volume and drum-pitch automation**, plus **velocity/gate per step (V0.59)**; use **[STP]** to stop sustained notes.
-- Apply eight live Punch-In commands: **REPEAT, RING MOD, FILTER, TAPE STOP, STUTTER, OCTAVE UP, OCTAVE DOWN and MUTE**. For effects 1–5, hold the relevant key and turn ALGORITHM to edit that effect's parameter.
-- Open a separate MASTER screen with a four-band graphical EQ, compressor, reverb and reorderable processing blocks. V0.52 adds compressor Attack and reverb Width, with four pixel-art knobs controlled independently by K1–K4. Hold SEQ and turn K4 to reorder the processing chain. These are FM1-constrained implementations, not bit-identical copies of desktop effects.
-
-## Professional editing
-
-In the tracker while transport is stopped, hold **SEQ** and press the physical black OP keys: **OP1** copies a lane, **OP2** pastes a lane, **OP3** copies the entire six-lane pattern plus recorded Punch-In FX, **OP4** pastes it, **OP5** Undo, **OP6** Redo. **SEQ + SEL** opens Block Editing (K4 start, K1 end, K2 action, K3 amount, SEL apply; HOME/SEQ exit). Native Undo/Redo stores six edit actions in RAM, not on flash. A new edit after Undo discards the redo branch. The WebSimulator provides explicit buttons for the same actions. The Block Editor uses the same black/white/magenta 1-bit BEETLE styling as the tracker.
-
-
-### Live Mute Groups
-
-- **GLO** opens Mixer. **SEQ+SEL** opens Performance Snapshots; **FX** from Performance opens **MUTE GROUPS**.
-- Four independently editable groups, each with a membership mask over the six lanes. On MUTE GROUPS: **K1** selects group, **K2** selects lane, **SEL** adds/removes lane, **K3** mutes/unmutes every member, **HOME** returns to snapshots, **SEQ** to tracker.
-- If all members are currently/queued muted, K3 unmutes the group; otherwise it mutes the entire group. Unassigned lanes are unaffected.
-- **Quantized Mutes ON** defers the group toggle until the next pattern boundary during PLAY; **OFF** applies it immediately. STOP cancels pending state; existing Performance Snapshots continue to recall full mute combinations.
-- Firmware project schema **V15** stores the four group masks. V14 and older supported projects initialize them empty. Browser exports/imports include these masks.
-
-## Controls and workflow
-
-| Where | Control | Function |
-| --- | --- | --- |
-| Tracker | **SELECT rotary** | Select CH1–CH6. Scrolling left from CH1 opens the recorded Punch-In-event lane; scrolling right past CH6 stops. |
-| Tracker | **ALGORITHM rotary** | Choose from the 48 patterns when no Punch-In key is held. |
-| Tracker | **K1 / K2 / K3** | Select step, select cell/column, change selected value respectively. |
-| Tracker | **SEL button** | Clear the currently selected step. |
-| Tracker | **PRESET rotary** | Cycle the selected note cell through its note, **[---]** (empty), and **[STP]**. |
-| Tracker | **ENV** | Insert **[STP]** directly. |
-| Tracker | **OCT− / OCT+** | With the cursor on an instrument cell, decrease/increase the instrument number (0–3). Otherwise use the normal synth octave controls. |
-| Tracker | **SEQ + OP1** | Copy the selected inclusive step range when active; otherwise copy the current pattern lane. |
-| Tracker | **SEQ + OP2** | Paste the copied range at the cursor, or paste the full copied lane. Keeps instrument, chord, note and FX data together, including drum NOTE2 FX. |
-| Tracker | **SEQ + rightmost black key (F#5)** | Open **CLEAR CURRENT LANE** for the selected channel and current pattern only. K1 selects YES/NO, SEL confirms, HOME cancels. Starts at NO; only available with playback stopped. Erases all 16 rows including notes, chords, instruments, FX, dynamics, groove and independent drum NOTE2 FX. Undo is supported. |
-| Tracker | **SEL (hold) + K1** | Select a step range including the starting step; **SEQ + OP1** then copies only the selection. |
-| Tracker | **SEQ + ALGORITHM** | Shift the active channel by one step per detent: left moves up, right moves down. Synth notes/chords/FX stay together; CH6 NOTE1 and NOTE2 shift independently with their FX. |
-| Tracker | **SEQ + OP3 / OP4** | Copy/paste the complete pattern including all six channels and Punch-In FX. |
-| Tracker | **SEQ + OP5 / OP6** | Undo / redo tracker edits. |
-| Mixer | **GLO** | Open/close the mixer. Six black OP keys can mute CH1–CH6; their LEDs indicate mute. |
-| Instrument Edit | **EDIT** | Open instrument parameters; on the next EDIT page access the drum component editor. |
-| Song Chains | **K1** | Select the song position (POS 01–64). The POS number remains visible alongside every channel heading. |
-| Song Chains | **K2** | Choose the CH1, CH2, CH3, CH4, CH5, DR or REP column. The active cell is outlined in magenta. |
-| Song Chains | **K3** | Choose a pattern independently for the selected channel (01–48, or `--` to silence that lane); on REP, set repeats 1–16. |
-| Song Chains | **OCT+ / OCT−** | Insert/delete a song row. New row defaults all six channels to the pattern matching its displayed POS (positions 49–64 use P48 because only 48 patterns exist); existing customized rows are not rewritten. |
-| Song Chains | **SEL** | Toggle SONG ON/OFF. Playback mixes six channel-specific pattern sources on one clock; shorter lane patterns repeat within a row. |
-| Song | **ARP** | Open Song Mode (not GLO double-click). |
-| Master | **LFO** | Open the master EQ/compressor/reverb chain. |
-| Punch-In | **REC / Punch-In screen** | Hold a Punch-In key for an effect; ALGORITHM adjusts that effect's stored setting. |
-| Projects | **SAVE / LOAD menus** | Work with 12 slots. A project stores patterns, instruments, mixer, drums, MASTER settings, song data and five Punch-In ALGORITHM parameters. |
-
-**Keyboard octave:** TRACKER and EDIT share the same octave range (−4 to +3). OCT−/OCT+ shift the live keyboard octave without transposing existing pattern notes. In EDIT, pressing both octave buttons together toggles MONO/POLY without shifting octave.
-
-**TYPE selection in EDIT:** the encoders step through all nine instrument types with wraparound.
-
-Some controls are context-sensitive. Screen labels and FM1 button names take precedence over this overview.
-
-### Punch-In FX
-
-- **REPEAT:** freezes and loops a recent audio snapshot. ALGORITHM changes its length.
-- **RING MOD:** multiplies the live stereo mix by a 440 Hz bipolar carrier, with ALGORITHM controlling wet intensity (default 20). Applies even if only CH6 drums are playing.
-- **FILTER:** opens at setting 0 by default; the ALGORITHM setting is retained.
-- **TAPE STOP:** progressively slows sample read speed and lowers pitch.
-- **STUTTER:** gates the current audio alternately on and off, with ALGORITHM-controlled speed.
-
-Each effect retains its own ALGORITHM value when released. SAVE/LOAD stores all five adjustable Punch-In settings; supported older projects open with default values where fields are missing.
-
-### Standard digital drum kit
-
-BEETLE boots with a **preconfigured digital kit**, not fourteen identical generic parameter sets. Kick emphasizes low body; snare uses a brighter wire texture; closed hats have shorter tails than open hats; toms have separate tuning; crash and ride have different envelopes; clap and rim are individually shaped. You can change each component in Drum Edit and save those changes with a project. The sounds are generated in software and must still be judged through the real FM1 output.
-
-## Projects, compatibility and storage safety
-
-- **12 project slots**, with journalled A/B storage where the experimental storage backend is enabled.
-- **Current project schema: V19.** Newly saved projects include per-step velocity and gate as well as the earlier MASTER parameters (compressor Attack and reverb Width). Supported older projects, including V10, V9 and earlier formats, remain readable; missing settings are initialized to defaults and old project data are not silently rewritten. V8 previously added the five Punch-In values; V6/V7/V8 compatibility was included in earlier regression tests.
-- The physical project record has a **finite capacity**. A fully populated project may not fit. An oversized project is rejected *before* any flash erase; do not assume all 48 six-lane patterns can be filled to capacity simultaneously.
-- **WARNING:** the storage-enabled build requires explicit first-use setup. The experimental storage region can overwrite legacy user data at addresses **`0x97000–0xDFFFF`**. Never initialize it without a verified full-flash backup and an independently working recovery path. Project writes are *disabled* in the pilot build.
-- The WebInstaller does not make a complete backup. Even a verified OTA transfer does not guarantee that the new firmware will boot or that USB recovery will remain available.
-
-## Build and test
-
-The target is the M-VAVE FM1 JieLi **pi32v2** environment. The JieLi cross-toolchain is a separate prerequisite; **the toolchain is not bundled**.
-
-```bash
-export JIELI_TOOLCHAIN=/path/to/jieli-linux-toolchain
-cd source
-python firmware/fm1-native/build.py --hardware-test
-python firmware/fm1-native/build.py --pilot
-# Destructive storage-capable variant, experimental only:
-python firmware/fm1-native/build.py --beetle-storage-lab --updater
-bash tests/track/run_v085.sh
-```
-
-Use a known-good version of Python, a C compiler with ASan/UBSan support for host tests, and the JieLi toolchain for the target. Source releases include an audited baseline of the hardware layer and package-integrity test scripts. **None of these tests substitute for physical device validation.**
-
-The documented release contains a standalone WebInstaller and `.fwsc` package; use a desktop browser with Web MIDI, a direct data cable, and the correct FM1 device identity. **Never bypass the installer identity or hash checks.**
-
-
-## Known limitations
-
-- Punch-In RING MOD replaces the older reverse command; saved projects may contain events with that former slot number.
-- PCM interpolation, the small target CPU, memory footprint and analogue FM1 output affect perceived quality.
-- The upstream/protected **OTA loader** has not been changed to force the pink BEETLE Matrix screen; it may still show ETCH branding during installation.
-- A full-screen redraw still requires two 120-row SPI transfers. Previous splash optimizations reduced unnecessary transfers and idle repaints, but smooth navigation and animation still require hardware measurement.
-- Flash ownership/recovery and sustained 8-voice + drum + MASTER FX load **remain experimental**.
-
-## Support
-
-If you find a bug, include the firmware version, what you pressed, your exact project state, and (when safe) a diagnostic log. Do not share a flash image containing private material publicly. Contributions that preserve realtime audio safety, backward compatibility and upstream copyright attribution are welcome.
-
-**BEETLE — SikkenWorks. Born out of passion.**
-
-## Project Manager V1.1 · Password-free BEETLE files
-
-The included project manager now exports and imports AES-GCM encrypted `.beetle` project files without requiring passwords. A shared key is bundled with the open-source web tools; protection is against casual text inspection and accidental corruption, not against determined decryption. BEETLE 1.01 RC1.0.11 WebSimulator can import legacy native TRK1 projects and JSON backups and export native V19 `.beetle` files, including independent SONG CHAINS sources. Device transfer requires the **experimental Project Transfer firmware**, and remains physically unverified. See `BEETLE-PROJECT-FORMAT-V2.md`.
+<p align="center">
+  <sub>Development release: <strong>RC1.0.11</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+</p>
 
 ---
 
-## Open-source origins, credits and licences
+## What is BEETLE?
 
-BEETLE is **not a clean-room firmware**. Parts of its low-level architecture and update pathway came from earlier open-source projects. These contributions are important and must remain credited:
+BEETLE turns the **M-VAVE FM1** into a standalone, hands-on music workstation. Compose patterns, play the built-in keyboard, design instruments, program drums, arrange songs and perform with live effects, all using the FM1's own controls.
 
-1. **Felucca**, by **Leo Kuroshita (@kurogedelic), Hügelton Instruments** — original M-VAVE FM1 hardware abstraction, startup and linker foundations, LCD, input scanning, audio and boot/OTA infrastructure used or carried forward in the ETCH/BEETLE native tree. [Felucca](https://github.com/hugelton/Felucca) is distributed under **GPL-3.0-only**. BEETLE includes a recorded SHA-256 audit for 19 preserved critical Felucca/HAL/bootstrap files in `source/reference/felucca-hal-sha256.json`; this proves equivalence only for the enumerated files, **not** that the entire application is unchanged upstream code.
-2. **ETCH**, by **SikkenWorks** — the prior SikkenWorks FM1 firmware and working **ETCH V1.37 firmware container/bootloader reference** on which BEETLE's device startup and `.fwsc` packaging workflow were based. Some `native_*`, flash/OTA, UI and shared hardware support modules retain ETCH lineage; the tracker, new digital drum instruments and project workflow are BEETLE-specific additions. The protected bootloader is intentionally kept unchanged for compatibility; the loader may still display older branding. [ETCH](https://github.com/SikkenWorks/ETCH).
-3. **JieLi Technology** — manufacturer of the AC79-series chip, target architecture, and tooling used to compile and package firmware. The released container inherits necessary device/SDK-format material from the verified reference package. Refer to original JieLi licensing terms and the upstream Felucca licence notices; third-party toolchain binaries are not part of this repository.
-4. **reSID**, originally developed by **Dag Lem** — acknowledged for its historical and technical contribution to SID chip emulation and as an inspiration for BEETLE's SID-style instruments. **Not included as a compiled or linked dependency.** [reSID repository](https://github.com/libsidplayfp/resid). See `source/CREDITS-AND-LICENSES.md` for further detail.
-5. **Nes_Snd_Emu**, originally developed by **Shay Green (blargg)**, with the linked fork maintained by **James Athey** — NES APU emulator and technical reference for BEETLE's three NES-style instruments: **NES PULSE**, **NES TRIANGLE** and **NES NOISE**. [Nes_Snd_Emu](https://github.com/jamesathey/Nes_Snd_Emu) is distributed under **LGPL-2.1**. **The original Nes_Snd_Emu C++ library is not copied, compiled or linked into BEETLE**; the BEETLE engine is an independent lightweight C implementation. See `source/CREDITS-AND-LICENSES.md` and `source/LICENSES/NES-SND-EMU-LGPL-2.1.txt` for reference and licence details.
+| | |
+| :-- | :-- |
+| **6 channels** | CH1–CH5: synthesizers · CH6: digital drums with two hits per step |
+| **48 patterns** | 1–16 steps per pattern, with independent channel content |
+| **Song Chains** | 64 song positions with a separate pattern source for each channel |
+| **Sound engine** | Up to eight shared synth voices, separate drum voices, 14 drum instruments |
+| **Sound design** | VA, SID-inspired and NES-inspired instruments, patch editing and an eight-slot project instrument library |
+| **Performance** | Mixer, mute/solo, Punch-In FX, snapshots and mute groups |
+| **Projects** | 12 project slots, plus browser-based backup and project tools |
 
+## Where to Start
 
-Felucca's own attribution document, preserved at **`source/LICENSES/FELUCCA-LICENSING.txt`**, identifies additional third-party projects in the broader upstream repository: **DaisySP** (Electrosmith / Emilie Gillet, MIT), **Rings** (Emilie Gillet, MIT), **msfa/Dexed** (Google / Pascal Gauthier, Apache-2.0), **CrispyZebra**, **Fukiai**, **Inter Tight**, **DotGothic16**, **Versilian Studios VSCO-2**, **klattsch**, and **X0X**. Those are upstream acknowledgments: **this BEETLE target build does not claim to embed all of those engines, fonts, or audio assets**. See Felucca's corresponding source and notices for the actual upstream file-level relationships.
+You can learn the workflow in a few minutes using the [Web Simulator](https://sikkenworks.github.io/BEETLE/simulator.html), or follow the same controls on an FM1 running BEETLE.
 
-The enlarged two-frame pink loading artwork is derived from an image **provided by the BEETLE project user**. The firmware draws it in nearest-neighbour pixel scaling without an external icon-font dependency.
+1. **Open the tracker.** Press **SEQ**. This is your main editing screen.
+2. **Choose a channel.** Turn **SELECT**: CH1–CH5 are synth lanes; CH6 is the drum lane.
+3. **Pick a pattern.** Turn **ALGORITHM** to choose one of the 48 patterns while stopped.
+4. **Move around the grid.** Turn **K1** for the step (row) and **K2** for the field (column). Turn **K3** to change the selected value.
+5. **Enter a sound.** Press a musical key to write a note or drum hit. The tracker normally advances after the main note is entered. On CH6, selecting **NOTE2** with K2 lets you enter a second drum hit without overwriting NOTE1 or advancing the step.
+6. **Correct mistakes.** **SEL** clears the selected step. **ENV** inserts a note stop (`[STP]`) in the focused note field; it is *not* the same as clearing the entire step. Use **SEQ + OP5** to undo an edit.
+7. **Play it back.** Press **PLAY/STOP**. Change the tempo with **K4**. Stop playback before making structural edits.
+8. **Build the sound and arrangement.** Press **EDIT** for instruments, **GLO** for the mixer, **LFO** for master effects, or **ARP** for Song Chains. Press **SEQ** to return to the tracker.
+9. **Save your work.** Press **SAVE**, or open **HOME → SAVE / SAVE AS** to manage a project slot.
 
-### reSID credits and acknowledgment
+> **FM1 terminology:** **SEL** means the physical SELECT push-button; **SELECT** in this guide means the *rotary encoder*. **OP1–OP6** are the six mapped black musical keys used with **SEQ**. The function of some controls changes with the current screen.
 
-**reSID — original author: Dag Lem.** reSID is a reverse-engineered emulation of the MOS6581 SID (Sound Interface Device), developed for Commodore 64 audio. See the original project: **[libsidplayfp/reSID](https://github.com/libsidplayfp/resid)** (a mirror of VICE's reSID), including its `AUTHORS` and licensing notices.
+## FM1 Controls
 
-BEETLE acknowledges **Dag Lem and the reSID project** as an influence on its SID-inspired instrument design. BEETLE includes five SID-style instruments (`SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, and `SID NOISE`), implemented in BEETLE's separate lightweight synth engine. **BEETLE does not bundle, compile, link, or run the original reSID C++ source code.** It is not cycle-accurate reSID emulation.
+### Buttons
 
-### NES APU credits and acknowledgment
+Every dedicated button is listed here with its role in BEETLE.
 
-**Nes_Snd_Emu — original author Shay Green (blargg); linked fork maintained by James Athey.** [Project and source](https://github.com/jamesathey/Nes_Snd_Emu). Its upstream licence is **GNU LGPL 2.1** and a reference copy is included in `source/LICENSES/NES-SND-EMU-LGPL-2.1.txt`.
+| FM1 button | What it does in BEETLE |
+| :-- | :-- |
+| **FX** | Opens **Per-Step FX** for the selected step. Press again to reach **Punch-In FX**. In the Performance screen, opens **Mute Groups**. |
+| **SEL** | In the tracker, **clears the selected step** on release. Elsewhere it confirms a choice, toggles an option or applies the screen's highlighted action. Hold it and rotate K1 in the tracker to select a range. |
+| **ENV** | **Stops the selected note** by writing `[STP]` in the focused NOTE or drum NOTE2 field. This is a note-stop command, not full step deletion. |
+| **LFO** | Opens **MASTER FX**: EQ, compressor and reverb. |
+| **EDIT** | Opens the **Instrument Editor**. Press again to reach the drum component editor where applicable. |
+| **GLO** | Opens or closes the regular **Mixer**. |
+| **HOME** | Opens **Projects** for New, Save, Load, Help and related tools. **Hold HOME** to open the Scale Guide. |
+| **SAVE** | Opens the project save workflow or saves the current named project. |
+| **ARP** | Opens **Song Chains**. When SONG is enabled, pressing ARP from Song Chains opens the **Live Mixer**; pressing again returns to Song Chains. |
+| **SEQ** | Returns to the **Tracker** and acts as the modifier for editing shortcuts. |
+| **PLAY/STOP** | Starts or stops playback. When SONG is enabled, playback follows the Song Chain. |
+| **REC** | Arms or disarms **Punch-In recording**. During playback, held Punch-In keys can be captured as performance automation. |
+| **OCT− / OCT+** | Changes the live keyboard octave (−4 to +3) without changing previously saved notes. On Song Chains, removes/adds a song position. Other screens may assign contextual actions. |
 
-BEETLE's **NES PULSE**, **NES TRIANGLE** and **NES NOISE** types use an independent, lightweight fixed-point C implementation in `source/firmware/fm1-native/beetle_nes_apu.h`, informed by NES APU behavior and the Nes_Snd_Emu technical reference. **No original Nes_Snd_Emu source is embedded, copied, compiled or linked.** This is a NES-inspired synthesizer, not the full original Nes_Snd_Emu emulator and not a cycle-accurate NES APU. BEETLE's source remains **GPL-3.0-only**.
+### Rotary encoders
 
-The full attribution and distinction between incorporated code and inspirations are documented in [`source/CREDITS-AND-LICENSES.md`](source/CREDITS-AND-LICENSES.md).
+| Encoder | Primary function | Other important uses |
+| :-- | :-- | :-- |
+| **SELECT** | Choose CH1–CH6 in the Tracker. Turning left from CH1 reaches the recorded Punch-In event lane. | Choose MASTER FX blocks or drum components on their respective screens. |
+| **ALGORITHM** | Select patterns **01–48** in the Tracker. | **SEQ + ALGORITHM** shifts the selected lane's steps up/down while stopped. |
+| **PRESET** | Cycle a focused NOTE through **note / `[---]` (empty) / `[STP]` (stop)**. | On CH6 NOTE2, cycles its second-hit value, empty and stop states. |
+| **K1** | Move vertically through tracker steps. | Select rows/items; adjust an active Punch-In effect parameter **while its key is held**. |
+| **K2** | Move horizontally between tracker fields. | Select columns, parameters and Song Chain sources. |
+| **K3** | Change the focused tracker value. | Edit the selected parameter in most BEETLE editors. |
+| **K4** | Change tempo (BPM). | **SEQ + K4** sets pattern length while stopped; contextually selects project slots or adjusts a MASTER FX parameter. |
 
-### Source licence and distribution obligations
+**Punch-In parameter note:** On **1.01 RC1.0.11**, the native firmware uses **K1**, not ALGORITHM, to adjust an effect while its Punch-In key is held. ALGORITHM is the pattern encoder in the tracker.
 
-The included native firmware and derivatives are distributed under **GNU GPL v3 only (`GPL-3.0-only`)**, preserving the licence of Felucca-derived source. The full GPL text is at `source/LICENSE`. If you distribute a modified BEETLE firmware, provide its complete corresponding source and all applicable copyright notices, including relevant Felucca notices. The presence of a working binary, WebInstaller or bootloader does **not** by itself satisfy source-offer requirements.
+### Musical keys
 
-See `source/LICENSES/FELUCCA-LICENSING.txt` and copyright/SPDX headers in individual source files. For code with unclear lineage, retain the upstream notices rather than claiming exclusive SikkenWorks authorship.
+| Where | What the keyboard does |
+| :-- | :-- |
+| **Tracker / CH1–CH5** | Enter synth notes. Pressing a key writes to NOTE even if another tracker column has focus; existing instrument/chord/FX fields are preserved. |
+| **Tracker / CH6** | Enter a drum in NOTE1, or a separate second hit when **NOTE2** is focused. |
+| **Instrument Editor** | Audition the selected synth patch without adding tracker notes. |
+| **Drum Editor** | Audition the selected drum component. |
+| **Mixer / Live Mixer** | The six assigned **black keys mute CH1–CH6**; their six corresponding **white keys solo CH1–CH6**. LEDs reflect active mute/solo states. |
+| **Punch-In FX / REC armed** | Eight assigned white keys, from left to right, hold the eight performance effects. Release the key to end the held effect. |
+
+### Editing shortcuts
+
+These combinations apply in the **Tracker** unless another screen is specified. Most destructive editing requires playback to be stopped.
+
+| Hold / press | Result |
+| :-- | :-- |
+| **SEQ + OP1** | Copy the current lane, or the selected step range if a range is active. |
+| **SEQ + OP2** | Paste the copied lane or range at the appropriate destination. |
+| **SEQ + OP3** | Copy the complete six-channel pattern and recorded Punch-In events. |
+| **SEQ + OP4** | Paste the complete pattern and Punch-In events. |
+| **SEQ + OP5 / OP6** | Undo / Redo. The available undo history lives in RAM. |
+| **Hold SEL + turn K1** | Select an inclusive range of tracker steps for range copying. |
+| **SEQ + SEL** | Open **Block Editing** (Tracker), or **Performance Snapshots** (Mixer). |
+| **SEQ + FX** | Open **Step Dynamics** (velocity and gate). |
+| **SEQ + ENV** | Open **Step Groove** (microtiming, ratchets and probability). |
+| **SEQ + OCT− / OCT+** | Transpose the saved synth note at the cursor down/up one octave, with preview. |
+| **SEQ + K4** | Change the current pattern length (1–16 steps) while stopped. |
+| **SEQ + ALGORITHM** | Rotate the selected channel's step data upward/downward while stopped. |
+| **SEQ + EDIT** | Open the eight-slot **Instrument Library** from the Instrument Editor. |
+| **SEQ + rightmost black key (F#5)** | Open **CLEAR CURRENT LANE**. K1 selects YES/NO, SEL confirms; HOME cancels. Erases only the current channel in the current pattern; supports Undo. |
+| **OCT− + OCT+ in EDIT** | Toggle instrument **MONO/POLY** without changing keyboard octave. |
+
+## The Main Screens
+
+### Tracker
+
+Each pattern holds up to 16 steps for each of six lanes. The highlighted cell is edited with K1/K2/K3; the keyboard enters notes. `[---]` means no new note, while `[STP]` ends a sounding note. **CH6** has independent NOTE1 and NOTE2 drum hits and their own step FX. Use **FX** for effects and **SEQ + FX / ENV** for step dynamics and groove.
+
+### Instrument Editor and Library
+
+Press **EDIT** to adjust synth types, oscillators, envelopes, filters and patch settings. BEETLE includes VA, SID-inspired and NES-inspired sound types. Instrument settings are independent across patch slots. The **Instrument Library** (SEQ + EDIT) keeps eight named patches *inside the current project*; its STORE, LOAD, COPY and RENAME actions use K1 for slot, K2 for action, K3 for active instrument, K4 for copy destination, and SEL to execute. Save the project to keep library changes.
+
+### Mixer and Live Mixer
+
+Press **GLO** for the regular six-lane mixer: volume (0–120%), pan, mute, solo and swing. K1 selects a lane, K2 selects its parameter and K3 edits it. **SEL** toggles quantized mutes. With quantization enabled, mute changes during playback take effect at the next pattern boundary; otherwise they are immediate. New projects start with synth lane volume 50%, drum lane volume 80% and regular-mixer quantized mutes OFF.
+
+The **Live Mixer** is separate and only available when **SONG is ON**. Its mute/solo changes are temporary performance overrides, not edits to the persistent mixer. **OCT−** toggles live quantized mute and **OCT+** toggles live quantized solo independently; both default ON. Its mapped black keys mute lanes and the matching white keys solo them.
+
+From the regular Mixer, **SEQ + SEL** opens four **Performance Snapshots** (K1 slot, K2 save, K3/SEL recall). Press **FX** there to enter **Mute Groups**: K1 chooses one of four groups, K2 chooses its member lane, SEL adds/removes membership and K3 toggles the whole group. Both features follow the mixer's quantization behavior during playback.
+
+### MASTER FX
+
+Press **LFO** for the master effects chain. Turn **SELECT** to focus **EQ**, **Compressor** or **Reverb**; turn **K1–K4** to adjust the block's four parameters; press **SEL** to enable/disable it. Hold **SEQ** and turn **K4** to change processing order. Master effects apply to the overall output.
+
+### Punch-In FX
+
+Press **FX** until **PUNCH-IN FX** is displayed, or arm **REC** to use the keyboard for performance effects. Hold one of the eight mapped white keys. For the first five effects, **turn K1 while holding the key** to edit its setting; the last three are direct actions without a K1 parameter.
+
+| Effect | Behavior |
+| :-- | :-- |
+| **REPEAT** | Loops a short recent audio fragment. K1 adjusts its length. |
+| **RING MOD** | Applies ring modulation to the current mix. K1 adjusts intensity (default 20). |
+| **FILTER** | Applies a live filter. K1 adjusts its setting. |
+| **TAPE STOP** | Slows the audio and drops its pitch. K1 adjusts its setting. |
+| **STUTTER** | Rhythmically gates the mix. K1 chooses a tempo-related rate (default ×1). |
+| **OCT UP** | Temporarily shifts the effect's pitch upward. |
+| **OCT DOWN** | Temporarily shifts the effect's pitch downward. |
+| **MUTE** | Temporarily mutes the output. |
+
+The five adjustable Punch-In settings are saved with the project. With **REC** armed and playback running, BEETLE can record held effects and parameter changes for later playback.
+
+### Song Chains
+
+Press **ARP** to arrange patterns into a complete song. A song has up to **64 positions**. Each position can draw **each of its six channels from a different pattern**: `CH1 CH2 CH3 CH4 CH5 DR REP`.
+
+| Control | In Song Chains |
+| :-- | :-- |
+| **K1** | Select song position (POS 01–64). |
+| **K2** | Select source column (CH1–CH5, DR or REP). |
+| **K3** | Choose source pattern 01–48, `--` for a silent channel, or repeats 1–16 in REP. |
+| **OCT+** | Insert a new song position. Each channel defaults to the pattern matching that position (POS above 48 defaults to P48). |
+| **OCT−** | Delete the selected song position. |
+| **SEL** | Turn SONG ON or OFF. |
+| **ARP** | With SONG ON, switch between Song Chains and Live Mixer. |
+
+**Example:** POS 02 can play CH1–CH5 from **P02** while DR uses **P01**. The source patterns remain unchanged. Shorter source patterns loop within the song position. Recorded global Punch-In events use the CH1 source pattern; setting CH1 to `--` also silences those events for that position.
+
+### Projects and Project Manager
+
+Press **HOME** to access **NEW**, **SAVE**, **SAVE AS**, **LOAD**, **HELP** and other project tools. There are **12 project slots**. A project saves patterns, song arrangements, instruments and library, drums, mixer, effects and performance settings. The current project data schema is **V19**; supported older projects are migrated when loaded. V19 files cannot be opened in older V18 firmware.
+
+The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html) can import/export `.beetle` files. Its AES-GCM file encoding uses a shared key included in the open-source tools: this protects against casual inspection or corruption, **not determined decryption**. Direct device transfer requires the **experimental Project Transfer firmware** and has not been confirmed on physical hardware.
+
+**Storage and firmware safety:** On-device flash capacity is finite, so an entirely filled 48-pattern project is not guaranteed to fit. The experimental storage backend may overwrite older user data in `0x97000–0xDFFFF` on first-use provisioning. Obtain a verified full-flash backup and a working independent recovery method before experimenting with destructive storage or firmware updates. The WebInstaller does not make a full device backup, and successful transfer verification does not guarantee a bootable firmware or working recovery path.
+
+For setup and build instructions, see [`docs/START-HERE.md`](docs/START-HERE.md). For release-specific fixes and historical changes, see [`CHANGELOG.md`](CHANGELOG.md).
+
+## Support
+
+For a bug report, include your BEETLE firmware version, the screen and buttons involved, steps to reproduce, and relevant project details. Share diagnostic logs only when safe; do **not** upload a private full-flash dump publicly. Contributions should preserve real-time audio safety, backward compatibility and third-party attributions.
+
+---
+
+## Credits and Licences
+
+BEETLE is developed by **SikkenWorks (Joppe Sikken)**. It builds on earlier open-source FM1 work and is **not a clean-room firmware**. The following credits and licence distinctions are part of the project and must be retained.
+
+| Project / contributor | Contribution and licence relationship |
+| :-- | :-- |
+| **[Felucca](https://github.com/hugelton/Felucca)** · **Leo Kuroshita (@kurogedelic), Hügelton Instruments** | Original FM1 hardware abstraction, startup/linker foundations, LCD, input scanning, audio and boot/OTA infrastructure carried forward in the ETCH/BEETLE native tree. **GPL-3.0-only.** The SHA-256 audit in `reference/felucca-hal-sha256.json` verifies 19 listed critical files only, not identity of the entire firmware. |
+| **[ETCH](https://github.com/SikkenWorks/ETCH)** · **SikkenWorks** | Earlier FM1 firmware supplying the working ETCH V1.37 firmware-container/bootloader reference and lineage for some native, flash/OTA, UI and hardware-support modules. The BEETLE tracker, digital drum instruments and project workflow are BEETLE-specific. The protected bootloader remains unchanged and may show inherited branding. |
+| **JieLi Technology** | Manufacturer of the AC79-series target chip and associated toolchain/device SDK. Applicable JieLi and upstream notices continue to apply; third-party compiler toolchain binaries are not bundled. |
+| **[reSID](https://github.com/libsidplayfp/resid)** · **Dag Lem** | Original creator of reSID, a MOS6581 SID emulator and technical inspiration for BEETLE's five SID-style instruments: `SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`. **Original reSID C++ source is not bundled, compiled, linked or executed.** BEETLE's lightweight implementation is SID-inspired, not cycle-accurate reSID emulation. |
+| **[Nes_Snd_Emu](https://github.com/jamesathey/Nes_Snd_Emu)** · **Shay Green (blargg)**, fork maintained by **James Athey** | NES APU technical reference for BEETLE's `NES PULSE`, `NES TRIANGLE` and `NES NOISE` types. Upstream library: **LGPL-2.1**. BEETLE implements an independent, lightweight fixed-point C engine in `firmware/fm1-native/beetle_nes_apu.h`. **Original Nes_Snd_Emu C++ code is not copied, embedded, compiled or linked** and this is not cycle-accurate NES APU emulation. See `LICENSES/NES-SND-EMU-LGPL-2.1.txt`. |
+
+**Additional upstream attributions.** The preserved [`LICENSES/FELUCCA-LICENSING.txt`](LICENSES/FELUCCA-LICENSING.txt) acknowledges **DaisySP** (Electrosmith / Emilie Gillet, MIT), **Rings** (Emilie Gillet, MIT), **msfa/Dexed** (Google / Pascal Gauthier, Apache-2.0), **CrispyZebra**, **Fukiai**, **Inter Tight**, **DotGothic16**, **Versilian Studios VSCO-2**, **klattsch** and **X0X**. These are attributions within the broader upstream project; BEETLE does **not** claim to include all of those engines, fonts or sound assets.
+
+**Artwork.** The enlarged two-frame pink loading illustration derives from artwork supplied by the BEETLE project user and uses nearest-neighbour pixel scaling without an external icon-font dependency.
+
+**Source licence and redistribution.** BEETLE's native firmware and derivatives are distributed under **GNU GPL v3 only (`GPL-3.0-only`)**, preserving the licence of the Felucca-derived source. The full text is provided in [`LICENSE`](LICENSE). When distributing modified firmware, provide the complete corresponding source and applicable copyright, SPDX and upstream licence notices. A binary, WebInstaller or bootloader alone does not satisfy source-offer obligations. For detailed file-level provenance and third-party notices, see [`docs/CREDITS-AND-LICENSES.md`](docs/CREDITS-AND-LICENSES.md), [`LICENSES/FELUCCA-LICENSING.txt`](LICENSES/FELUCCA-LICENSING.txt) and the source-file headers. Where lineage is uncertain, retain upstream notices rather than claiming exclusive authorship.
+
+<p align="center"><strong>BEETLE · SikkenWorks · Born out of passion.</strong></p>
