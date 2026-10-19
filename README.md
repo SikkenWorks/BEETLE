@@ -1,38 +1,8 @@
-**Current release: BEETLE 1.01 RC1.0.5.** Project menu now includes double-confirmation full BEETLE project-storage wipe (12 slots), strictly limited to verified BEETLE-owned storage. This is experimental hardware functionality. See [`RC1.0.5-README.md`](RC1.0.5-README.md) before attempting it.
+> **Project Transfer V2:** The Project Manager can physically DELETE an occupied project slot to `[ EMPTY ]` when used with the updated experimental V2 firmware. V1 only supports export/import. Back up your projects first; real hardware deletion is not yet validated.
 
-**Current update: BEETLE 1.01 RC1.0.4.** See `RC1.0.4-README.md`.
+> **RC1.01 Project Transfer release:** this repository's [`WebInstaller.html`](WebInstaller.html) installs the **Project Manager-compatible** firmware, not the original RC1 package. Use [`BEETLE-Project-Manager.html`](BEETLE-Project-Manager.html) for USB project slots and [`simulator.html`](simulator.html) for the simulator. See [`START-HERE.md`](START-HERE.md) for safety and file details.
 
-> **RC1.02 update:** Reverse key/scale search, center-out startup LED ripple, Project Transfer V4 recovery for corrupted BEETLE-owned slots. See [RC1.02-README.md](../RC1.02-README.md). Experimental hardware operation is not independently validated.
-
-## BEETLE 1.01 RC1 — Current candidate
-
-CH6 ENV now updates only the focused drum note (NOTE1 or NOTE2). The WebSimulator also fixes PROJECTS selection overlap and tightens selection frames in other menus. Full history: [CHANGELOG.md](CHANGELOG.md).
-
-<div align="center">
-  <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html">
-    <img
-      src="https://img.shields.io/badge/▲_INSTALL-BEETLE_(CHROME%2FEDGE)-000000?style=for-the-badge&labelColor=000000&logoColor=white"
-      alt="Install BEETLE (Chrome/Edge)"
-      width="450"
-    />
-  </a>
-
-  <a href="https://sikkenworks.github.io/BEETLE/simulator.html">
-    <img
-      src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_WEB_SIMULATOR-000000?style=for-the-badge&labelColor=000000&logoColor=white"
-      alt="Launch BEETLE Web Simulator"
-      width="450"
-    />
-  </a>
-
-  <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html">
-    <img
-      src="https://img.shields.io/badge/▶_LAUNCH-BEETLE_PROJECT_MANAGER-000000?style=for-the-badge&labelColor=000000&logoColor=white"
-      alt="Launch BEETLE Web Simulator"
-      width="450"
-    />
-  </a>
-</div>
+> **PROJECT BACKUPS:** `BEETLE-Project-Manager.html` is the 12-slot encrypted backup/restore tool. It requires the Project Transfer firmware **included with this release**. The maintainer reports a working connection after selecting the correct installer; full hardware safety/recovery validation remains pending. See [Project Manager safety/usage](PROJECT-MANAGER-README.md).
 
 # BEETLE
 
@@ -42,17 +12,6 @@ CH6 ENV now updates only the focused drum note (NOTE1 or NOTE2). The WebSimulato
 **Current development version: 1.01 RC1** · [Changelog](CHANGELOG.md)
 
 BEETLE public beta builds are tested on a physical FM1 by the project maintainer before GitHub publication. Particular new features still require verification as part of that release process.
-
-## BEETLE 1.01 RC1: performance controls
-
-- **Live Mixer is SONG-only.** Open Song Mode via ARP; press SEL to enable SONG, then ARP again. Turning SONG off bypasses and clears every temporary Live Mixer MUTE/SOLO, with the normal saved mixer unchanged.
-- **Black keys (six leftmost):** lane MUTE. **Corresponding white keys:** lane SOLO. `[X] M` / `[X] S` are live; `[Q M]` / `[Q S]` indicate queued operations. Both have LED feedback.
-- **OCT− in Live Mixer:** Q MUTE ON/OFF. **OCT+ in Live Mixer:** Q SOLO ON/OFF. The two quantizers are independent, default ON in Live Mixer, commit at next pattern boundary during PLAY, and apply immediately when OFF or stopped.
-- **Punch-In:** hold an effect and turn K1. REPEAT, RING MOD, FILTER and TAPE STOP now change **one point per detent** (0–100). Stutter retains its seven musical rates. Ring Mod defaults to 20, Stutter to ×1.
-- **CH6 NOTE2:** with NOTE2 focused, ENV writes `[STP]` to NOTE2 only; NOTE1 remains exactly as it was. White-key entry continues to target NOTE2.
-- Master effects retain **SELECT** navigation, **K1–K4** controls and **SEL** ON/OFF; per-waveform ADSR and project format **V17** are retained.
-
-The complete version-by-version history is in [CHANGELOG.md](CHANGELOG.md). The experimental hardware/storage build still requires maintainer testing before publishing this candidate as a final 1.0 release.
 
 ## Performance, instruments and controls
 
@@ -76,10 +35,6 @@ The complete version-by-version history is in [CHANGELOG.md](CHANGELOG.md). The 
 - In TRACKER, a musical-key press always enters a note in **NOTE**, no matter whether the highlighted column is NOTE, INS, CHD or FX. Existing column values are preserved. CH6 enters the main drum NOTE.
 - Hold **SEQ** and press **OCT−** or **OCT+** on an existing synth NOTE to shift that saved step by one octave with note preview. This works from any tracker column; empty and stop steps are ignored. Undo/Redo supports the change.
 - OCT− / OCT+ without SEQ changes the live keyboard octave (−4 to +3), never previously saved notes. On hardware, the matching OCT LED remains lit while the keyboard octave is below or above zero.
-
-## Release history
-
-All release notes and version-by-version changes are kept exclusively in [CHANGELOG.md](CHANGELOG.md).
 
 ## Current workflow
 
@@ -191,6 +146,27 @@ Use a known-good version of Python, a C compiler with ASan/UBSan support for hos
 
 The documented release contains a standalone WebInstaller and `.fwsc` package; use a desktop browser with Web MIDI, a direct data cable, and the correct FM1 device identity. **Never bypass the installer identity or hash checks.**
 
+
+## Known limitations
+
+- Punch-In RING MOD replaces the older reverse command; saved projects may contain events with that former slot number.
+- PCM interpolation, the small target CPU, memory footprint and analogue FM1 output affect perceived quality.
+- The upstream/protected **OTA loader** has not been changed to force the pink BEETLE Matrix screen; it may still show ETCH branding during installation.
+- A full-screen redraw still requires two 120-row SPI transfers. Previous splash optimizations reduced unnecessary transfers and idle repaints, but smooth navigation and animation still require hardware measurement.
+- Flash ownership/recovery and sustained 8-voice + drum + MASTER FX load **remain experimental**.
+
+## Support
+
+If you find a bug, include the firmware version, what you pressed, your exact project state, and (when safe) a diagnostic log. Do not share a flash image containing private material publicly. Contributions that preserve realtime audio safety, backward compatibility and upstream copyright attribution are welcome.
+
+**BEETLE — SikkenWorks. Born out of passion.**
+
+## Project Manager V1.1 · Password-free BEETLE files
+
+The included project manager now exports and imports AES-GCM encrypted `.beetle` project files without requiring passwords. A shared key is bundled with the open-source web tools; protection is against casual text inspection and accidental corruption, not against determined decryption. BEETLE 1.01 RC1 WebSimulator can import native TRK1 V12–V17 files as well as its old JSON backup files and export native V17 `.beetle` files. Device transfer requires the **experimental Project Transfer firmware**, and remains physically unverified. See `BEETLE-PROJECT-FORMAT-V2.md`.
+
+---
+
 ## Open-source origins, credits and licences
 
 BEETLE is **not a clean-room firmware**. Parts of its low-level architecture and update pathway came from earlier open-source projects. These contributions are important and must remain credited:
@@ -225,24 +201,3 @@ The full attribution and distinction between incorporated code and inspirations 
 The included native firmware and derivatives are distributed under **GNU GPL v3 only (`GPL-3.0-only`)**, preserving the licence of Felucca-derived source. The full GPL text is at `source/LICENSE`. If you distribute a modified BEETLE firmware, provide its complete corresponding source and all applicable copyright notices, including relevant Felucca notices. The presence of a working binary, WebInstaller or bootloader does **not** by itself satisfy source-offer requirements.
 
 See `source/LICENSES/FELUCCA-LICENSING.txt` and copyright/SPDX headers in individual source files. For code with unclear lineage, retain the upstream notices rather than claiming exclusive SikkenWorks authorship.
-
-## Known limitations
-
-- Punch-In RING MOD replaces the older reverse command; saved projects may contain events with that former slot number.
-- PCM interpolation, the small target CPU, memory footprint and analogue FM1 output affect perceived quality.
-- The upstream/protected **OTA loader** has not been changed to force the pink BEETLE Matrix screen; it may still show ETCH branding during installation.
-- A full-screen redraw still requires two 120-row SPI transfers. Previous splash optimizations reduced unnecessary transfers and idle repaints, but smooth navigation and animation still require hardware measurement.
-- Flash ownership/recovery and sustained 8-voice + drum + MASTER FX load **remain experimental**.
-
-## Support
-
-If you find a bug, include the firmware version, what you pressed, your exact project state, and (when safe) a diagnostic log. Do not share a flash image containing private material publicly. Contributions that preserve realtime audio safety, backward compatibility and upstream copyright attribution are welcome.
-
-**BEETLE — SikkenWorks. Born out of passion.**
-
-### Fixes 1.01 RC1
-
-- PROJECTS WebSimulator: de roze menubalk blijft binnen de geselecteerde regel. Overige menu's zijn op dezelfde overlapfout gecontroleerd.
-- CH6 `ENV` werkt op de geselecteerde NOTE1 of NOTE2 zonder het andere drumveld te wissen; de audiorelease van NOTE1/NOTE2 is nu ook gescheiden.
-- De CREDITS behouden de originele auteurs, zonder de agressief geformuleerde code-ontkenning. Zie [code- en licentieaudit](CODE-PROVENANCE-AUDIT.md).
-- De volledige versiegeschiedenis staat in [CHANGELOG.md](CHANGELOG.md).

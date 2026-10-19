@@ -1,3 +1,7 @@
+# BEETLE · CHANGELOG
+
+All recorded firmware, simulator, installer and project-manager developments, newest first. For usage and controls, see [README.md](README.md).
+
 # RC1.0.5 — Double-Confirmed BEETLE Project Storage Wipe
 
 - FM1 PROJECTS adds **WIPE ALL STORAGE**; K1 choose NO/YES, SEL, two independent dialogs **ARE YOU SURE?** and **REALLY?** with default NO.
@@ -46,6 +50,8 @@
 - Chord voices attached to a root are fitted to the selected scale under LOCK.
 - Simulator behavior matches native code. Project Manager V1.4, true DELETE and format unchanged.
 - Experimental firmware: no independent physical FM1 validation.
+
+---
 
 ## BEETLE 1.01 RC1.01 · Project Transfer V2 TRUE DELETE
 
