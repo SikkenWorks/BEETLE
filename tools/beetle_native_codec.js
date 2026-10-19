@@ -1,5 +1,4 @@
-/* Native FM1 TRK1 V12-V17 -> browser simulator model. Based on track_project_store.c.
-   Rejects unknown or truncated data, and validates both native CRC32 fields. */
+/* SPDX-License-Identifier: GPL-3.0-only: BEETLE native TRK1 V12–V18 project codec. */
 const BeetleNative=(()=>{
  const crc=b=>{let c=0xffffffff;for(const v of b){c^=v;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (~c)>>>0;};
  const u16=(b,i)=>b[i]|(b[i+1]<<8), u32=(b,i)=>(b[i]|b[i+1]<<8|b[i+2]<<16|b[i+3]<<24)>>>0;
@@ -8,7 +7,7 @@ const BeetleNative=(()=>{
   const b=raw instanceof Uint8Array?raw:new Uint8Array(raw);
   if(b.length<42||b.length>24576||ascii(b.subarray(0,4))!=='TRK1')throw Error('Not a native FM1 TRK1 project.');
   const schema=u16(b,4),slot=u16(b,6);
-  if(schema<12||schema>17)throw Error('Native project schema V'+schema+' is not supported by this simulator importer (V12–V17).');
+  if(schema<12||schema>18)throw Error('Native project schema V'+schema+' is not supported by this simulator importer (V12–V18).');
   if(slot>=12||u32(b,8)!==b.length||u32(b,12)!==crc(b.subarray(24))||u32(b,16)!==crc(b.subarray(0,16)))throw Error('Native project CRC, length, or slot is invalid.');
   let pos=24;
   const need=n=>{if(pos+n>b.length)throw Error('Truncated native project.');};
@@ -20,7 +19,7 @@ const BeetleNative=(()=>{
   const name=ascii(take(12)),innerSlot=read();if(innerSlot!==slot)throw Error('Native project slot mismatch.');
   const root=read(),mode=read(),keylock=read(),bpm=word(),count=read(),songLoop=read(),songMode=read();
   if(root>=12||mode>=9||keylock>2||bpm<30||bpm>300||count<1||count>64||songLoop>1||songMode>1)throw Error('Invalid native project settings.');
-  const p=freshProject(name);p.bpm=bpm;p.harmony={root,mode,keylock};p.song=[];p.songLoop=!!songLoop;p.nativeSlot=slot;p.nativeSchema=schema;
+  const p=freshProject(name);p.nativeSongEnabled=!!songMode;p.bpm=bpm;p.harmony={root,mode,keylock};p.song=[];p.songLoop=!!songLoop;p.nativeSlot=slot;p.nativeSchema=schema;
   for(let i=0;i<count;i++){const pattern=read(),repeats=read();if(pattern>=48||repeats<1||repeats>16)throw Error('Invalid Song entry.');p.song.push({pattern,repeats});}
   for(let c=0;c<6;c++){const volume=read(),pan=signed(read()),mute=read(),solo=read(),swing=read();if(volume>120||Math.abs(pan)>100||mute>1||solo>1||swing>100)throw Error('Invalid mixer lane.');p.mixer[c]={volume:volume/100,pan:pan/100,mute:!!mute,solo:!!solo,swing};}
   for(let r=0;r<48;r++){
@@ -34,6 +33,13 @@ const BeetleNative=(()=>{
     const note=readBits(8),inst=readBits(2),chd=readBits(4),fx=readBits(4),amount=readBits(7),dyn=readBits(8),groove=schema>=12?readBits(7):0;
     if(fx>=12||amount>100||(c===5?!(note===255||note===254||note<14):!(note===255||note===254||note<128)))throw Error('Invalid native step.');
     if(!pat)pat=emptyPattern();pat.channels[c][step]={note:note===255?null:note,inst,chd,fx,amount,dyn,groove};
+   }
+   if(schema>=18){
+    const fxMask=word();
+    for(let j=0;j<16;j++)if(fxMask&(1<<j)){
+     const fx=read(),amount=read();if(fx>=12||amount>100)throw Error('Invalid NOTE2 FX');
+     if(!pat)pat=emptyPattern();pat.note2Fx[j]={fx,amount};
+    }
    }
    const events=read();if(events>64)throw Error('Invalid Punch-In event count.');
    for(let e=0;e<events;e++){
@@ -111,6 +117,17 @@ const BeetleNative=(()=>{
    const put=(n,count)=>{for(let j=0;j<count;j++){val|=((n>>>j)&1)<<bits;if(++bits===8){byte(val);bits=0;val=0;}}};
    for(const s of selected){put(s[0],8);put(s[1],2);put(s[2],4);put(s[3],4);put(s[4],7);put(s[5],8);put(s[6],7);}
    if(bits)byte(val);
+   // TRK1 V18: independent CH6 NOTE2 FX follows packed notes.
+   const note2=pat.note2Fx||[];let secondMask=0;
+   for(let j=0;j<16;j++){
+    const f=note2[j]||{fx:0,amount:50};
+    if(f.fx||(f.amount&&f.amount!==50))secondMask|=1<<j;
+   }
+   b16(secondMask);
+   for(let j=0;j<16;j++)if(secondMask&(1<<j)){
+    byte(limited(note2[j].fx,0,11,'NOTE2 FX'));
+    byte(limited(note2[j].amount,0,100,'NOTE2 value'));
+   }
    const events=pat.punch||[];
    if(events.length>24)throw Error('FM1 only supports 24 Punch-In events per pattern.');
    byte(events.length);
@@ -175,7 +192,7 @@ const BeetleNative=(()=>{
   const len=i;if(len>12256)throw Error('FM1 project does not fit in a 12 KiB slot.');
   const write16=(at,n)=>{out[at]=n&255;out[at+1]=(n>>>8)&255;};
   const write32=(at,n)=>{for(let k=0;k<4;k++)out[at+k]=(n>>>(8*k))&255;};
-  out.set(Uint8Array.from([84,82,75,49]),0);write16(4,17);write16(6,slot);write32(8,len);
+  out.set(Uint8Array.from([84,82,75,49]),0);write16(4,18);write16(6,slot);write32(8,len);
   write32(12,crc(out.subarray(24,len)));write32(16,crc(out.subarray(0,16)));
   return out.slice(0,len);
  }

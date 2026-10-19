@@ -7,7 +7,8 @@ void track_song_init(struct track_song_bank *b,const struct track_engine *e){
  if(!b||!e)return;
  memset(b,0,sizeof(*b));
  for(uint8_t i=0;i<TRACK_PATTERNS;i++){
-  b->patterns[i].length=16u;
+   b->patterns[i].length=16u;
+   for(uint8_t s=0;s<TRACK_STEPS;s++)b->patterns[i].note2_fx[s].value=50u;
   for(uint8_t c=0;c<TRACK_CHANNELS;c++)for(uint8_t s=0;s<TRACK_STEPS;s++){
    b->patterns[i].ch[c][s].note=255u;
    b->patterns[i].ch[c][s].instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:(c&3u));

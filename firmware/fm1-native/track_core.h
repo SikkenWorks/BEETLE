@@ -50,7 +50,10 @@ static inline uint8_t track_step_gate(const struct track_step *s){return (uint8_
 static inline void track_step_set_vel(struct track_step *s,uint8_t v){s->dynamics=(uint8_t)(((v&15u)<<4)|(s->dynamics&15u));}
 static inline void track_step_set_gate(struct track_step *s,uint8_t v){s->dynamics=(uint8_t)((s->dynamics&240u)|(v&15u));}
 _Static_assert(sizeof(struct track_step)==5u,"BEETLE step must stay 5 bytes for FM1 RAM");
-struct track_pattern {struct track_step ch[TRACK_CHANNELS][TRACK_STEPS];uint8_t length;};
+/* NOTE2 has an independent FX/value pair; the 5-byte primary step stays ABI-stable. */
+struct track_note2_fx {uint8_t effect,value;};
+struct track_pattern {struct track_step ch[TRACK_CHANNELS][TRACK_STEPS];uint8_t length;
+ struct track_note2_fx note2_fx[TRACK_STEPS];};
 struct track_harmony {uint8_t root,mode,keylock;};
 struct track_transport {uint16_t bpm;uint8_t playing,play_step,edit_step,edit_column,edit_channel,stop_step;uint32_t tick_remainder;};
 struct track_engine {struct track_pattern active;struct track_harmony harmony;struct track_transport transport;uint8_t project_slot,pattern_slot,record_armed,punch_mask,dirty;};
@@ -84,7 +87,8 @@ void track_punch(struct track_engine *e,uint8_t effect,uint8_t held);
 int track_is_lit(uint8_t button); /* FN indices 2..13; ARP=10 remains off */
 uint32_t track_home_action(uint32_t held_ms,uint8_t released); /* 1 HOME short, 2 GUIDE long */
 /* Pure endian-defined codec: fixed 324-byte pattern, no flash access. */
-#define TRACK_PATTERN_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*7u)
+#define TRACK_PATTERN_V3_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*7u)
+#define TRACK_PATTERN_BYTES (TRACK_PATTERN_V3_BYTES+TRACK_STEPS*2u)
 #define TRACK_PATTERN_V2_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*6u)
 #define TRACK_PATTERN_LEGACY_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*5u)
 int track_pattern_encode(const struct track_pattern *pattern,uint8_t *dst,uint32_t cap);

@@ -51,8 +51,12 @@ static uint8_t track_store_preflight(const struct track_store_project *p){
   if(m->volume>120u || m->pan< -100 || m->pan>100 || m->mute>1u ||
      m->solo>1u || m->swing>100u)return 0u;
  }
- for(uint8_t k=0u;k<TRACK_PATTERNS;k++)
-  if(p->song.patterns[k].length<1u || p->song.patterns[k].length>TRACK_STEPS)return 0u;
+ for(uint8_t k=0u;k<TRACK_PATTERNS;k++){
+  const struct track_pattern *pat=&p->song.patterns[k];
+  if(pat->length<1u || pat->length>TRACK_STEPS)return 0u;
+  for(uint8_t s=0u;s<TRACK_STEPS;s++)
+   if(pat->note2_fx[s].effect>=TRACK_FX_COUNT||pat->note2_fx[s].value>100u)return 0u;
+ }
  for(uint8_t k=0u;k<TRACK_DRUM_COUNT;k++){
   const struct track_drum_timbre *d=&p->drum[k];
   if(d->attack>100u || d->decay>100u || d->sustain>100u || d->release>100u ||
@@ -116,6 +120,18 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
    pack_bits(out+i,&bit,st->dynamics,8u);pack_bits(out+i,&bit,st->groove,7u);
   }
   i+=packed;
+  /* V18: compact independent CH6 NOTE2 FX: two-byte bitmask + FX/value pairs.
+   * A blank pair (0/0 or 0/50) consumes no storage. Older schemas are decoded below. */
+  uint16_t fx2_mask=0u;
+  for(s=0;s<TRACK_STEPS;s++){
+   const struct track_note2_fx *f=&pat->note2_fx[s];
+   if(f->effect || (f->value && f->value!=50u))fx2_mask|=(uint16_t)(1u<<s);
+  }
+  if(i+2u>cap)return -2;
+  wr16(out+i,fx2_mask);i+=2u;
+  for(s=0;s<TRACK_STEPS;s++)if(fx2_mask&(1u<<s)){
+   PUT1(pat->note2_fx[s].effect);PUT1(pat->note2_fx[s].value);
+  }
   const struct track_song_clip *clip=&p->song.clips[r];if(clip->count>TRACK_SONG_FX_EVENTS)return -1;
   PUT1(clip->count);
   for(uint8_t x=0;x<clip->count;x++){
@@ -225,7 +241,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -288,6 +304,15 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
    if(!valid_step(st,lane))return -3;
   }
   if(rd16(data+4u)>=4u)i+=packed;
+  for(s=0;s<TRACK_STEPS;s++){pat->note2_fx[s].effect=0u;pat->note2_fx[s].value=50u;}
+  if(rd16(data+4u)>=18u){
+   if(i+2u>n)return -2;
+   uint16_t mask=rd16(data+i);i+=2u;
+   for(s=0;s<TRACK_STEPS;s++)if(mask&(1u<<s)){
+    GET1(pat->note2_fx[s].effect);GET1(pat->note2_fx[s].value);
+    if(pat->note2_fx[s].effect>=TRACK_FX_COUNT||pat->note2_fx[s].value>100u)return -3;
+   }
+  }
   struct track_song_clip *clip=&p->song.clips[r];GET1(clip->count);
   if(clip->count>TRACK_SONG_FX_EVENTS)return -3;
   for(uint8_t x=0;x<clip->count;x++){

@@ -1,3 +1,7 @@
+> **RC1.0.6 HF2 package:** See [RC1.0.6-HF2-README.md](RC1.0.6-HF2-README.md). The included experimental firmware and installer have not been validated on physical FM1 hardware.
+
+**Current release: BEETLE 1.01 RC1.0.5.** Project menu now includes double-confirmation full BEETLE project-storage wipe (12 slots), strictly limited to verified BEETLE-owned storage. This is experimental hardware functionality. See [`RC1.0.5-README.md`](RC1.0.5-README.md) before attempting it.
+
 # BEETLE 1.01 RC1.0.4
 
 Open `simulator.html` for the tracker simulator, `BEETLE-Project-Manager.html` for encrypted .beetle project backup/restore, and `WebInstaller.html` for the firmware installer.

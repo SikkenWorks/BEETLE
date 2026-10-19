@@ -1,6 +1,22 @@
-# BEETLE · CHANGELOG
+## BEETLE 1.01 RC1.0.7 — Inclusive Step Selection
 
-All recorded firmware, simulator, installer and project-manager developments, newest first. For usage and controls, see [README.md](README.md).
+SEL+K1 now includes the original cursor row in every selection, in both directions, and captures the anchor when SEL is pressed. Simulator and HELP updated. The V18 project format and the existing OTA flow are unchanged; target firmware ID is FM-1_2107.
+
+
+## RC1.0.6 HF2 — B1 WebInstaller transport & protected header correction
+
+- Compiled the RC1.0.6 tracker source as `FM-1_2106` for reliable post-boot identity checks.
+- Repacked firmware with the byte-exact 16 KiB protected header and OTA loader from previous compatible BEETLE release (matches B1 HF2).
+- Integrated the verified firmware into a BEETLE-branded WebInstaller built on the user-provided B1 HF2 transfer workflow.
+- Retained V18 independent drum FX, lane rotation, selection/copy/paste, Project Transfer, and existing tracker features.
+- OTA CHECK/loader transitions have been software-simulated, but no physical FM1 recovery or install has been demonstrated.
+
+## 1.01 RC1.0.6 — Development / tracker editing and V18 drum FX
+
+- SEQ+ALGORITHM step rotation, SEL+K1 range selection, partial copy/paste.
+- Drum NOTE1 and NOTE2 now have independent FX settings; native V18 serialization, V17 migration and updated simulator.
+- Project Manager rejects V18 projects sent to V17 firmware.
+- OTA loader-transition failure from installed RC1.0.4 remains unresolved; RC1.0.6 is not hardware-certified or flash-ready.
 
 # RC1.0.5 — Double-Confirmed BEETLE Project Storage Wipe
 
@@ -50,8 +66,6 @@ All recorded firmware, simulator, installer and project-manager developments, ne
 - Chord voices attached to a root are fitted to the selected scale under LOCK.
 - Simulator behavior matches native code. Project Manager V1.4, true DELETE and format unchanged.
 - Experimental firmware: no independent physical FM1 validation.
-
----
 
 ## BEETLE 1.01 RC1.01 · Project Transfer V2 TRUE DELETE
 

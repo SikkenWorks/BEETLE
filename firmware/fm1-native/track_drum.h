@@ -29,6 +29,8 @@ int track_drum_trigger(struct track_drum_engine *d,uint8_t index);
 int track_drum_trigger_pair(struct track_drum_engine *d,uint8_t first,uint8_t second);
 int track_drum_trigger_pair_percent(struct track_drum_engine *d,uint8_t first,uint8_t second,uint8_t percent);
 int track_drum_trigger_pair_tuned(struct track_drum_engine *d,uint8_t first,uint8_t second,int8_t semitones);
+/* Update an already-triggered voice after per-NOTE pitch FX (ISR-safe). */
+void track_drum_retune_voice(struct track_drum_engine *d,struct track_drum_voice *v);
 void track_drum_stop(struct track_drum_engine *d);
 void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix,int16_t *stereo,uint32_t frames);
 const char *track_drum_name(uint8_t index);

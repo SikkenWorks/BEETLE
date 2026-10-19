@@ -173,7 +173,7 @@ static volatile uint32_t native_nested_ticks, native_nested_count;
 #define ETCH_NATIVE_OTA 0
 #endif
 #define FELUCCA_OTA ETCH_NATIVE_OTA
-#define FELUCCA_ID "FM-1_2101"
+#define FELUCCA_ID "FM-1_2107"
 #define ETCH_UI_VERSION "V043"
 #define FELUCCA_OTA_DRYRUN 0
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
@@ -420,7 +420,7 @@ static union {
  struct etch_project_settings etch;
  struct {
   struct track_store_project project;
-  uint8_t scratch[TRACK_STORE_MAX];
+  uint8_t scratch[TRACK_STORE_V4_MAX];
  } beetle;
 } beetle_project_workspace __attribute__((section(".pool"),aligned(4)));
 #define native_project_cfg beetle_project_workspace.etch

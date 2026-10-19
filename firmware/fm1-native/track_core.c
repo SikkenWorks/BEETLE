@@ -150,7 +150,7 @@ uint32_t track_home_action(uint32_t held_ms,uint8_t released){if(held_ms>=1500u)
  * decodes with default velocity and legato gate. No architecture byte copies. */
 int track_pattern_encode(const struct track_pattern *p,uint8_t *dst,uint32_t cap){
  if(!p||!dst||cap<TRACK_PATTERN_BYTES||p->length<1u||p->length>TRACK_STEPS)return -1;
- dst[0]='T';dst[1]='R';dst[2]=3u;dst[3]=p->length;uint32_t at=4u;
+ dst[0]='T';dst[1]='R';dst[2]=4u;dst[3]=p->length;uint32_t at=4u;
  for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<16u;st++){
   const struct track_step *s=&p->ch[c][st];
   if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>3u||
@@ -158,12 +158,16 @@ int track_pattern_encode(const struct track_pattern *p,uint8_t *dst,uint32_t cap
   dst[at++]=s->note;dst[at++]=(uint8_t)s->instrument;dst[at++]=(uint8_t)s->chord;
   dst[at++]=(uint8_t)s->effect;dst[at++]=(uint8_t)s->value;dst[at++]=(uint8_t)s->dynamics;dst[at++]=(uint8_t)s->groove;
  }
+ for(unsigned st=0u;st<TRACK_STEPS;st++){
+  if(p->note2_fx[st].effect>=TRACK_FX_COUNT||p->note2_fx[st].value>100u)return -1;
+  dst[at++]=p->note2_fx[st].effect;dst[at++]=p->note2_fx[st].value;
+ }
  return (int)at;
 }
 int track_pattern_decode(struct track_pattern *p,const uint8_t *src,uint32_t len){
  if(!p||!src||len<4u||src[0]!='T'||src[1]!='R'||(src[3]<1u||src[3]>TRACK_STEPS))return -1;
  uint8_t version=src[2];
- if((version!=1u&&version!=2u&&version!=3u)||len!=(version==1u?TRACK_PATTERN_LEGACY_BYTES:version==2u?TRACK_PATTERN_V2_BYTES:TRACK_PATTERN_BYTES))return -1;
+ if((version<1u||version>4u)||len!=(version==1u?TRACK_PATTERN_LEGACY_BYTES:version==2u?TRACK_PATTERN_V2_BYTES:version==3u?TRACK_PATTERN_V3_BYTES:TRACK_PATTERN_BYTES))return -1;
  struct track_pattern next={0};next.length=src[3];uint32_t at=4u;
  for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<16u;st++){
   struct track_step *s=&next.ch[c][st];
@@ -171,6 +175,12 @@ int track_pattern_decode(struct track_pattern *p,const uint8_t *src,uint32_t len
   s->effect=src[at++];s->value=src[at++];s->dynamics=version>=2u?src[at++]:0u;s->groove=version>=3u?src[at++]:0u;
   if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>3u||
       s->chord>=(c==TRACK_DRUM_CHANNEL?16u:TRACK_CHORD_COUNT)||s->effect>=TRACK_FX_COUNT||s->value>100u)return -1;
+ }
+ for(unsigned st=0u;st<TRACK_STEPS;st++){
+  next.note2_fx[st].value=version>=4u?src[at+1u]:50u;
+  next.note2_fx[st].effect=version>=4u?src[at]:0u;
+  if(version>=4u)at+=2u;
+  if(next.note2_fx[st].effect>=TRACK_FX_COUNT||next.note2_fx[st].value>100u)return -1;
  }
  memcpy(p,&next,sizeof(next));return 0;
 }

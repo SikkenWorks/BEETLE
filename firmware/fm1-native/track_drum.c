@@ -132,6 +132,11 @@ int track_drum_trigger_pair_tuned(struct track_drum_engine *d,uint8_t a,uint8_t 
   }
  }return n;
 }
+void track_drum_retune_voice(struct track_drum_engine *d,struct track_drum_voice *v){
+ if(!d||!v||!v->active||v->component>=TRACK_DRUM_COUNT)return;
+ v->phase_step=rate_step(v->pitch_semitones);
+ update_length(v,&d->components[v->component]);
+}
 void track_drum_stop(struct track_drum_engine *d){if(d)for(unsigned i=0;i<TRACK_DRUM_POLY;i++)d->voices[i].active=0u;}
 static int16_t clamp16(int32_t x){return (int16_t)(x>32767?32767:x<-32768?-32768:x);}
 static int32_t get_pcm(uint8_t id,uint32_t sample){
