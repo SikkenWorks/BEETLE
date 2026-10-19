@@ -1,3 +1,21 @@
+## BEETLE 1.01 RC1.1 — HELP chapters + USB-C stereo capture
+
+- Replaced HELP's continuous scrolling list with **12 topic chapters**. **K2** changes the topic and **K1** scrolls only within it; chapter change returns to its first line. On-device page counter and scroll thumb show progress within the selected topic. HOME and SEQ continue to exit safely, without altering any saved data.
+- Updated the WebSimulator HELP view to match the native chapter structure and navigation. The simulator still uses WebAudio only, not a real USB audio peripheral.
+- Enabled the existing **Felucca-derived USB Audio Class 1 endpoint** in the bundled BEETLE FM1 build (`--usb-audio`): 2-channel 16-bit PCM at **44.1 kHz**, recording the post-master BEETLE output to a computer via the FM1 USB-C port. No firmware-side screen capture or USB playback sink added. Analog output and USB MIDI remain in the build. The optional 48 kHz resampler is deliberately not enabled because it has not been hardware performance-tested.
+- Conserved control RAM by moving only RC diagnostic counters into the existing RAM pool. JieLi linker/app audit, original OTA loader identity bytes, and the protected first 16 KiB of flash are checked. New firmware identity: `FM-1_2113` (base: `FM-1_2112`).
+- Project format **V19 unchanged**, so the Song Chains, note/FX editing, patterns, library, storage and other RC1.0.11b functionality remain sourced from the same code base.
+- **Experimental release**: no physical FM1 verification for USB enumeration, real-time audio/multi-effect headroom, or OTA/recovery. Software success is not a hardware-safety guarantee. The included installer pins the exact new `.fwsc` SHA-256 and preserves its device/firmware checks.
+
+## BEETLE 1.01 RC1.0.11b — SONG CHAINS AUDIO STABILITY (experimental)
+
+- Fixed the native DMA deadline overload policy: it previously reduced the inherited ETCH voice counter, which does not control BEETLE synthesizer rendering. BEETLE now reduces its real synth voice budget from 8 toward 4 only when recurring audio deadlines are missed, with gradual restoration after sustained healthy blocks. An emergency budget reduction may temporarily steal quiet/released voices to maintain audio continuity.
+- Cached mixer mute/solo/volume/pan per audio-render chunk instead of repeating a six-lane solo scan for each voice on each sample. No changes to normal PCM mixer semantics.
+- Optimized SONG CHAINS composition for full 16-step lanes with contiguous copies, preserving variable-length lane repetition and NOTE2 FX.
+- Replaced inherited ETCH PLAY/AUDIO STOP fallback with a BEETLE-specific AUDIO STOP recovery screen. Automatic/manual restarts reset tracker DSP state without writing or modifying saved projects.
+- Inspected user-provided V19 backup with 64 song rows; row 50 is valid, with 48 note events; row 52 contains 50 note events. This is consistent with high audio load but does not substitute for measured hardware DMA timings. The backup is not distributed in release files.
+- Updated release firmware identity to `FM-1_2112`; protected boot header, OTA loader, V19 schema and storage regions unchanged. Native build and packet CRC/hashes verified; hardware installation, full-length endurance and glitch-free operation unverified.
+
 ## BEETLE 1.01 RC1.0.11 — SONG CHAINS (per-lane song arrangements)
 
 - Reworked native Song Mode to reference a separate pattern for each of CH1–CH5 and DR per song position (01–64). Columns **POS, CH1, CH2, CH3, CH4, CH5, DR, REP** remain labeled at the top of the song screen.

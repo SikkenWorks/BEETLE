@@ -57,6 +57,7 @@ struct track_chip_engine {
  uint8_t fx_type[TRACK_CHANNELS],fx_value[TRACK_CHANNELS];
  uint8_t step_gain[TRACK_CHANNELS]; /* persistent per-channel 0..100% volume automation */
  uint8_t mono; /* 1: held last note priority; 0: up to 8 voices */
+ uint8_t realtime_voice_budget; /* 8 normally; 4..8 only during DMA deadline pressure */
  uint32_t alloc_serial,steal_count,restart_count,health_cookie;
  uint16_t phrase_div_q8; /* Q8 mix divisor, smoothed per sample */
  uint8_t phrase_max_voices; /* preserve headroom until entire phrase ends */
@@ -93,6 +94,7 @@ void track_chip_release_channel(struct track_chip_engine *s,uint8_t channel);
 /* A new note or STP ends only this lane, with a bounded click-safe fade. */
 void track_chip_stop_channel(struct track_chip_engine *s,uint8_t channel);
 void track_chip_set_mono(struct track_chip_engine *s,uint8_t mono);
+void track_chip_set_realtime_budget(struct track_chip_engine *s,uint8_t budget);
 /* Nonzero means sane. A damaged DSP state is reset without rebooting the FM1. */
 int track_chip_health(const struct track_chip_engine *s);
 void track_chip_recover(struct track_chip_engine *s);

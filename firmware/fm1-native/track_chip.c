@@ -98,7 +98,7 @@ static int32_t va_shape(uint8_t wave,uint32_t phase,uint32_t step,uint8_t width)
 }
 void track_chip_init(struct track_chip_engine *s){
  if(!s)return;
- memset(s,0,sizeof(*s));s->health_cookie=TRACK_CHIP_COOKIE;s->phrase_div_q8=256u;s->punch_bpm=120u;
+ memset(s,0,sizeof(*s));s->health_cookie=TRACK_CHIP_COOKIE;s->phrase_div_q8=256u;s->punch_bpm=120u;s->realtime_voice_budget=TRACK_CHIP_VOICES;
  for(unsigned i=0;i<8;i++)s->punch_param[i]=50u;
  s->punch_param[1]=20u;s->punch_param[2]=0u;s->punch_param[4]=50u;
  for(unsigned i=0;i<TRACK_CHANNELS;i++){s->step_gain[i]=100u;s->fx_type[i]=0u;s->fx_value[i]=50u;s->duty[i]=2u;s->cutoff[i]=96u;s->cut_after[i]=0xFFFFFFFFu;}
@@ -106,7 +106,7 @@ void track_chip_init(struct track_chip_engine *s){
   s->env_attack[i]=1u;s->env_decay[i]=14u;s->env_sustain[i]=100u;s->env_release[i]=16u;}
 }
 int track_chip_health(const struct track_chip_engine *s){
- if(!s||s->health_cookie!=TRACK_CHIP_COOKIE||s->voice_count>TRACK_CHIP_VOICES||s->last_voice_index>=TRACK_CHIP_VOICES)return 0;
+ if(!s||s->health_cookie!=TRACK_CHIP_COOKIE||s->voice_count>TRACK_CHIP_VOICES||s->last_voice_index>=TRACK_CHIP_VOICES||s->realtime_voice_budget<4u||s->realtime_voice_budget>TRACK_CHIP_VOICES)return 0;
  for(uint8_t k=0u;k<TRACK_CHANNELS;k++){
   if(s->step_gain[k]>100u)return 0;
   if(k>=4u)continue;
@@ -150,6 +150,32 @@ void track_chip_silence(struct track_chip_engine *s){
  if(!track_chip_health(s))track_chip_recover(s);
  s->tail_left=s->prev_left;s->tail_right=s->prev_right;s->release_left=64u;
  s->voice_count=0u;memset(s->voices,0,sizeof(s->voices));s->phrase_max_voices=0u;s->phrase_div_q8=256u;
+}
+/* Emergency-only pressure valve. Under repeated missed DMA deadlines reduce
+ * actual BEETLE synth polyphony (the inherited ETCH voice limit does not
+ * control the tracker DSP). Pick released/quiet voices first. No allocation,
+ * no reconfiguration during ordinary playback, and never touch saved data. */
+void track_chip_set_realtime_budget(struct track_chip_engine *s,uint8_t budget){
+ if(!s)return;
+ if(budget<4u)budget=4u;
+ if(budget>TRACK_CHIP_VOICES)budget=TRACK_CHIP_VOICES;
+ s->realtime_voice_budget=budget;
+ while(s->voice_count>budget){
+  uint8_t victim=0u;
+  int32_t best=INT32_MAX;
+  for(uint8_t i=0u;i<s->voice_count;i++){
+   const struct track_chip_voice *v=&s->voices[i];
+   int32_t amp=v->last_level<0?-v->last_level:v->last_level;
+   if(amp>30000)amp=30000;
+   int32_t score=(v->active?0:-100000)+(v->released?0:50000)+amp;
+   if(score<best){best=score;victim=i;}
+  }
+  uint8_t last=(uint8_t)(s->voice_count-1u);
+  if(victim!=last)s->voices[victim]=s->voices[last];
+  memset(&s->voices[last],0,sizeof(s->voices[last]));
+  s->voice_count=last;
+  s->steal_count++;
+ }
 }
 void track_chip_set_mono(struct track_chip_engine *s,uint8_t mono){
  if(!s)return;
@@ -241,7 +267,7 @@ int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrume
  }
  /* Released voices are reused first. Invalid/inactive slots never count. */
  if(!s->mono)for(uint8_t i=0;i<s->voice_count;i++)if(!s->voices[i].active){index=i;break;}
- if(index==TRACK_CHIP_VOICES&&s->voice_count<TRACK_CHIP_VOICES)index=s->voice_count++;
+ if(index==TRACK_CHIP_VOICES&&s->voice_count<s->realtime_voice_budget)index=s->voice_count++;
  if(index==TRACK_CHIP_VOICES){
   /* Advanced voice stealing: prefer released/quiet, then oldest and same
    * channel. No heap, nondeterministic selection or silent dropped notes. */
@@ -458,6 +484,18 @@ static int32_t beetle_step_fx_voice(int32_t mono,const struct track_chip_engine 
 void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix,int16_t *stereo,uint32_t frames){
  if(!s||!stereo)return;
  if(!track_chip_health(s))track_chip_recover(s);
+ /* MIXER state is fixed for a render chunk. A full solo scan previously ran
+  * for every VOICE and every SAMPLE, a costly hotspot in dense SONG CHAINS.
+  * Precompute once per call. ISR owns the mixer for the duration of render. */
+ uint8_t mix_solo=0u;
+ uint8_t mix_muted[TRACK_SYNTH_CHANNELS]={0};
+ int16_t mix_vol[TRACK_SYNTH_CHANNELS],mix_pan[TRACK_SYNTH_CHANNELS];
+ if(mix)for(uint8_t c=0u;c<TRACK_CHANNELS;c++)mix_solo|=mix->ch[c].solo;
+ for(uint8_t c=0u;c<TRACK_SYNTH_CHANNELS;c++){
+  mix_muted[c]=(uint8_t)(mix&&(mix->ch[c].mute||(mix_solo&&!mix->ch[c].solo)));
+  mix_vol[c]=mix?mix->ch[c].volume:100;
+  mix_pan[c]=mix?mix->ch[c].pan:0;
+ }
  for(uint32_t f=0;f<frames;f++){
   int64_t left=0,right=0;
   uint8_t foreground=0u,active_voices=0u; /* normal and ADSR-release voices counted separately */
@@ -472,11 +510,8 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
     mono=(int32_t)(((int64_t)mono*gain)/100);
     mono=bound(mono,-9500,9500);
    }
-   int32_t vol=100,pan=0;
-   if(mix){const struct track_mixer_channel *m=&mix->ch[v->channel];
-    uint8_t solo=0u;for(uint8_t c=0;c<TRACK_CHANNELS;c++)solo|=mix->ch[c].solo;
-    if(m->mute||(solo&&!m->solo))continue;
-    vol=m->volume;pan=m->pan;}
+   if(mix_muted[v->channel])continue;
+   const int32_t vol=mix_vol[v->channel],pan=mix_pan[v->channel];
    mono=(int32_t)(((int64_t)mono*vol*s->step_gain[v->channel])/10000);
    if(v->active && vol && s->step_gain[v->channel]){
     active_voices++;if(!v->released)foreground++;

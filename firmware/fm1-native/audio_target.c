@@ -37,7 +37,9 @@ static uint32_t native_scope_window_peak;
 static uint8_t native_scope_silent_windows;
 static volatile uint32_t native_halves,native_late,native_max_ticks;
 /* ALNK0 and the MIDI consumer own these counters; UI copies with IRQs off. */
-static struct beetle_rc_monitor native_rc;
+/* USB Audio increases static control RAM by a few words. Keep purely
+ * diagnostic counters in the existing zero-initialized POOL section. */
+static struct beetle_rc_monitor native_rc __attribute__((section(".pool")));
 static volatile uint8_t native_ui_pressure; /* ISR-owned hysteretic LCD budget hint */
 static volatile uint32_t native_max_wall_ticks,native_max_nested_ticks;
 /* DMA pre-publish guard hits: block writes into a buffer that may be active. */
@@ -124,6 +126,18 @@ extern void isr_alnk0(void);
 static void native_stop(void){native_suspended=1;native_output_enabled=0u;fm1_audio_output_enable(0u);fm1_audio_stop();native_tripped=1;}
 static void native_budget_late(void){
  native_healthy_blocks=0;
+#ifdef TRACK_FIRMWARE
+ /* The tracker runs track_chip_render(), not ETCH's native voice renderer.
+  * The old protection shed ETCH voices and had NO effect on BEETLE load,
+  * eventually producing repeated AUDIO STOP/restarts in dense song rows. */
+ if(track_chip.realtime_voice_budget>4u){
+  track_chip_set_realtime_budget(&track_chip,(uint8_t)(track_chip.realtime_voice_budget-1u));
+  ++native_voice_shed_count;
+  native_missed_streak=0u;
+ }else if(++native_missed_streak>=8u){
+  etch_boot_audio_fault(&etch_boot);native_stop();
+ }
+#else
  if(native_audio.voice_limit>4u){
   native_audio.voice_limit=etch_voice_budget_reduce(native_audio.voice_limit);
   ++native_voice_shed_count;
@@ -131,13 +145,19 @@ static void native_budget_late(void){
  }else if(++native_missed_streak>=8u){
   etch_boot_audio_fault(&etch_boot);native_stop();
  }
+#endif
 }
 static void native_budget_ok(void){
  native_missed_streak=0;
  if(++native_healthy_blocks>=768u){
   native_healthy_blocks=0;
+#ifdef TRACK_FIRMWARE
+  if(track_chip.realtime_voice_budget<TRACK_CHIP_VOICES)
+   track_chip_set_realtime_budget(&track_chip,(uint8_t)(track_chip.realtime_voice_budget+1u));
+#else
   if(native_audio.voice_limit<8u)
    native_audio.voice_limit=etch_voice_budget_restore(native_audio.voice_limit);
+#endif
  }
 }
 /* Main-only pause: block a leftover ALNK interrupt before transferring ownership. */

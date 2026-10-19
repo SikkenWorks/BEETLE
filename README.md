@@ -15,10 +15,14 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>RC1.0.11</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>RC1.1</strong> · <a href="CHANGELOG.md">Release history</a></sub>
 </p>
 
 ---
+
+**RC1.1 — Chapter HELP + USB-C audio capture:** HELP now has twelve chapters, selected using **K2**, and each chapter scrolls independently with **K1**. BEETLE RC1.1's experimental firmware additionally exposes a class-compliant **stereo 16-bit / 44.1 kHz USB Audio Class 1 capture input** to your computer over USB-C, alongside analog audio output and USB MIDI. The supplied `.fwsc` is compiled with `--usb-audio`; previous firmware releases do **not** gain the feature by updating the WebInstaller alone. Neither USB audio performance nor OTA/recovery has yet been verified on a physical FM1. **Back up and verify a recovery route before installing.**
+
+**RC1.0.11b — Song Chains audio-stability hotfix:** reduces per-voice mixer work and song-transition cost; the BEETLE synth voice budget now responds to repeated DMA deadline pressure instead of incorrectly limiting unused ETCH voices. Any audio-stop recovery screen now uses BEETLE branding. No changes to saved project format (V19), Song Chains, or tracker controls. Software-tested; physical FM1 endurance testing remains pending.
 
 ## What is BEETLE?
 
@@ -49,6 +53,29 @@ You can learn the workflow in a few minutes using the [Web Simulator](https://si
 9. **Save your work.** Press **SAVE**, or open **HOME → SAVE / SAVE AS** to manage a project slot.
 
 > **FM1 terminology:** **SEL** means the physical SELECT push-button; **SELECT** in this guide means the *rotary encoder*. **OP1–OP6** are the six mapped black musical keys used with **SEQ**. The function of some controls changes with the current screen.
+
+## HELP chapters (RC1.1)
+
+Press **HOME → HELP**. Turn **K2** to browse the twelve topics. Turn **K1** to scroll *inside the selected chapter*. The scroll position resets at each chapter change, and the bottom counter refers to the current chapter, not the whole manual. **HOME** returns to Projects and **SEQ** returns to Tracker. HELP remains read-only; turning the other encoders will not edit your music.
+
+Chapters: Tracker Basics, Pattern Editing, Step Dynamics / Groove, Instrument / Keyboard, Projects, Live FX / Record, Song Chains, Live Mixer / Solo, Mixer / Performance, Master FX, Guide / Navigation and USB-C Audio.
+
+## USB-C stereo audio capture (RC1.1, experimental)
+
+Connect the FM1 with a **USB-C data cable**. On Windows, open **Settings → System → Sound → Input** or the audio input selector in a recording application and choose **BEETLE Audio** (device naming depends on the operating system). Set the recording format to **44,100 Hz, stereo, 16-bit** when available. Start playback on the FM1 and recording on the computer. The computer initiates the USB audio stream; there is no extra on-device enable switch. The stream taps BEETLE's final master stereo signal, including the master volume, and leaves the analog output and USB-MIDI path present.
+
+USB-C audio is **audio from FM1 → computer**, not computer → FM1. It is not USB screen capture, audio-file transfer, USB mass storage, or multitrack individual stems. The WebSimulator produces local browser audio and **does not act as a physical USB audio device**.
+
+The USB audio endpoint and the associated ISR were already present as an optional Felucca-derived implementation, but had been disabled in the provided RC1.0.11b firmware. RC1.1 enables this existing UAC1 capture path in the distributed native build with `--usb-audio` (44.1 kHz only). This is a **software-/linker-validated experimental feature**, not proof that Windows/macOS/Linux enumerates it on a real FM1 or that it runs glitch-free with all six lanes and MASTER FX. Check for a BEETLE Audio input after installing; if the device fails to enumerate, do not assume an OS-level driver change will fix the firmware. See [`docs/RC1.1-HELP-USB-AUDIO-VALIDATION.md`](docs/RC1.1-HELP-USB-AUDIO-VALIDATION.md).
+
+Build the distributed USB-audio configuration with:
+
+```bash
+export JIELI_TOOLCHAIN=/path/to/jieli-linux-toolchain
+python firmware/fm1-native/build.py --beetle-storage-lab --updater --usb-audio
+```
+
+The `.fwsc` includes experimental storage/OTA code as in the RC1.0.11b base; installing it remains risky. A separate recovery-tested stock firmware image has not been produced here.
 
 ## FM1 Controls
 

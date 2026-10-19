@@ -103,9 +103,18 @@ static uint8_t track_boot_menu_choice,track_save_return_page,track_new_project_f
 static uint8_t track_preset_focus_pattern,track_preset_focus_channel,track_preset_focus_step;
 static uint8_t track_preset_focus_column,track_preset_focus_original,track_preset_focus_valid;
 static uint8_t track_rc_tab; /* V0.73: read-only RC AUDIO/MIDI diagnostics */
-static uint8_t track_help_offset; /* V0.54: scroll state, not project data. */
+static uint8_t track_help_offset; /* Chapter-local scroll, never saved in project. */
+static uint8_t track_help_chapter;
 static struct beetle_load_input_gate track_load_input_guard; /* consume stale SEL during/after LOAD and SAVE */
 static uint8_t track_audio_started,track_prev_notes[TRACK_CHANNELS][5];
+/* Called only in main, with IRQs held, after a hardware audio rearm. */
+static void beetle_audio_resume_after_fault(void){
+ track_chip_silence(&track_chip);
+ track_chip_set_realtime_budget(&track_chip,TRACK_CHIP_VOICES);
+ track_drum_stop(&track_drum);
+ track_audio_started=0u;
+}
+
 static uint8_t track_lane_instrument[TRACK_SYNTH_CHANNELS];
 /* V0.83: EDIT focuses a patch for FUTURE notes, independently of the
  * instrument already stored in any existing pattern/song step. */
@@ -1664,30 +1673,37 @@ static void track_fm1_paint(void){
   beetle_draw_keyboard_octave(216u);return;
  }
  if(track_page==19u){
-  track_page_header("HELP / SHORTCUTS",43u);
-  track_pix_text("K1: SCROLL HELP",9u,49u,TRACK_PINK);
-  lcd_fill(9u,62u,221u,1u,0x4807u);
+  track_page_header("HELP",43u);
+  uint8_t first=(uint8_t)(beetle_help_chapter_heading(track_help_chapter)+1u);
+  uint8_t length=beetle_help_chapter_length(track_help_chapter);
+  uint8_t max=beetle_help_chapter_maxscroll(track_help_chapter);
+  const char *chapter=beetle_help_lines[first-1u]+2;
+  char counter[16],num[8],total[8];
+  track_fmt_int(num,(uint32_t)track_help_chapter+1u);
+  track_fmt_int(total,beetle_help_chapter_count());
+  uint8_t n=0u,j=0u;while(num[j]&&n<5u)counter[n++]=num[j++];counter[n++]='/';
+  j=0u;while(total[j]&&n<11u)counter[n++]=total[j++];counter[n]=0;
+  track_pix_text("K2: CHAPTER   K1: SCROLL",9u,49u,TRACK_PINK);
+  lcd_fill(9u,63u,221u,1u,0x4807u);
+  lcd_fill(9u,66u,219u,14u,0x3005u);
+  track_pix_text(chapter,12u,69u,TRACK_BRIGHT);
+  track_pix_text(counter,196u,69u,TRACK_PINK);
   for(uint8_t row=0u;row<BEETLE_HELP_VISIBLE;row++){
-   uint8_t idx=(uint8_t)(track_help_offset+row);
-   if(idx>=BEETLE_HELP_COUNT)break;
-   uint16_t y=(uint16_t)(68u+(uint16_t)row*13u);
-   const char *str=beetle_help_lines[idx];
-   if(str[0]=='#'){
-    lcd_fill(8u,y-2u,218u,11u,0x3005u);
-    track_pix_text(str+2,12u,y,TRACK_PINK);
-   }else track_pix_text(str,12u,y,TRACK_WHITE);
+   uint8_t local=(uint8_t)(track_help_offset+row);
+   if(local>=length)break;
+   uint8_t idx=(uint8_t)(first+local);
+   track_pix_text(beetle_help_lines[idx],12u,(uint16_t)(86u+(uint16_t)row*12u),TRACK_WHITE);
   }
-  /* A small scrollbar shows progress through the complete list. */
-  lcd_fill(231u,68u,2u,125u,0x3807u);
-  uint8_t max=beetle_help_last_offset();
-  uint16_t thumb_y=(uint16_t)(68u+(max?(uint32_t)track_help_offset*104u/max:0u));
-  lcd_fill(230u,thumb_y,4u,21u,TRACK_PINK);
+  lcd_fill(231u,84u,2u,110u,0x3807u);
+  uint16_t thumb_y=(uint16_t)(84u+(max?(uint32_t)track_help_offset*92u/max:0u));
+  lcd_fill(230u,thumb_y,4u,18u,TRACK_PINK);
   lcd_fill(9u,201u,221u,1u,0x4807u);
   track_pix_text("HOME: MENU  SEQ: TRACKER",10u,208u,TRACK_BRIGHT);
   char count[18]="";char a[8],b[8];
-  track_fmt_int(a,(uint32_t)track_help_offset+BEETLE_HELP_VISIBLE>=BEETLE_HELP_COUNT?BEETLE_HELP_COUNT:(uint32_t)track_help_offset+BEETLE_HELP_VISIBLE);
-  track_fmt_int(b,BEETLE_HELP_COUNT);
-  uint8_t n=0u,j=0u;while(a[j]&&n<8u)count[n++]=a[j++];count[n++]='/';
+  uint8_t seen=(uint8_t)(track_help_offset+BEETLE_HELP_VISIBLE);
+  if(seen>length)seen=length;
+  track_fmt_int(a,seen);track_fmt_int(b,length);
+  n=0u;j=0u;while(a[j]&&n<8u)count[n++]=a[j++];count[n++]='/';
   j=0u;while(b[j]&&n<15u)count[n++]=b[j++];count[n]=0;
   track_pix_center(count,120u,225u,TRACK_PINK);
   return;
@@ -2590,8 +2606,12 @@ static void track_fm1_poll(void){
   * Trap navigation here so HOME does not accidentally arm long-press guide. */
  if(track_page==19u){
   if(k1){
-   track_help_offset=beetle_help_scroll(track_help_offset,k1);
+   track_help_offset=beetle_help_chapter_scroll(track_help_chapter,track_help_offset,k1);
    changed=1u;
+  }
+  if(k2){
+   uint8_t chapter=beetle_help_chapter_shift(track_help_chapter,k2);
+   if(chapter!=track_help_chapter){track_help_chapter=chapter;track_help_offset=0u;changed=1u;}
   }
   if(pressed&(1u<<8)){track_page=1u;track_home_fired=1u;track_home_since=now;changed=1u;}
   if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
@@ -3332,7 +3352,7 @@ static void track_fm1_poll(void){
     }else if(track_menu_index==5u){
      track_page=28u;changed=1u;
     }else if(track_menu_index==4u){
-     track_help_offset=0u;track_page=19u;changed=1u;
+     track_help_chapter=0u;track_help_offset=0u;track_page=19u;changed=1u;
     }else if(track_menu_index==3u){
      if(track_state.dirty){track_unsaved_action=2u;track_page=13u;}
      else beetle_project_new_session();

@@ -173,7 +173,7 @@ static volatile uint32_t native_nested_ticks, native_nested_count;
 #define ETCH_NATIVE_OTA 0
 #endif
 #define FELUCCA_OTA ETCH_NATIVE_OTA
-#define FELUCCA_ID "FM-1_2111"
+#define FELUCCA_ID "FM-1_2113"
 #define ETCH_UI_VERSION "V043"
 #define FELUCCA_OTA_DRYRUN 0
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
@@ -1602,6 +1602,19 @@ static void track_fm1_draw(void);
 #endif
 static void screen_render(void){
 #ifdef TRACK_FIRMWARE
+ if(native_tripped && !native_safe && !native_updating){
+  /* A DMA deadline fault must NEVER display ETCH's PLAY interface on a
+   * BEETLE device. This is a read-only local recovery page, not a crash. */
+  lcd_fill(0u,0u,240u,240u,0x0000u);
+  label("BEETLE",14u,15u,0xF81Au);
+  label("AUDIO STOP",14u,70u,0xF800u);
+  label("DMA DEADLINE",14u,96u,0xFFFFu);
+  label("RESTARTING AUDIO",14u,133u,0xF81Au);
+  label("HOME+PLAY TO RETRY",14u,172u,0xFFFFu);
+  label("PROJECT SAFE",14u,213u,0x07E0u);
+  etch_panel_commit();
+  return;
+ }
  if(native_screen_gate.ready && !native_safe && !native_tripped && !native_updating){track_fm1_draw();return;}
 #endif
  /* Until the analog output has settled, leave the splash on the LCD.
@@ -2298,7 +2311,11 @@ void fm1_cstart(void){
   if(!muted&&native_tripped && (fm1_in.buttons&((1u<<8)|(1u<<12)))==((1u<<8)|(1u<<12))){
    if(!native_audio_rearm_held)native_audio_rearm_held=etch_ms;
    if((uint32_t)(etch_ms-native_audio_rearm_held)>=1000u){
-    fm1_irq_off();native_stop();native_tripped=0;native_start();fm1_irq_enable_all();
+    fm1_irq_off();native_stop();native_tripped=0;native_start();
+#ifdef TRACK_FIRMWARE
+    beetle_audio_resume_after_fault();
+#endif
+    fm1_irq_enable_all();
     native_audio_rearm_held=0;first_frame=1;
    }
   }else native_audio_rearm_held=0;
@@ -2310,7 +2327,11 @@ void fm1_cstart(void){
    if(!native_auto_fault_at)native_auto_fault_at=etch_ms?etch_ms:1u;
    uint32_t backoff=1000u+(uint32_t)(native_auto_restarts<8u?native_auto_restarts:8u)*1000u;
    if((uint32_t)(etch_ms-native_auto_fault_at)>=backoff){
-    fm1_irq_off();native_stop();native_tripped=0;native_start();fm1_irq_enable_all();
+    fm1_irq_off();native_stop();native_tripped=0;native_start();
+#ifdef TRACK_FIRMWARE
+    beetle_audio_resume_after_fault();
+#endif
+    fm1_irq_enable_all();
     if(native_auto_restarts<8u)native_auto_restarts++;
     native_auto_fault_at=0;first_frame=1;
    }

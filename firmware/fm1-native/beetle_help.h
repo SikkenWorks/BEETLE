@@ -1,15 +1,15 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * BEETLE on-device help: fixed-width, <=36 glyphs at 5x7+1 pixel.
- * Headlines use the leading '#' marker; all items are one clipped row.
+ * Chapters are delimited by # headings. K2 selects chapter; K1 scrolls only within it.
  */
 #ifndef BEETLE_HELP_H
 #define BEETLE_HELP_H
 #include <stdint.h>
-#define BEETLE_HELP_VISIBLE 10u
+#define BEETLE_HELP_VISIBLE 9u
 static const char *const beetle_help_lines[] = {
- "# TRACKER",
+ "# TRACKER BASICS",
  "K1 STEP   K2 CELL  K3 VALUE",
- "HELP: K1 SCROLLS ONLY",
+ "HELP: K2 CHAPTER K1 SCROLL",
  "K4 BPM  SEQ+K4 PAT LEN 1-16",
  "PLAY+ALG: QUEUE NEXT PATTERN",
  "SELECT: CHANNEL 1-6",
@@ -26,6 +26,7 @@ static const char *const beetle_help_lines[] = {
  "CH6 NOTE/NOTE2 SHIFT SEPARATE",
  "DRUM NOTE1/NOTE2 FX SEPARATE",
  "SEL+K1: INCLUDE START STEP",
+ "# PATTERN EDITING",
  "SEQ+OP1: COPY RANGE OR LANE",
  "SEQ+OP2: PASTE AT CURSOR",
  "SEQ+OP3: COPY WHOLE PATTERN",
@@ -36,6 +37,7 @@ static const char *const beetle_help_lines[] = {
  "CLEAR LANE: K1 YES/NO, SEL",
  "CLEAR LANE: HOME CANCEL",
  "SEQ+SEL: BLOCK EDIT MENU",
+ "# STEP DYNAMICS / GROOVE",
  "SEQ+FX: STEP VELOCITY/GATE",
  "SEQ+ENV: STEP GROOVE EDIT",
  "GROOVE K1 STEP K2 PARAM K3 VAL",
@@ -101,7 +103,7 @@ static const char *const beetle_help_lines[] = {
  "SHORT PATTERNS LOOP IN ROW",
  "GLOBAL PUNCH SOURCE: CH1",
  "V18 SONGS AUTO-MIGRATE V19",
- "# SONG / MIXER / MASTER",
+ "# LIVE MIXER / SOLO",
  "ARP: LIVE WHEN SONG ON",
  "LIVE MIXER: BLACK 1-6 MUTE",
  "WHITE KEYS BELOW: SOLO 1-6",
@@ -114,6 +116,7 @@ static const char *const beetle_help_lines[] = {
  "NORMAL MIXER Q DEFAULT OFF",
  "MIXER VOLUME: 0-120%",
  "UNDO: SONG ARRANGEMENT EDITS",
+ "# MIXER / PERFORMANCE",
  "GLO: MIXER",
  "MIXER SEL: QUANT MUTES ON/OFF",
  "MIXER SEQ+SEL: PERFORMANCE",
@@ -132,6 +135,7 @@ static const char *const beetle_help_lines[] = {
  "Q1 PENDING MUTE / Q0 UNMUTE",
  "SWITCH OFF: APPLY QUEUED NOW",
  "STOP CANCELS PENDING MUTES",
+ "# MASTER FX",
  "LFO: MASTER EQ / FX",
  "MASTER SELECT: FX SCROLL",
  "MASTER SEL: FX ON/OFF",
@@ -141,33 +145,60 @@ static const char *const beetle_help_lines[] = {
  "HOLD HOME: SCALE GUIDE",
  "HOME: OPEN PROJECTS MENU",
  "SEQ: BACK TO TRACKER",
+ "# USB-C AUDIO",
+ "USB-C: 44.1 KHZ 16-BIT STEREO",
+ "PC: FM1 USB AUDIO INPUT",
+ "CONNECT WITH A DATA USB-C CABLE",
+ "USB AUDIO STARTS WHEN PC RECORDS",
+ "ANALOGUE OUT + USB MIDI REMAIN",
+ "USB AUDIO: NO FM1 SETTING NEEDED",
+ "HOST MUST SELECT FM1 AUDIO INPUT",
+ "USB CAPTURE REQUIRES RC1.1 BUILD",
  };
 #define BEETLE_HELP_COUNT ((uint8_t)(sizeof(beetle_help_lines)/sizeof(beetle_help_lines[0])))
-static inline uint8_t beetle_help_last_offset(void){
- return BEETLE_HELP_COUNT>BEETLE_HELP_VISIBLE?(uint8_t)(BEETLE_HELP_COUNT-BEETLE_HELP_VISIBLE):0u;
+/* Chapter indexing is derived from the existing source lines so adding or
+ * extending a topic never requires manually synchronizing an offset table.
+ * These helpers are UI-only and leave the persisted V19 project unchanged. */
+static inline uint8_t beetle_help_chapter_count(void){
+ uint8_t count=0u;
+ for(uint8_t i=0u;i<BEETLE_HELP_COUNT;i++)if(beetle_help_lines[i][0]=='#')count++;
+ return count;
 }
-/* Jump directly between real chapter headings, not arbitrary pages. */
-static inline uint8_t beetle_help_heading(uint8_t current,int32_t detents){
- int8_t dir=(detents>0)?1:-1;
- while(detents){
-  uint8_t found=current;uint8_t got=0u;
-  if(dir>0){
-   for(uint8_t i=(uint8_t)(current+1u);i<BEETLE_HELP_COUNT;i++)
-    if(beetle_help_lines[i][0]=='#'){found=i;got=1u;break;}
-  }else{
-   for(int32_t i=(int32_t)current-1;i>=0;i--)
-    if(beetle_help_lines[i][0]=='#'){found=(uint8_t)i;got=1u;break;}
-  }
-  if(got){current=found>beetle_help_last_offset()?beetle_help_last_offset():found;}
-  else if(dir>0)current=beetle_help_last_offset();else current=0u;
-  if(detents>0)detents--;else detents++;
+static inline uint8_t beetle_help_chapter_heading(uint8_t chapter){
+ uint8_t seen=0u;
+ for(uint8_t i=0u;i<BEETLE_HELP_COUNT;i++)if(beetle_help_lines[i][0]=='#'){
+  if(seen==chapter)return i;
+  seen++;
  }
- return current;
+ return 0u;
 }
-static inline uint8_t beetle_help_scroll(uint8_t current,int32_t delta){
- int32_t next=(int32_t)current+delta;
- if(next<0)next=0;
- if(next>beetle_help_last_offset())next=beetle_help_last_offset();
- return (uint8_t)next;
+static inline uint8_t beetle_help_chapter_end(uint8_t chapter){
+ uint8_t start=beetle_help_chapter_heading(chapter);
+ for(uint16_t i=(uint16_t)start+1u;i<BEETLE_HELP_COUNT;i++)
+  if(beetle_help_lines[i][0]=='#')return (uint8_t)i;
+ return BEETLE_HELP_COUNT;
+}
+static inline uint8_t beetle_help_chapter_length(uint8_t chapter){
+ uint8_t first=beetle_help_chapter_heading(chapter);
+ uint8_t last=beetle_help_chapter_end(chapter);
+ return last>first?(uint8_t)(last-first-1u):0u;
+}
+static inline uint8_t beetle_help_chapter_maxscroll(uint8_t chapter){
+ uint8_t n=beetle_help_chapter_length(chapter);
+ return n>BEETLE_HELP_VISIBLE?(uint8_t)(n-BEETLE_HELP_VISIBLE):0u;
+}
+static inline uint8_t beetle_help_chapter_shift(uint8_t chapter,int32_t detents){
+ int32_t result=(int32_t)chapter+detents;
+ int32_t last=(int32_t)beetle_help_chapter_count()-1;
+ if(result<0)result=0;
+ if(result>last)result=last;
+ return (uint8_t)result;
+}
+static inline uint8_t beetle_help_chapter_scroll(uint8_t chapter,uint8_t current,int32_t detents){
+ int32_t result=(int32_t)current+detents;
+ int32_t last=beetle_help_chapter_maxscroll(chapter);
+ if(result<0)result=0;
+ if(result>last)result=last;
+ return (uint8_t)result;
 }
 #endif

@@ -51,14 +51,25 @@ static void track_song_compose(struct track_song_bank *b,struct track_engine *e)
   uint8_t src=ent->lane[c];
   const struct track_pattern *p=src<TRACK_PATTERNS?&b->patterns[src]:0;
   uint8_t plen=p&&p->length&&p->length<=TRACK_STEPS?p->length:TRACK_STEPS;
-  for(uint8_t s=0u;s<TRACK_STEPS;s++){
-   struct track_step *dst=&out->ch[c][s];
-   if(p)*dst=p->ch[c][s%plen];
-   else {memset(dst,0,sizeof(*dst));dst->note=TRACK_NOTE_EMPTY;
-    dst->instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:(c&3u));dst->value=50u;}
-   if(c==TRACK_DRUM_CHANNEL){
-    if(p)out->note2_fx[s]=p->note2_fx[s%plen];
-    else {out->note2_fx[s].effect=0u;out->note2_fx[s].value=50u;}
+  if(p){
+   /* Most patterns are 16 steps. One contiguous bounded copy replaces
+    * 16 per-cell modulo operations at each SONG boundary in the audio ISR. */
+   if(plen==TRACK_STEPS){
+    memcpy(out->ch[c],p->ch[c],sizeof(out->ch[c]));
+    if(c==TRACK_DRUM_CHANNEL)memcpy(out->note2_fx,p->note2_fx,sizeof(out->note2_fx));
+   }else{
+    for(uint8_t s=0u;s<TRACK_STEPS;s++){
+     uint8_t k=(uint8_t)(s%plen);
+     out->ch[c][s]=p->ch[c][k];
+     if(c==TRACK_DRUM_CHANNEL)out->note2_fx[s]=p->note2_fx[k];
+    }
+   }
+  }else{
+   for(uint8_t s=0u;s<TRACK_STEPS;s++){
+    struct track_step *dst=&out->ch[c][s];
+    memset(dst,0,sizeof(*dst));dst->note=TRACK_NOTE_EMPTY;
+    dst->instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:(c&3u));dst->value=50u;
+    if(c==TRACK_DRUM_CHANNEL){out->note2_fx[s].effect=0u;out->note2_fx[s].value=50u;}
    }
   }
  }

@@ -1,14 +1,14 @@
 {
-  "firmware": "BEETLE 1.01 RC1.0.11 SONG CHAINS",
-  "identity": "FM-1_2111",
+  "firmware": "BEETLE 1.01 RC1.1 HELP CHAPTERS + USB-C AUDIO (EXPERIMENTAL)",
+  "identity": "FM-1_2113",
   "schema": 19,
   "bytes": 610086,
-  "sha256": "fbdc3898fbd3545fbe441f76ed7b9434bab5529c0ec54369a6b7b4034d71f724",
-  "app_sha256": "19f4784b0a8e26dcc0d350bb164337c71b4e50ec606779b882c3b40c850d8736",
+  "sha256": "8e01053179296a8c3685bbf1daa9e7729d23cc7db463211b2f093ab4c4d4fbe0",
+  "app_sha256": "80c749e074782b65edf0284bc7a347ccef82516bbea25dcf955da802b00827c5",
   "protected_header_sha256": "d9f43191777656de01c7bed4f9e9ba2e34e94832c5d2ed02c3fc7ab7a6d9bd67",
   "ota_sha256": "d71d1b7c12adede951605e758a3580dacccedc427d49e1fceaf51decccc68a4b",
-  "source_reference": "reference/BEETLE-RC1.0.10-BOOT-OTA-REFERENCE.fwsc.reference",
-  "source_reference_sha256": "68217f412e440be6291e3d3b98e6649f08b3c92e9f009abda66394d3cfec987b",
+  "source_reference": "BEETLE-1.01-RC1.0.11b-FWSC.reference",
+  "source_reference_sha256": "505e50a83c07fd1180491594decfc40fb07a05a13d98773b6373ee77f229c27e",
   "checks": {
     "header_same": true,
     "loader_same": true,
@@ -16,6 +16,13 @@
     "container_same": true,
     "verified": true,
     "app_audit": true
+  },
+  "usb_audio": {
+    "interface": "USB Audio Class 1 capture, USB endpoint 4 IN",
+    "sample_rate": 44100,
+    "channels": 2,
+    "bits": 16,
+    "hardware_verified": false
   },
   "hardware_tested": false,
   "recovery_proven": false,
