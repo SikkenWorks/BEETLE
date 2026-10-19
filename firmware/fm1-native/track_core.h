@@ -12,6 +12,7 @@
 #define TRACK_PROJECTS 12u
 #define TRACK_STEPS 16u
 #define TRACK_FX_COUNT 12u
+#define TRACK_INSTRUMENT_SLOTS 8u
 #define TRACK_FX_DRUM_PITCH 11u
 #define TRACK_NOTE_STOP 254u
 #define TRACK_NOTE_EMPTY 255u
@@ -19,13 +20,14 @@
 #define TRACK_CHORD_COUNT 12u
 #define TRACK_PUNCH_COUNT 8u
 /* Sparse pattern backing store: an inactive pattern may be loaded on demand. */
-/* A 5-byte packed step: 8 NOTE + 2 INST + 4 CHORD + 4 FX + 7 VALUE
+/* A 5-byte packed step: 8 NOTE + 3 INST + 4 CHORD + 4 FX + 7 VALUE
  * + 8 dynamics bits. Keeps the 48-pattern bank the SAME RAM size.
+ * V1.3.1 uses 6 bytes per step to address eight synth patches.
  * dyn=0 has legacy velocity 94 and legato gate. Nibbles are independent.
  * Fields never address-taken. Explicit wire serialization avoids ABI issues. */
 struct __attribute__((packed)) track_step {
  uint8_t note;
- unsigned int instrument:2;
+ unsigned int instrument:3;
  unsigned int chord:4;
  unsigned int effect:4;
  unsigned int value:7;
@@ -49,7 +51,7 @@ static inline uint8_t track_step_velocity(const struct track_step *s){
 static inline uint8_t track_step_gate(const struct track_step *s){return (uint8_t)TRACK_DYN_GATE(s->dynamics);}
 static inline void track_step_set_vel(struct track_step *s,uint8_t v){s->dynamics=(uint8_t)(((v&15u)<<4)|(s->dynamics&15u));}
 static inline void track_step_set_gate(struct track_step *s,uint8_t v){s->dynamics=(uint8_t)((s->dynamics&240u)|(v&15u));}
-_Static_assert(sizeof(struct track_step)==5u,"BEETLE step must stay 5 bytes for FM1 RAM");
+_Static_assert(sizeof(struct track_step)==6u,"BEETLE eight-patch step must stay 6 bytes");
 /* NOTE2 has an independent FX/value pair; the 5-byte primary step stays ABI-stable. */
 struct track_note2_fx {uint8_t effect,value;};
 struct track_pattern {struct track_step ch[TRACK_CHANNELS][TRACK_STEPS];uint8_t length;

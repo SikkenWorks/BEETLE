@@ -265,6 +265,8 @@ etch_native_reset(&native_audio);native_audio.keys=keys&0x7ffffffu;}
    native_mono[i]=(int16_t)((left+right)/2);
    dst[2*i]=left*128;dst[2*i+1]=right*128;
 #if ETCH_NATIVE_UAC
+   /* Same post-master stereo L/R samples as DAC; never copy native_mono.
+    * UAC streams this exact interleaved pair, including six mixer PAN values. */
    native_usb_stereo[2*i]=left;native_usb_stereo[2*i+1]=right;
 #endif
   }

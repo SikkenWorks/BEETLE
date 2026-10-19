@@ -13,7 +13,7 @@ static const uint8_t chord[TRACK_CHORD_COUNT][6]={
  {3,0,5,7},{4,0,4,7,11},{4,0,3,7,10},{4,0,4,7,10},
  {4,0,4,7,14},{5,0,3,7,10,14}};
 static uint8_t bounded(uint8_t n,uint8_t cap){return n<cap?n:(uint8_t)(cap-1u);}
-void track_init(struct track_engine *e){if(!e)return;memset(e,0,sizeof(*e));e->transport.bpm=120u;e->active.length=16u;for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<TRACK_STEPS;st++){e->active.ch[c][st].note=255u;e->active.ch[c][st].instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:(c&3u));e->active.ch[c][st].value=50u;}}
+void track_init(struct track_engine *e){if(!e)return;memset(e,0,sizeof(*e));e->transport.bpm=120u;e->active.length=16u;for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<TRACK_STEPS;st++){e->active.ch[c][st].note=255u;e->active.ch[c][st].instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:c);e->active.ch[c][st].value=50u;}}
 /* Scroll order: note 0..last, EMPTY, STP, then loop. Cope with stale data. */
 uint8_t track_note_scroll(uint8_t note,int32_t delta,uint8_t drum){
  const int32_t count=drum?TRACK_DRUM_COUNT:128;
@@ -37,7 +37,7 @@ int track_set_note(struct track_engine *e,uint8_t channel,uint8_t st,uint8_t not
 int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step){
  if(!e||channel>=TRACK_CHANNELS||step>=TRACK_STEPS)return -1;
  struct track_step *s=&e->active.ch[channel][step];
- s->note=TRACK_NOTE_EMPTY;s->instrument=(uint8_t)(channel==TRACK_DRUM_CHANNEL?3u:(channel&3u));
+ s->note=TRACK_NOTE_EMPTY;s->instrument=(uint8_t)(channel==TRACK_DRUM_CHANNEL?3u:channel);
  s->chord=0u;s->effect=0u;s->value=50u;s->dynamics=0u;s->groove=0u;e->dirty=1u;return 0;
 }
 /* Clear a complete lane including inactive rows, to prevent notes returning when
@@ -167,7 +167,7 @@ int track_pattern_encode(const struct track_pattern *p,uint8_t *dst,uint32_t cap
  dst[0]='T';dst[1]='R';dst[2]=4u;dst[3]=p->length;uint32_t at=4u;
  for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<16u;st++){
   const struct track_step *s=&p->ch[c][st];
-  if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>3u||
+  if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>(c==TRACK_DRUM_CHANNEL?3u:7u)||
      s->chord>=(c==TRACK_DRUM_CHANNEL?16u:TRACK_CHORD_COUNT)||s->effect>=TRACK_FX_COUNT||s->value>100u)return -1;
   dst[at++]=s->note;dst[at++]=(uint8_t)s->instrument;dst[at++]=(uint8_t)s->chord;
   dst[at++]=(uint8_t)s->effect;dst[at++]=(uint8_t)s->value;dst[at++]=(uint8_t)s->dynamics;dst[at++]=(uint8_t)s->groove;
@@ -187,7 +187,7 @@ int track_pattern_decode(struct track_pattern *p,const uint8_t *src,uint32_t len
   struct track_step *s=&next.ch[c][st];
   s->note=src[at++];s->instrument=src[at++];s->chord=src[at++];
   s->effect=src[at++];s->value=src[at++];s->dynamics=version>=2u?src[at++]:0u;s->groove=version>=3u?src[at++]:0u;
-  if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>3u||
+  if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>(c==TRACK_DRUM_CHANNEL?3u:7u)||
       s->chord>=(c==TRACK_DRUM_CHANNEL?16u:TRACK_CHORD_COUNT)||s->effect>=TRACK_FX_COUNT||s->value>100u)return -1;
  }
  for(unsigned st=0u;st<TRACK_STEPS;st++){

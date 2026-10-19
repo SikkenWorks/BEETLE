@@ -56,14 +56,15 @@ static const char *const beetle_help_lines[] = {
  "BLOCK: K2 ACTION K3 AMOUNT",
  "BLOCK: SEL APPLY",
  "# INSTRUMENT / KEYBOARD",
- "EDIT: INSTRUMENT SETTINGS",
+ "EDIT: EIGHT SYNTH PATCH SLOTS",
+ "EDIT TOP: INST 1-8 = TRACKER NO.",
  "K1 ROW  K2 PAGE  K3 VALUE",
  "OCT - / +: LIVE KEYBOARD",
  "EDIT: BOTH OCT = MONO/POLY",
  "EDIT: SEQ+EDIT LIBRARY",
- "LIBRARY: 8 PROJECT PATCHES",
+ "LIBRARY: 8 STORED PRESETS",
  "LIB: K1 SLOT K2 ACTION",
- "LIB: K3 ACTIVE INST 1-4",
+ "LIB: K3 ACTIVE INST 1-8",
  "LIB: K4 COPY DEST SLOT",
  "LIB: SEL STORE/LOAD/COPY/NAME",
  "NAME: K1 POS K2 CHAR SEL SAVE",
@@ -88,6 +89,8 @@ static const char *const beetle_help_lines[] = {
  "RING MOD DEFAULT 20",
  "STUTTER DEFAULT BPM X1",
  "REC + PLAY: RECORD PUNCH FX",
+ "NEW FX TAKE REPLACES SAME FX LANE",
+ "SONG: PUNCH REC USES CH1 PAT",
  "# SONG CHAINS",
  "POS: SONG ROW NUMBER 01-64",
  "CH1 CH2 CH3 CH4 CH5 DR REP",
@@ -102,6 +105,8 @@ static const char *const beetle_help_lines[] = {
  "EACH CH PLAYS ITS OWN PATTERN",
  "SHORT PATTERNS LOOP IN ROW",
  "GLOBAL PUNCH SOURCE: CH1",
+ "REC SONG: WRITES ACTIVE CH1 PAT",
+ "FX NEW SONG ROW: NO GHOST CARRY",
  "V18 SONGS AUTO-MIGRATE V19",
  "# LIVE MIXER / SOLO",
  "ARP: LIVE WHEN SONG ON",
@@ -153,12 +158,12 @@ static const char *const beetle_help_lines[] = {
  "ANALOGUE OUT + USB MIDI REMAIN",
  "USB AUDIO: NO FM1 SETTING NEEDED",
  "HOST MUST SELECT FM1 AUDIO INPUT",
- "USB CAPTURE REQUIRES RC1.1 BUILD",
+ "USB CAPTURE: V1.2 CLOCK FIX",
  };
 #define BEETLE_HELP_COUNT ((uint8_t)(sizeof(beetle_help_lines)/sizeof(beetle_help_lines[0])))
 /* Chapter indexing is derived from the existing source lines so adding or
  * extending a topic never requires manually synchronizing an offset table.
- * These helpers are UI-only and leave the persisted V19 project unchanged. */
+ * These helpers are UI-only and leave the V20 project, V19 migration supported. */
 static inline uint8_t beetle_help_chapter_count(void){
  uint8_t count=0u;
  for(uint8_t i=0u;i<BEETLE_HELP_COUNT;i++)if(beetle_help_lines[i][0]=='#')count++;

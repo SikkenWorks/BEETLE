@@ -15,14 +15,18 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>RC1.1</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.3.1</strong> · <a href="CHANGELOG.md">Release history</a></sub>
 </p>
 
 ---
 
-**RC1.1 — Chapter HELP + USB-C audio capture:** HELP now has twelve chapters, selected using **K2**, and each chapter scrolls independently with **K1**. BEETLE RC1.1's experimental firmware additionally exposes a class-compliant **stereo 16-bit / 44.1 kHz USB Audio Class 1 capture input** to your computer over USB-C, alongside analog audio output and USB MIDI. The supplied `.fwsc` is compiled with `--usb-audio`; previous firmware releases do **not** gain the feature by updating the WebInstaller alone. Neither USB audio performance nor OTA/recovery has yet been verified on a physical FM1. **Back up and verify a recovery route before installing.**
+**BEETLE V1.3.1** introduces **eight active synthesizer instrument slots (INST 1–8)** across CH1–CH5. They are independent editable patches, not waveform types or the eight stored Instrument Library presets. You can still select all **12 oscillator types**, including **VA OSC** and **VA OSC2** and their A/B waves, in each patch. The **CH6 drum engine remains a separate ROM kit**; its old "INST 4" label has been replaced with KIT in the tracker. Select a synth note's INST column with K2 and turn K3 to assign 1–8, then press EDIT on CH1–CH5 to edit the active patch. New projects default synth CH1–CH5 to INST 1–5; in Song Mode the same instrument bank is shared across all 48 patterns.
 
-**RC1.0.11b — Song Chains audio-stability hotfix:** reduces per-voice mixer work and song-transition cost; the BEETLE synth voice budget now responds to repeated DMA deadline pressure instead of incorrectly limiting unused ETCH voices. Any audio-stop recovery screen now uses BEETLE branding. No changes to saved project format (V19), Song Chains, or tracker controls. Software-tested; physical FM1 endurance testing remains pending.
+**Project compatibility:** new firmware stores **V20 TRK1 projects** with eight patch slots and 3-bit instrument references. Existing **V19 projects** load with INST 1–4 intact and initialize INST 5–8 to new defaults. Save backups before updating: older V1.3 firmware does **not** understand the V20 format. Maximum stored project size remains 12,256 bytes and overflow is rejected without erasing storage. Eight active patches are distinct from the preexisting eight *project-local* Instrument Library presets. The 8-voice synth polyphony limit is unchanged. The experimental linker increases `.pool` by 3 KiB and reduces the available stack guard reservation; physical stress tests are still required.
+
+**BEETLE V1.3** fixes Song Mode Punch-In recording, prevents unintended start-of-transport FX events, improves chord-versus-single-note gain staging, and preserves separate left/right stereo mixer panning through the USB capture path. Instrument EDIT shows `INST 1/4` through `INST 4/4` to match the tracker. These changes retain the V19 project format and all V1.2 waveform and USB clock fixes. See [V1.3 validation](docs/V1.3-VALIDATION.md).
+
+**BEETLE V1.2** includes a twelve-chapter on-device HELP system and **USB-C stereo capture** (USB Audio Class 1, 44.1 kHz / 16-bit), with revised clock-drift interpolation to avoid abrupt USB resynchronization. The native oscillator output has fixed, calibrated waveform gains for all twelve types and all five VA waveshapes. This correction is part of the firmware DSP, not an automatic loudness compressor. The analog and USB-MIDI paths are retained. **USB streaming, sustained DSP load and OTA recovery have not been validated on a physical FM1**; consult the [Changelog](CHANGELOG.md) and [V1.2 validation notes](docs/V1.2-AUDIO-VALIDATION.md) before installation.
 
 ## What is BEETLE?
 
@@ -34,7 +38,7 @@ BEETLE turns the **M-VAVE FM1** into a standalone, hands-on music workstation. C
 | **48 patterns** | 1–16 steps per pattern, with independent channel content |
 | **Song Chains** | 64 song positions with a separate pattern source for each channel |
 | **Sound engine** | Up to eight shared synth voices, separate drum voices, 14 drum instruments |
-| **Sound design** | VA, SID-inspired and NES-inspired instruments, patch editing and an eight-slot project instrument library |
+| **Sound design** | Eight active synth instrument patches, 12 selectable oscillator types, two VA oscillator modes, plus eight project-local library presets |
 | **Performance** | Mixer, mute/solo, Punch-In FX, snapshots and mute groups |
 | **Projects** | 12 project slots, plus browser-based backup and project tools |
 
@@ -54,19 +58,19 @@ You can learn the workflow in a few minutes using the [Web Simulator](https://si
 
 > **FM1 terminology:** **SEL** means the physical SELECT push-button; **SELECT** in this guide means the *rotary encoder*. **OP1–OP6** are the six mapped black musical keys used with **SEQ**. The function of some controls changes with the current screen.
 
-## HELP chapters (RC1.1)
+## HELP chapters
 
 Press **HOME → HELP**. Turn **K2** to browse the twelve topics. Turn **K1** to scroll *inside the selected chapter*. The scroll position resets at each chapter change, and the bottom counter refers to the current chapter, not the whole manual. **HOME** returns to Projects and **SEQ** returns to Tracker. HELP remains read-only; turning the other encoders will not edit your music.
 
 Chapters: Tracker Basics, Pattern Editing, Step Dynamics / Groove, Instrument / Keyboard, Projects, Live FX / Record, Song Chains, Live Mixer / Solo, Mixer / Performance, Master FX, Guide / Navigation and USB-C Audio.
 
-## USB-C stereo audio capture (RC1.1, experimental)
+## USB-C stereo audio capture (V1.2, experimental)
 
 Connect the FM1 with a **USB-C data cable**. On Windows, open **Settings → System → Sound → Input** or the audio input selector in a recording application and choose **BEETLE Audio** (device naming depends on the operating system). Set the recording format to **44,100 Hz, stereo, 16-bit** when available. Start playback on the FM1 and recording on the computer. The computer initiates the USB audio stream; there is no extra on-device enable switch. The stream taps BEETLE's final master stereo signal, including the master volume, and leaves the analog output and USB-MIDI path present.
 
 USB-C audio is **audio from FM1 → computer**, not computer → FM1. It is not USB screen capture, audio-file transfer, USB mass storage, or multitrack individual stems. The WebSimulator produces local browser audio and **does not act as a physical USB audio device**.
 
-The USB audio endpoint and the associated ISR were already present as an optional Felucca-derived implementation, but had been disabled in the provided RC1.0.11b firmware. RC1.1 enables this existing UAC1 capture path in the distributed native build with `--usb-audio` (44.1 kHz only). This is a **software-/linker-validated experimental feature**, not proof that Windows/macOS/Linux enumerates it on a real FM1 or that it runs glitch-free with all six lanes and MASTER FX. Check for a BEETLE Audio input after installing; if the device fails to enumerate, do not assume an OS-level driver change will fix the firmware. See [`docs/RC1.1-HELP-USB-AUDIO-VALIDATION.md`](docs/RC1.1-HELP-USB-AUDIO-VALIDATION.md).
+The USB audio endpoint and the associated ISR originated from Felucca. V1.2 preserves that foundation but changes the 44.1 kHz ring reader to interpolate smoothly across physical FM1/host clock drift, with bounded rate tracking and fixed 44/45-frame packets. BEETLE V1.2 includes this UAC1 capture path in the distributed native build with `--usb-audio` (44.1 kHz only). This is a **software-/linker-validated experimental feature**, not proof that Windows/macOS/Linux enumerates it on a real FM1 or that it runs glitch-free with all six lanes and MASTER FX. Check for a BEETLE Audio input after installing; if the device fails to enumerate, do not assume an OS-level driver change will fix the firmware. See [`docs/V1.2-AUDIO-VALIDATION.md`](docs/V1.2-AUDIO-VALIDATION.md).
 
 Build the distributed USB-audio configuration with:
 
@@ -75,7 +79,7 @@ export JIELI_TOOLCHAIN=/path/to/jieli-linux-toolchain
 python firmware/fm1-native/build.py --beetle-storage-lab --updater --usb-audio
 ```
 
-The `.fwsc` includes experimental storage/OTA code as in the RC1.0.11b base; installing it remains risky. A separate recovery-tested stock firmware image has not been produced here.
+The `.fwsc` retains the experimental storage/OTA code from the V1.1 base; installing it remains risky. A separate recovery-tested stock firmware image has not been produced here.
 
 ## FM1 Controls
 

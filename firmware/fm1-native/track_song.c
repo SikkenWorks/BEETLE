@@ -11,7 +11,7 @@ void track_song_init(struct track_song_bank *b,const struct track_engine *e){
    for(uint8_t s=0;s<TRACK_STEPS;s++)b->patterns[i].note2_fx[s].value=50u;
   for(uint8_t c=0;c<TRACK_CHANNELS;c++)for(uint8_t s=0;s<TRACK_STEPS;s++){
    b->patterns[i].ch[c][s].note=255u;
-   b->patterns[i].ch[c][s].instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:(c&3u));
+   b->patterns[i].ch[c][s].instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:c);
    b->patterns[i].ch[c][s].value=50u;
   }
  }
@@ -68,7 +68,7 @@ static void track_song_compose(struct track_song_bank *b,struct track_engine *e)
    for(uint8_t s=0u;s<TRACK_STEPS;s++){
     struct track_step *dst=&out->ch[c][s];
     memset(dst,0,sizeof(*dst));dst->note=TRACK_NOTE_EMPTY;
-    dst->instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:(c&3u));dst->value=50u;
+    dst->instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:c);dst->value=50u;
     if(c==TRACK_DRUM_CHANNEL){out->note2_fx[s].effect=0u;out->note2_fx[s].value=50u;}
    }
   }
@@ -186,7 +186,7 @@ uint8_t track_song_effect_parameter(const struct track_song_bank *b,uint8_t pat,
  }
  return best<0?fallback:clip->data[best].param;
 }
-uint8_t track_song_effect_mask(const struct track_song_bank *b,uint8_t pat,uint8_t step){
+uint8_t track_song_effect_mask_boundary(const struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t allow_wrap){
  if(!b||pat>=TRACK_PATTERNS||step>=TRACK_STEPS)return 0u;
  const struct track_song_clip *clip=&b->clips[pat];uint8_t mask=0u;
  /* Evaluate each Punch lane as a periodic timeline. Record order only wins
@@ -199,8 +199,9 @@ uint8_t track_song_effect_mask(const struct track_song_bank *b,uint8_t pat,uint8
    if(ev->fx!=fx||ev->step>step||ev->down>1u)continue;
    if((int)ev->step>=best_time){best_time=ev->step;best=i;}
   }
-  if(best<0){
-   /* Carry a long-held Punch through the next pattern wrap. */
+  if(best<0 && allow_wrap){
+   /* During an ordinary repeating pattern, a genuine held FX may cross the wrap.
+    * At transport start or a different Song row, there is NO prior state. */
    for(uint8_t i=0;i<clip->count;i++){
     const struct track_song_event *ev=&clip->data[i];
     if(ev->fx!=fx||ev->down>1u)continue;
@@ -210,4 +211,18 @@ uint8_t track_song_effect_mask(const struct track_song_bank *b,uint8_t pat,uint8
   if(best>=0&&clip->data[best].down)mask|=(uint8_t)(1u<<fx);
  }
  return mask;
+}
+
+uint8_t track_song_effect_mask(const struct track_song_bank *b,uint8_t pat,uint8_t step){
+ return track_song_effect_mask_boundary(b,pat,step,1u);
+}
+
+/* A new take replaces only this effect lane; do not mix its fresh down/up
+ * edges with stale events from an earlier take, which caused ghost FX. */
+void track_song_clear_punch_fx(struct track_song_bank *b,uint8_t pat,uint8_t fx){
+ if(!b||pat>=TRACK_PATTERNS||fx>=TRACK_PUNCH_COUNT)return;
+ struct track_song_clip *clip=&b->clips[pat];uint8_t w=0u;
+ for(uint8_t i=0u;i<clip->count;i++)if(clip->data[i].fx!=fx)
+  clip->data[w++]=clip->data[i];
+ clip->count=w;clip->overflow=0u;
 }

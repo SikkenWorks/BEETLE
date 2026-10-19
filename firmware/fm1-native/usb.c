@@ -21,7 +21,7 @@
  * FELUCCA_UAC_48K=1 (the default with FELUCCA_UAC) offers 48 kHz too: the host picks the rate with
  * SET_CUR (UAC1 sampling frequency control, two discrete rates in the one alt setting). The engines stay
  * at 44.1 kHz; at 48 kHz uac_tap resamples (polyphase FIR 160 / 147, uac_fir.h) into the ring. 44.1 kHz,
- * the rate until a host asks for another, sends the samples as before, bit for bit. */
+ * the rate until a host asks for another, uses V1.2 clock-drift SRC for uninterrupted USB PCM. */
 #include "hal/fm1_usb.h"   /* registers; relative, so the loader and the host tests find it too */
 #ifndef FELUCCA_CDC
 #define FELUCCA_CDC 0
@@ -64,9 +64,10 @@ static struct {
 #endif
 
 #if FELUCCA_UAC
+#include "beetle_usb_capture_src.h"
 /* USB audio input. The I2S clock is not locked to USB (about 44,117.6 Hz against the host's 44,100):
  * the endpoint is asynchronous, so each 1 ms packet carries what the ring holds, 44 or 45 frames
- * (the 44.1 pattern) and one more or one fewer while the ring's fill drifts out of its band.
+ * (the 44.1 pattern); fractional resampling absorbs independent oscillator drift.
  * The render writes HALF_FRAMES (128) frames every 2.9 ms; the fill measured when a render starts is
  * the low point of that saw tooth, and is kept in UA_LO..UA_HI. A frame waits in the ring for that fill
  * plus its place in the render: 80..256 frames, ~3.8 ms on average (256-frame halves and a 96..160
@@ -106,14 +107,16 @@ static struct {
     uint8_t e0_rx;               /* SET_CUR sampling frequency: data stage pending */
     volatile uint32_t fill_min;  /* ring fill when the last render started */
     uint32_t acc;                /* 44.1 frames per ms: 0.1 frame steps */
-    uint32_t last;               /* the last frame sent, repeated on an underrun */
+    uint32_t last;               /* last correctly rendered USB frame; dropout hold */
+    uint32_t src_step;           /* V1.2 fractional input advance per output, Q16 */
+    uint16_t src_fraction;       /* V1.2 fractional read position, Q16 */
     uint32_t starts, pkts, frames;               /* frames in packets sent from the ring */
     uint32_t underruns, overruns, missed;        /* glitches: ring empty (repeat), ring full (drop), no packet ready */
     uint32_t stalls;                             /* the host stopped reading for > 20 ms (alt still 1) */
     uint32_t adj_up, adj_down;                   /* packets one frame longer / shorter than the pattern */
     uint32_t fill_lo, fill_hi;                   /* range of fill_min since the stream started */
     uint32_t rate_sets;                          /* SET_CUR sampling frequency requests */
-} uac;
+} uac __attribute__((section(".usb_audio_ram"))); /* boot-zeroed dedicated UAC SRAM */
 #if FELUCCA_UAC_48K
 #include "uac_fir.h"
 /* the resampler's input history: the last 32 frames, written twice so a window of UAC_FIR_N never wraps */
@@ -422,6 +425,8 @@ static void uac_stream(uint32_t alt)                    /* SET_INTERFACE, config
     uac.alt = (uint8_t)alt;
     uac.acc = 0;
     uac.last = 0;
+    uac.src_step = BEETLE_UAC_SRC_ONE;
+    uac.src_fraction = 0u;
     if (alt) {                                          /* (the fill range of the last stream stays readable) */
         uac.starts++;
         uac.fill_lo = 0xFFFFFFFFu;
@@ -1015,6 +1020,8 @@ static __attribute__((noinline)) void uac_render_start(void)   /* audio ISR, bef
         RING_PUBLISH();
         ua_w = r + prime;
         uac.fill_min = prime;
+        uac.src_step = BEETLE_UAC_SRC_ONE;
+        uac.src_fraction = 0u;
         RING_PUBLISH();
         uac.go = 1;
         return;
@@ -1130,12 +1137,10 @@ static __attribute__((noinline)) void uac_tap(const int32_t *out, uint32_t n)   
  * primed, silence. An empty ring repeats the last frame. Returns the frame count. */
 static uint32_t uac_packet(uint32_t *d)
 {
-    uint32_t n = 44u, r, fill, k, i, lo = UA_LO, hi = UA_HI;
+    uint32_t n = 44u, r, fill, k, i;
 #if FELUCCA_UAC_48K
-    if (uac.r48) {                                      /* 48 frames a ms, no pattern */
-        n = 48u;
-        lo = UA_LO48;
-        hi = UA_HI48;
+    if (uac.r48) {
+        n = 48u; /* legacy experimental 48k path, not shipped in V1.2 */
     } else
 #endif
     {
@@ -1145,31 +1150,57 @@ static uint32_t uac_packet(uint32_t *d)
             n++;
         }
     }
-    if (!uac.go || uac.ring48 != uac.r48) {             /* not primed (at this rate) yet */
-        for (i = 0; i < n; i++)
-            d[i] = 0;
+    if (!uac.go || uac.ring48 != uac.r48) {
+        for (i = 0; i < n; i++) d[i] = 0;
         return n;
     }
-    if (uac.fill_min > hi) {
-        n++;
-        uac.adj_up++;
-    } else if (uac.fill_min < lo) {
-        n--;
-        uac.adj_down++;
+#if FELUCCA_UAC_48K
+    if (uac.r48) {
+        /* The optional 48k FIR writer already performs SRC. Keep its
+         * independent ring path until it has been physically validated. */
+        r = ua_r;fill = ua_w - r;RING_PUBLISH();
+        k = fill < n ? fill : n;
+        for (i = 0; i < k; i++)d[i] = ua_ring[(r + i) & (UA_N - 1u)];
+        if (k < n) {
+            uint32_t last = k ? d[k - 1u] : uac.last;
+            uac.underruns++;
+            for (; i < n; i++)d[i] = last;
+        }
+        uac.last = d[n - 1u];RING_PUBLISH();ua_r = r + k;
+        uac.pkts++;uac.frames += n;
+        return n;
     }
+#endif
+    /* V1.2: read continuously through the ring at a fractional position.
+     * The USB packet ALWAYS carries the host's nominal 44/45-frame pattern.
+     * Do not add or remove a whole frame to chase low-frequency codec drift.
+     * The last input frame is reserved as the right interpolation neighbour.
+     */
+    if (uac.fill_min <= UA_N)
+        uac.src_step = beetle_usb_src_next_step(uac.src_step, uac.fill_min, UA_PRIME);
     r = ua_r;
     fill = ua_w - r;
-    RING_PUBLISH();                                     /* the slots after the index */
-    k = fill < n ? fill : n;
-    for (i = 0; i < k; i++)
-        d[i] = ua_ring[(r + i) & (UA_N - 1u)];
-    if (k < n) {
-        uint32_t last = k ? d[k - 1u] : uac.last;
-        uac.underruns++;
-        for (; i < n; i++)
-            d[i] = last;
+    RING_PUBLISH();
+    uint32_t pos = uac.src_fraction;
+    uint32_t step = uac.src_step;
+    uint32_t last = uac.last;
+    for (i = 0; i < n; i++) {
+        uint32_t src = pos >> 16u;
+        if (src + 1u >= fill) {
+            /* An actual DMA/USB starvation is diagnosed and held only until
+             * the next real block. Never consume uninitialized buffer data. */
+            uac.underruns++;
+            for (; i < n; i++) d[i] = last;
+            break;
+        }
+        d[i] = last = beetle_usb_src_lerp(ua_ring[(r + src) & (UA_N - 1u)],
+                          ua_ring[(r + src + 1u) & (UA_N - 1u)],(uint16_t)pos);
+        pos += step;
     }
-    uac.last = d[n - 1u];
+    k = pos >> 16u;
+    if (k > fill - (fill ? 1u : 0u)) k = fill - (fill ? 1u : 0u);
+    uac.src_fraction = (uint16_t)pos;
+    uac.last = last;
     RING_PUBLISH();
     ua_r = r + k;
     uac.pkts++;

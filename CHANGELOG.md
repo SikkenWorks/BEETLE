@@ -1,3 +1,33 @@
+## BEETLE V1.3.1 — Eight active synth instruments, separate drums
+
+- Expanded active synth instrument patch slots from **4 to 8**, each independently editable and addressable by tracker INST 1–8 (0–7 internally); all **12 waveform/oscillator types** remain available in *each* patch, including VA OSC and VA OSC2 with dual A/B waves.
+- Five synth lanes (CH1–CH5) remain eight-voice shared polyphony. **CH6 is the dedicated drum kit**, and its tracker column says KIT/ROM rather than implying that INST 4 is the drums.
+- EDIT and HELP now display INST 1–8; the existing eight-slot project-local Instrument Library remains separate and unchanged.
+- **V20 project serialization:** adds 3-bit synth instrument references and eight actual synth patches and TYPE banks. Older V19 files load without changing the first four patch sounds. V20 cannot be opened by V1.3 and earlier firmware. Slot capacity remains 12,256 bytes, with preflight protection against oversized projects.
+- Fixed the empty-step migration so legacy CH5 default instrument values do not inflate sparse projects.
+- The simulator's binary import/export and JSON backup conversion also support 8 patches and migration from V19/four-slot backups.
+- Retains Song Chains (64 positions), 48 patterns, two VA oscillators, drums, Punch-In FX, USB-C stereo audio, panning, effects, backups and credits.
+- JieLi native build, OTA-package structure and original protected loader/header checks pass. Linker pool expands 3 KiB, reducing available stack reservation. **Hardware audio/stability, USB, OTA flashing and recovery remain unverified.**
+
+## BEETLE V1.3 — Song Punch-In, ghost FX, polyphonic loudness and stereo PAN
+
+- **Song recording:** REC+PLAY now records physical Punch-In keys into the active Song Chains **CH1 pattern**, not the unrelated tracker cursor pattern. A held, recorded FX spanning a Song position boundary closes in the prior CH1 source and opens in the next source. Source `--` deliberately does not save FX.
+- **Ghost FX guard:** Fresh PLAY never inherits an FX key from a previous looping pattern. The REC key latch is initialized from actual hardware key state; only fresh physical down events may be recorded, and orphan up events are ignored. A new FX take removes only stale events for the same FX in that source pattern. Explicit stop closes held recorded effects; no stray data is inserted at playback start.
+- **Chord/single-note balance:** Replaced nearly linear phrase polyphony attenuation with bounded power-style Q8 headroom normalization, smoothed in the render ISR. The note-on ADSR, velocity and individual oscillator balance remain unchanged; the existing 8-voice limit remains.
+- **Real stereo panning:** Synth and drum lanes now use centered, deterministic equal-power L/R gains computed once per audio block. The stereo post-master `left,right` pair is copied unmodified to the 44.1 kHz, 16-bit UAC capture endpoint. The scope-only mono path is never used for USB capture.
+- **Instrument numbering:** All instrument edit pages display the **INST 1–4** patch number at the top, matching the 1-based instrument cell in the tracker. HELP and WebSimulator updated.
+- **Compatibility:** V19 project layout unchanged, 64-song-position model and 48 source pattern clips retained, no memory/flash partition changes, protected firmware header and OTA loader preserved. If multiple Song positions refer to the same CH1 source pattern, their Punch events remain shared, as before; this is not 64 independent Song FX lanes.
+- **Tests:** Host PCM RMS and L/R isolation for synth/drum; fresh transport/CH1 recording route tests; native pi32v2/OTA-lab build and app audit; playback stability, V19 migration and UAC clock simulation. Physical USB recordings, device-side timing and safe OTA recovery are still **unverified**.
+
+## BEETLE V1.2 — USB capture continuity and oscillator loudness balance
+
+- **USB-C recording:** The 44.1 kHz UAC1 endpoint now delivers the regular 44/45-frame host cadence without inserting/removing whole packet samples to chase physical codec drift. A slowly adjusted Q16 fractional read position performs light linear PCM interpolation, with bounded correction and existing UAC underflow/overflow diagnostics. The legacy optional 48 kHz path is unchanged and **not enabled** in this release. USB Audio input, analog output and USB-MIDI remain enabled.
+- **Native sound balance:** Per-shape gain calibration for all five VA waves, plus fixed gain compensation for the 12 oscillator/instrument types, based on measured C-renderer RMS. These gains are fixed by the selected type, not dynamic compression. Velocity, ADSR, mixer level, drive, per-track effects and patch parameters remain editable.
+- **Measurements (software):** Before: clean C4 note across types from ~3,373 to ~17,028 RMS (over 14 dB variation). After: using shipped default clean patches, ~6,676–6,995 RMS (<0.5 dB); the ten VA type/shape tests also pass the same tolerance. A two-minute independent 44,117.6 Hz codec vs 44,100 Hz host ring test produced 5,292,000 samples with zero simulated underruns and overruns. These are fixed-configuration software measurements, not loudness matching across all notes, settings or mastered projects.
+- **Memory:** Moved only USB audio state into its dedicated boot-zeroed `.usb_audio_ram` linker region. No protected loader/header changes; JieLi linker and app audit pass.
+- **Compatibility:** No project format change (V19). Retains 12-slot storage, 64 Song Chains positions, 12 HELP chapters, five synth channels plus drum channel, Drum NOTE2, backup tools, mute groups, instrument library and existing FX.
+- **Experimental hardware warning:** No real FM1 USB audio/analog A/B recording was supplied or tested. Endpoint electrical behavior, actual host OS recordings, DSP deadline performance, USB interruptions, boot and independent stock OTA restore still need hardware validation. An exact firmware hash is not proof of safe flashing.
+
 ## BEETLE 1.01 RC1.1 — HELP chapters + USB-C stereo capture
 
 - Replaced HELP's continuous scrolling list with **12 topic chapters**. **K2** changes the topic and **K1** scrolls only within it; chapter change returns to its first line. On-device page counter and scroll thumb show progress within the selected topic. HOME and SEQ continue to exit safely, without altering any saved data.

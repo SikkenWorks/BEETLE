@@ -17,11 +17,11 @@ for fn in ('simulator.html','web/simulator.html'):
  assert 'helpScrollMax(model.helpChapter)' in text
  assert 'model.helpChapter+dir' in text
 print('PASS WebSimulator content and controls mirror native HELP')
-raw=Path('BEETLE-1.01-RC1.1-USB-AUDIO-EXPERIMENTAL.fwsc').read_bytes()
+raw=Path('BEETLE-V1.2-USB-AUDIO-EXPERIMENTAL.fwsc').read_bytes()
 sha=hashlib.sha256(raw).hexdigest()
 installer=Path('WebInstaller.html').read_text()
 assert "HASH_ET: '"+sha+"'" in installer
-assert "ID_ET: 'FM-1_2113'" in installer
+assert "ID_ET: 'FM-1_2114'" in installer
 b64=re.search(r'<script id="firmware-embedded" type="application/octet-stream">\s*(.*?)\s*</script>',installer,re.S)
 assert b64 and base64.b64decode(b64.group(1))==raw
 assert Path('FIRMWARE-MANIFEST.json').read_text().find(sha)>=0

@@ -10,7 +10,7 @@
 #include "beetle_performance_snapshots.h"
 #include "beetle_mute_groups.h"
 #define TRACK_STORE_MAGIC 0x314B5254u /* little endian "TRK1" */
-#define TRACK_STORE_VERSION 19u
+#define TRACK_STORE_VERSION 20u
 #define TRACK_STORE_MAX 24576u /* include legacy V1-V3 decode capacity */
 #define TRACK_STORE_V4_MAX 12256u /* physical V4 payload budget */
 struct track_store_instrument {
@@ -27,10 +27,10 @@ struct beetle_instrument_library {
 };
 struct track_master_settings {uint8_t eq[4],eq_freq[4],eq_width[4],comp_threshold,comp_ratio,comp_gain,reverb_wet,reverb_feedback,reverb_tone,enabled[3],order[3],comp_attack,reverb_spread;};
 struct track_store_project {
- struct track_store_instrument instruments[4];
+ struct track_store_instrument instruments[TRACK_CHIP_SLOTS];
  /* V17: independent TYPE settings in each of the four active patch slots. */
- uint16_t type_valid[4];
- struct track_store_instrument type_presets[4][TRACK_CHIP_TYPES];
+ uint16_t type_valid[TRACK_CHIP_SLOTS];
+ struct track_store_instrument type_presets[TRACK_CHIP_SLOTS][TRACK_CHIP_TYPES];
  struct beetle_instrument_library library;
  struct track_song_bank song;
  struct track_mixer mixer;

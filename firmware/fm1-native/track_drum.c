@@ -7,6 +7,7 @@
 #include "track_drum.h"
 #include "track_mixer.h"
 #include "track_core.h"
+#include "beetle_stereo_pan.h"
 #include "beetle_drum_rom.h"
 #include <string.h>
 static const char *const names[TRACK_DRUM_COUNT]={"KIK","SNR","HHC","HHO","TM1","TM2","TM3","CRS","RDE","CLP","PC1","PC2","PC3","RIM"};
@@ -150,7 +151,8 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
  const struct track_mixer_channel *m=mix?&mix->ch[TRACK_DRUM_CHANNEL]:0;
  uint8_t any_solo=0u;if(mix)for(uint8_t i=0;i<TRACK_CHANNELS;i++)any_solo|=mix->ch[i].solo;
  const uint32_t gain=!m?80u:(m->mute||(any_solo&&!m->solo)?0u:m->volume);
- const int32_t pan=m?m->pan:0;
+ uint16_t pan_left,pan_right;
+ beetle_stereo_pan_gain(m?m->pan:0,&pan_left,&pan_right);
  for(uint32_t f=0;f<frames;f++){
   int32_t mono=0;
   for(uint8_t i=0;i<TRACK_DRUM_POLY;i++){
@@ -190,8 +192,8 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
   uint32_t peak=(uint32_t)(mono<0?-(int64_t)mono:mono);
   if(peak>32767u)peak=32767u;
   if(peak>track_lane_pcm_peak[TRACK_DRUM_CHANNEL])track_lane_pcm_peak[TRACK_DRUM_CHANNEL]=(uint16_t)peak;
-  int32_t l=dst[f*2u]+mono*(100-pan)/100;
-  int32_t r=dst[f*2u+1u]+mono*(100+pan)/100;
+  int32_t l=dst[f*2u]+(int32_t)(((int64_t)mono*pan_left)>>8);
+  int32_t r=dst[f*2u+1u]+(int32_t)(((int64_t)mono*pan_right)>>8);
   dst[f*2u]=clamp16(l);dst[f*2u+1u]=clamp16(r);
  }
 }

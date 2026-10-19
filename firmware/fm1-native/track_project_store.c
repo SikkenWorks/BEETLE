@@ -15,14 +15,15 @@ uint32_t track_store_crc32(const uint8_t *p,uint32_t n){
  * exceeding that capacity are refused BEFORE any erase (not truncated). */
 #define TRACK_PACKED_STEP_BITS 25u /* V4-V10 */
 #define TRACK_V11_PACKED_STEP_BITS 33u /* adds 8 dynamics bits */
-#define TRACK_V12_PACKED_STEP_BITS 40u /* additional 7 groove bits */
+#define TRACK_V12_PACKED_STEP_BITS 40u
+#define TRACK_V20_PACKED_STEP_BITS 41u /* additional 7 groove bits */
 #define TRACK_PACKED_PATTERN_BYTES ((4u*TRACK_STEPS*TRACK_PACKED_STEP_BITS+7u)/8u)
 #define TRACK_V5_MASK_BYTES ((TRACK_CHANNELS*TRACK_STEPS+7u)/8u)
 static struct track_step empty_step(uint8_t lane){
- struct track_step v={TRACK_NOTE_EMPTY,(uint8_t)(lane==TRACK_DRUM_CHANNEL?3u:(lane&3u)),0u,0u,50u,0u,0u};return v;
+ struct track_step v={TRACK_NOTE_EMPTY,(uint8_t)(lane==TRACK_DRUM_CHANNEL?3u:lane),0u,0u,50u,0u,0u};return v;
 }
 static uint8_t valid_step(const struct track_step *st,uint8_t lane){
- return st->instrument<=3u && st->effect<TRACK_FX_COUNT && st->value<=100u &&
+ return st->instrument<=(lane==TRACK_DRUM_CHANNEL?3u:7u) && st->effect<TRACK_FX_COUNT && st->value<=100u &&
  (lane==TRACK_DRUM_CHANNEL ?
   ((st->note==TRACK_NOTE_EMPTY||st->note==TRACK_NOTE_STOP||st->note<TRACK_DRUM_COUNT)&&st->chord<=15u) :
   ((st->note==TRACK_NOTE_EMPTY||st->note==TRACK_NOTE_STOP||st->note<=127u)&&st->chord<TRACK_CHORD_COUNT));
@@ -110,14 +111,14 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
     out[mask_at+(pos>>3)]|=(uint8_t)(1u<<(pos&7u));populated++;
    }
   }
-  uint32_t packed=(populated*TRACK_V12_PACKED_STEP_BITS+7u)/8u;
+  uint32_t packed=(populated*TRACK_V20_PACKED_STEP_BITS+7u)/8u;
   if(i+packed>cap)return -2;
   memset(out+i,0,packed);uint32_t bit=0u;
   for(c=0;c<TRACK_CHANNELS;c++)for(s=0;s<TRACK_STEPS;s++){
    uint32_t pos=(uint32_t)c*TRACK_STEPS+s;
    if(!(out[mask_at+(pos>>3)]&(1u<<(pos&7u))))continue;
    const struct track_step *st=&pat->ch[c][s];
-   pack_bits(out+i,&bit,st->note,8u);pack_bits(out+i,&bit,st->instrument,2u);
+   pack_bits(out+i,&bit,st->note,8u);pack_bits(out+i,&bit,st->instrument,3u);
    pack_bits(out+i,&bit,st->chord,4u);pack_bits(out+i,&bit,st->effect,4u);
    pack_bits(out+i,&bit,st->value,7u);
    pack_bits(out+i,&bit,st->dynamics,8u);pack_bits(out+i,&bit,st->groove,7u);
@@ -147,7 +148,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
    PUT1(e->down==2u?(uint8_t)(e->param|0x80u):(e->param==255u?127u:e->param));
   }
  }
- for(c=0;c<4u;c++){
+ for(c=0;c<TRACK_CHIP_SLOTS;c++){
   const struct track_store_instrument *v=&p->instruments[c];
   struct track_va_patch def;const struct track_va_patch *vp=&v->va;
   if(!track_va_patch_valid(vp)){
@@ -217,7 +218,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
  }
  /* V17: a type can have its own ADSR, oscillator, cutoff and tuning.
   * Valid mask avoids wasting project space for unused waveform types. */
- for(c=0u;c<4u;c++){
+ for(c=0u;c<TRACK_CHIP_SLOTS;c++){
   if(p->type_valid[c] & (uint16_t)~((1u<<TRACK_CHIP_TYPES)-1u))return -1;
   if(i+2u>cap)return -2;
   wr16(out+i,p->type_valid[c]);i+=2;
@@ -244,7 +245,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -282,14 +283,18 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
  for(r=0;r<TRACK_PATTERNS;r++){
   struct track_pattern *pat=&p->song.patterns[r];GET1(pat->length);
   if(pat->length<1u||pat->length>TRACK_STEPS)return -3;
-  for(c=0;c<TRACK_CHANNELS;c++)for(s=0;s<TRACK_STEPS;s++)pat->ch[c][s]=empty_step(c);
+  for(c=0;c<TRACK_CHANNELS;c++)for(s=0;s<TRACK_STEPS;s++){
+   pat->ch[c][s]=empty_step(c);
+   /* V19 default CH5 instrument was 0. Keep old projects sonically identical. */
+   if(rd16(data+4u)<20u && c==4u)pat->ch[c][s].instrument=0u;
+  }
   uint32_t bit=0u,packed=0u;uint8_t present[TRACK_V5_MASK_BYTES];
   if(v5){
    if(i+TRACK_V5_MASK_BYTES>n)return -2;
    memcpy(present,data+i,TRACK_V5_MASK_BYTES);i+=TRACK_V5_MASK_BYTES;
    uint32_t count=0u;
    for(uint8_t x=0u;x<TRACK_V5_MASK_BYTES;x++)for(uint8_t b=0u;b<8u;b++)count+=(present[x]>>b)&1u;
-   packed=(count*(rd16(data+4u)>=12u?TRACK_V12_PACKED_STEP_BITS:rd16(data+4u)>=11u?TRACK_V11_PACKED_STEP_BITS:TRACK_PACKED_STEP_BITS)+7u)/8u;
+   packed=(count*(rd16(data+4u)>=20u?TRACK_V20_PACKED_STEP_BITS:rd16(data+4u)>=12u?TRACK_V12_PACKED_STEP_BITS:rd16(data+4u)>=11u?TRACK_V11_PACKED_STEP_BITS:TRACK_PACKED_STEP_BITS)+7u)/8u;
    if(i+packed>n)return -2;
   }else if(rd16(data+4u)>=4u){
    packed=TRACK_PACKED_PATTERN_BYTES;if(i+packed>n)return -2;
@@ -300,7 +305,7 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
    if(v5 && !(present[((uint32_t)c*TRACK_STEPS+s)>>3u]&(1u<<(((uint32_t)c*TRACK_STEPS+s)&7u))))continue;
    if(rd16(data+4u)>=4u){
     st->note=(uint8_t)unpack_bits(data+i,&bit,8u);
-    st->instrument=(uint8_t)unpack_bits(data+i,&bit,2u);
+    st->instrument=(uint8_t)unpack_bits(data+i,&bit,rd16(data+4u)>=20u?3u:2u);
     st->chord=(uint8_t)unpack_bits(data+i,&bit,4u);
     st->effect=(uint8_t)unpack_bits(data+i,&bit,4u);
     st->value=(uint8_t)unpack_bits(data+i,&bit,7u);
@@ -340,7 +345,7 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   }
  }
  if(rd16(data+4u)>=2u){
-  for(c=0;c<4u;c++){
+  for(c=0;c<(rd16(data+4u)>=20u?TRACK_CHIP_SLOTS:4u);c++){
    struct track_store_instrument *v=&p->instruments[c];
    GET1(v->type);GET1(v->attack);GET1(v->decay);GET1(v->sustain);GET1(v->release);
    GET1(v->duty);GET1(v->volume);if(i+2u>n)return -2;
@@ -357,9 +362,18 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
    if(!track_va_patch_valid(&v->va)||v->type>=TRACK_CHIP_TYPES||v->duty>100u||v->volume>100u)return -3;
   }
  }else{ /* Legacy TRACK v1: preserve all patterns, supply default patch knobs. */
-  for(c=0;c<4u;c++){
+  for(c=0;c<(rd16(data+4u)>=20u?TRACK_CHIP_SLOTS:4u);c++){
    struct track_store_instrument *v=&p->instruments[c];
    v->type=c;v->attack=1u;v->decay=14u;v->sustain=100u;v->release=16u;
+   v->duty=50u;v->cutoff=7000u;v->volume=65u;track_va_patch_default(&v->va);
+  }
+ }
+ if(rd16(data+4u)<20u){
+  /* Migration: legacy 1-4 remain untouched; 5-8 are independent factory sounds. */
+  for(c=4u;c<TRACK_CHIP_SLOTS;c++){
+   struct track_store_instrument *v=&p->instruments[c];
+   v->type=(uint8_t)(c==4u?TRACK_CHIP_VA_OSC:c==5u?TRACK_CHIP_VA_OSC2:c==6u?TRACK_CHIP_SID_6581:TRACK_CHIP_NES_PULSE);
+   v->attack=1u;v->decay=14u;v->sustain=100u;v->release=16u;
    v->duty=50u;v->cutoff=7000u;v->volume=65u;track_va_patch_default(&v->va);
   }
  }
@@ -439,7 +453,7 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
  }
  /* V16 and earlier migrate by seeding each active waveform. */
  if(rd16(data+4u)>=17u){
-  for(c=0u;c<4u;c++){
+  for(c=0u;c<(rd16(data+4u)>=20u?TRACK_CHIP_SLOTS:4u);c++){
    if(i+2u>n)return -2;
   p->type_valid[c]=rd16(data+i);i+=2;
    if(p->type_valid[c] & (uint16_t)~((1u<<TRACK_CHIP_TYPES)-1u))return -3;
@@ -466,7 +480,27 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
    if(t<TRACK_CHIP_TYPES){p->type_valid[c]=(uint16_t)(1u<<t);p->type_presets[c][t]=p->instruments[c];}
   }
  }
+ if(rd16(data+4u)<20u){
+  for(c=4u;c<TRACK_CHIP_SLOTS;c++){
+   uint8_t t=p->instruments[c].type;
+   p->type_valid[c]=(uint16_t)(1u<<t);p->type_presets[c][t]=p->instruments[c];
+  }
+ }
  if(i!=n)return -3;
+ /* Upgrading an old sparse V19 pattern must not materialize 768 empty
+  * CH5 cells. Empty rows never trigger an oscillator, so translate just
+  * the truly default rows to the new fifth synth lane's patch slot 5. */
+ if(rd16(data+4u)<20u){
+  for(uint8_t r0=0u;r0<TRACK_PATTERNS;r0++){
+   struct track_pattern *pat=&p->song.patterns[r0];
+   for(uint8_t step0=0u;step0<TRACK_STEPS;step0++){
+    struct track_step *v=&pat->ch[4u][step0];
+    if(v->note==TRACK_NOTE_EMPTY && v->instrument==0u &&
+       v->chord==0u && v->effect==0u && v->value==50u &&
+       v->dynamics==0u && v->groove==0u)v->instrument=4u;
+   }
+  }
+ }
  return 0;
 }
 int track_store_can_claim(const uint8_t *sector,uint32_t size){

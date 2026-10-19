@@ -1,5 +1,5 @@
 /* Test fixture usable with original RC1.0.11 and RC1.0.11b. Prints checksum
- * of deterministic stereo render sequences. Must be identical at no overload. */
+ * of deterministic stereo render sequences. V1.2 differs intentionally due to measured oscillator gain calibration. */
 #include <stdio.h>
 #include <stdint.h>
 #include "track_chip.h"

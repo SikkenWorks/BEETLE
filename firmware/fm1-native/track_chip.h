@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include "track_core.h"
 #define TRACK_CHIP_VOICES 8u
+#define TRACK_CHIP_SLOTS 8u
 #define TRACK_CHIP_RATE 44100u
 #define TRACK_CHIP_RETRO_PULSE 0u
 #define TRACK_CHIP_RETRO_WAVE 1u
@@ -51,9 +52,9 @@ struct track_chip_voice {
 };
 struct track_chip_engine {
  struct track_chip_voice voices[TRACK_CHIP_VOICES];
- uint8_t voice_count,last_voice_index,duty[TRACK_CHANNELS],cutoff[TRACK_CHANNELS],drive[TRACK_CHANNELS],osc_type[4];
- uint8_t env_attack[4],env_decay[4],env_sustain[4],env_release[4];
- struct track_va_patch patches[4]; /* per instrument, not per channel */
+ uint8_t voice_count,last_voice_index,duty[TRACK_CHANNELS],cutoff[TRACK_CHANNELS],drive[TRACK_CHANNELS],osc_type[TRACK_CHIP_SLOTS];
+ uint8_t env_attack[TRACK_CHIP_SLOTS],env_decay[TRACK_CHIP_SLOTS],env_sustain[TRACK_CHIP_SLOTS],env_release[TRACK_CHIP_SLOTS];
+ struct track_va_patch patches[TRACK_CHIP_SLOTS]; /* per instrument, not per channel */
  uint8_t fx_type[TRACK_CHANNELS],fx_value[TRACK_CHANNELS];
  uint8_t step_gain[TRACK_CHANNELS]; /* persistent per-channel 0..100% volume automation */
  uint8_t mono; /* 1: held last note priority; 0: up to 8 voices */

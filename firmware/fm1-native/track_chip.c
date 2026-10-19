@@ -2,7 +2,10 @@
 #include "track_chip.h"
 #include "beetle_sid_lite.h"
 #include "beetle_nes_apu.h"
+#include "beetle_wave_balance.h"
 #include "beetle_punch_timing.h"
+#include "beetle_voice_headroom.h"
+#include "beetle_stereo_pan.h"
 #include "track_mixer.h"
 #include <string.h>
 /* Exact note-to-Q32 increments generated offline; no libm in firmware. */
@@ -90,11 +93,11 @@ static uint32_t tune_step(uint32_t step,int cents){
  return (uint32_t)result;
 }
 static int32_t va_shape(uint8_t wave,uint32_t phase,uint32_t step,uint8_t width){
- if(wave<3u)return va_table(wave,phase,step);
+ if(wave<3u)return beetle_level_q8(va_table(wave,phase,step),beetle_shape_gain_q8(wave));
  if(wave==3u){uint8_t n=(uint8_t)(phase>>24);uint32_t f=(phase>>16)&255u;
-  return (int32_t)track_va_sine[n]+((((int32_t)track_va_sine[(uint8_t)(n+1u)]-track_va_sine[n])*(int32_t)f)>>8);}
+  return beetle_level_q8((int32_t)track_va_sine[n]+((((int32_t)track_va_sine[(uint8_t)(n+1u)]-track_va_sine[n])*(int32_t)f)>>8),beetle_shape_gain_q8(wave));}
  uint32_t pwidth=(uint32_t)(((uint64_t)(width<5u?5u:width>95u?95u:width)*0x100000000ULL)/100ULL);
- return (va_table(0u,phase,step)-va_table(0u,phase+pwidth,step))/2;
+ return beetle_level_q8((va_table(0u,phase,step)-va_table(0u,phase+pwidth,step))/2,beetle_shape_gain_q8(wave));
 }
 void track_chip_init(struct track_chip_engine *s){
  if(!s)return;
@@ -102,40 +105,41 @@ void track_chip_init(struct track_chip_engine *s){
  for(unsigned i=0;i<8;i++)s->punch_param[i]=50u;
  s->punch_param[1]=20u;s->punch_param[2]=0u;s->punch_param[4]=50u;
  for(unsigned i=0;i<TRACK_CHANNELS;i++){s->step_gain[i]=100u;s->fx_type[i]=0u;s->fx_value[i]=50u;s->duty[i]=2u;s->cutoff[i]=96u;s->cut_after[i]=0xFFFFFFFFu;}
- for(unsigned i=0;i<4;i++){s->osc_type[i]=(uint8_t)i;track_va_patch_default(&s->patches[i]);
+ for(unsigned i=0;i<TRACK_CHIP_SLOTS;i++){s->osc_type[i]=(uint8_t)(i==4u?TRACK_CHIP_VA_OSC:i==5u?TRACK_CHIP_VA_OSC2:i==6u?TRACK_CHIP_SID_6581:i==7u?TRACK_CHIP_NES_PULSE:i);track_va_patch_default(&s->patches[i]);
   s->env_attack[i]=1u;s->env_decay[i]=14u;s->env_sustain[i]=100u;s->env_release[i]=16u;}
 }
 int track_chip_health(const struct track_chip_engine *s){
  if(!s||s->health_cookie!=TRACK_CHIP_COOKIE||s->voice_count>TRACK_CHIP_VOICES||s->last_voice_index>=TRACK_CHIP_VOICES||s->realtime_voice_budget<4u||s->realtime_voice_budget>TRACK_CHIP_VOICES)return 0;
  for(uint8_t k=0u;k<TRACK_CHANNELS;k++){
   if(s->step_gain[k]>100u)return 0;
-  if(k>=4u)continue;
+ }
+ for(uint8_t k=0u;k<TRACK_CHIP_SLOTS;k++){
   if(!track_va_patch_valid(&s->patches[k]))return 0;
   if(s->env_attack[k]>99u||s->env_decay[k]>99u||s->env_sustain[k]>100u||s->env_release[k]>99u)return 0;
  }
- for(uint8_t i=0;i<s->voice_count;i++)if(s->voices[i].active&&(s->voices[i].channel>=TRACK_SYNTH_CHANNELS||s->voices[i].instrument>=4u||s->voices[i].type>=TRACK_CHIP_TYPES||s->voices[i].velocity==0u))return 0;
+ for(uint8_t i=0;i<s->voice_count;i++)if(s->voices[i].active&&(s->voices[i].channel>=TRACK_SYNTH_CHANNELS||s->voices[i].instrument>=TRACK_CHIP_SLOTS||s->voices[i].type>=TRACK_CHIP_TYPES||s->voices[i].velocity==0u))return 0;
  return 1;
 }
 void track_chip_recover(struct track_chip_engine *s){
  if(!s)return;
  /* Keep oscillator settings, restart only damaged DSP state and its history. */
- uint8_t duty[TRACK_CHANNELS],cutoff[TRACK_CHANNELS],drive[TRACK_CHANNELS],types[4],step_gain[TRACK_CHANNELS],fx_type[TRACK_CHANNELS],fx_value[TRACK_CHANNELS],mono=s->mono;
- uint8_t ea[4],ed[4],es[4],er[4],punch_params[5];
+ uint8_t duty[TRACK_CHANNELS],cutoff[TRACK_CHANNELS],drive[TRACK_CHANNELS],types[TRACK_CHIP_SLOTS],step_gain[TRACK_CHANNELS],fx_type[TRACK_CHANNELS],fx_value[TRACK_CHANNELS],mono=s->mono;
+ uint8_t ea[TRACK_CHIP_SLOTS],ed[TRACK_CHIP_SLOTS],es[TRACK_CHIP_SLOTS],er[TRACK_CHIP_SLOTS],punch_params[5];
  memcpy(punch_params,s->punch_param,sizeof(punch_params));
- memcpy(ea,s->env_attack,4);memcpy(ed,s->env_decay,4);memcpy(es,s->env_sustain,4);memcpy(er,s->env_release,4);
- struct track_va_patch patches[4];memcpy(patches,s->patches,sizeof(patches));
+ memcpy(ea,s->env_attack,sizeof(ea));memcpy(ed,s->env_decay,sizeof(ed));memcpy(es,s->env_sustain,sizeof(es));memcpy(er,s->env_release,sizeof(er));
+ struct track_va_patch patches[TRACK_CHIP_SLOTS];memcpy(patches,s->patches,sizeof(patches));
  uint32_t restarts=s->restart_count;
- memcpy(fx_type,s->fx_type,sizeof(fx_type));memcpy(fx_value,s->fx_value,sizeof(fx_value));memcpy(step_gain,s->step_gain,sizeof(step_gain));memcpy(duty,s->duty,sizeof(duty));memcpy(cutoff,s->cutoff,sizeof(cutoff));memcpy(drive,s->drive,sizeof(drive));memcpy(types,s->osc_type,4);
+ memcpy(fx_type,s->fx_type,sizeof(fx_type));memcpy(fx_value,s->fx_value,sizeof(fx_value));memcpy(step_gain,s->step_gain,sizeof(step_gain));memcpy(duty,s->duty,sizeof(duty));memcpy(cutoff,s->cutoff,sizeof(cutoff));memcpy(drive,s->drive,sizeof(drive));memcpy(types,s->osc_type,sizeof(types));
  track_chip_init(s);memcpy(s->punch_param,punch_params,sizeof(punch_params));for(uint8_t g=0;g<TRACK_CHANNELS;g++)if(step_gain[g]<=100u)s->step_gain[g]=step_gain[g];memcpy(s->duty,duty,sizeof(duty));memcpy(s->cutoff,cutoff,sizeof(cutoff));
- memcpy(s->drive,drive,sizeof(drive));memcpy(s->fx_type,fx_type,sizeof(fx_type));memcpy(s->fx_value,fx_value,sizeof(fx_value));memcpy(s->osc_type,types,4);
- for(uint8_t c=0;c<4u;c++){
+ memcpy(s->drive,drive,sizeof(drive));memcpy(s->fx_type,fx_type,sizeof(fx_type));memcpy(s->fx_value,fx_value,sizeof(fx_value));memcpy(s->osc_type,types,sizeof(types));
+ for(uint8_t c=0;c<TRACK_CHIP_SLOTS;c++){
   if(ea[c]<=99u)s->env_attack[c]=ea[c];
   if(ed[c]<=99u)s->env_decay[c]=ed[c];
   if(es[c]<=100u)s->env_sustain[c]=es[c];
   if(er[c]<=99u)s->env_release[c]=er[c];
  }
- for(uint8_t c=0;c<4u;c++)if(track_va_patch_valid(&patches[c]))s->patches[c]=patches[c];
- for(uint8_t c=0;c<4u;c++)if(s->osc_type[c]>=TRACK_CHIP_TYPES)s->osc_type[c]=TRACK_CHIP_RETRO_PULSE;
+ for(uint8_t c=0;c<TRACK_CHIP_SLOTS;c++)if(track_va_patch_valid(&patches[c]))s->patches[c]=patches[c];
+ for(uint8_t c=0;c<TRACK_CHIP_SLOTS;c++)if(s->osc_type[c]>=TRACK_CHIP_TYPES)s->osc_type[c]=TRACK_CHIP_RETRO_PULSE;
  s->mono=mono;s->restart_count=restarts+1u;
 }
 void track_chip_begin_step(struct track_chip_engine *s){
@@ -218,7 +222,7 @@ void track_chip_repitch_channel(struct track_chip_engine *s,uint8_t channel){
  }
 }
 void track_chip_refresh_instrument(struct track_chip_engine *s,uint8_t instrument){
- if(!s||instrument>=4u)return;
+ if(!s||instrument>=TRACK_CHIP_SLOTS)return;
  for(uint8_t i=0u;i<s->voice_count;i++){
   struct track_chip_voice *v=&s->voices[i];
   if(!v->active||v->instrument!=instrument)continue;
@@ -257,7 +261,7 @@ void track_chip_stop_channel(struct track_chip_engine *s,uint8_t channel){
  }
 }
 int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrument,uint8_t note,uint8_t velocity){
- if(!s||channel>=TRACK_SYNTH_CHANNELS||instrument>3u||note>127u||velocity==0u)return 0;
+ if(!s||channel>=TRACK_SYNTH_CHANNELS||instrument>=TRACK_CHIP_SLOTS||note>127u||velocity==0u)return 0;
  if(!track_chip_health(s))track_chip_recover(s);
  uint8_t index=TRACK_CHIP_VOICES;
  if(s->mono){
@@ -365,7 +369,7 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   uint32_t bphase=v->phase2+(uint32_t)(((int64_t)a*p->fm_depth*8192)/100);
   int32_t b=va_shape(p->wave_b,bphase,v->step2,p->pulse_width_b);
   level=(a*(100-(int)p->morph)+b*(int)p->morph)/100;
-  uint32_t cutoff=(uint32_t)s->cutoff[v->instrument]+28u;
+  uint32_t cutoff=(uint32_t)s->cutoff[v->channel]+28u;
   if(cutoff>245u)cutoff=245u;
   v->lowpass+=(int32_t)(((int64_t)(level-v->lowpass)*cutoff)>>8);
   level=v->lowpass;
@@ -438,6 +442,9 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   if(shaped< -14500)shaped=-14500+(shaped+14500)/4;
   level=shaped*2;
  }else level=(int32_t)(((int64_t)level*v->envelope)>>20u);
+ /* Normalize intrinsic waveform loudness before lane gain and effects.
+  * Never normalize based on live RMS (which would flatten performance). */
+ level=beetle_level_q8(level,beetle_type_gain_q8(v->type));
  v->last_level=level;
  return (int32_t)(((int64_t)level*v->velocity)/127);
 }
@@ -489,12 +496,13 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
   * Precompute once per call. ISR owns the mixer for the duration of render. */
  uint8_t mix_solo=0u;
  uint8_t mix_muted[TRACK_SYNTH_CHANNELS]={0};
- int16_t mix_vol[TRACK_SYNTH_CHANNELS],mix_pan[TRACK_SYNTH_CHANNELS];
+ int16_t mix_vol[TRACK_SYNTH_CHANNELS];
+ uint16_t pan_left[TRACK_SYNTH_CHANNELS],pan_right[TRACK_SYNTH_CHANNELS];
  if(mix)for(uint8_t c=0u;c<TRACK_CHANNELS;c++)mix_solo|=mix->ch[c].solo;
  for(uint8_t c=0u;c<TRACK_SYNTH_CHANNELS;c++){
   mix_muted[c]=(uint8_t)(mix&&(mix->ch[c].mute||(mix_solo&&!mix->ch[c].solo)));
   mix_vol[c]=mix?mix->ch[c].volume:100;
-  mix_pan[c]=mix?mix->ch[c].pan:0;
+  beetle_stereo_pan_gain(mix?mix->ch[c].pan:0,&pan_left[c],&pan_right[c]);
  }
  for(uint32_t f=0;f<frames;f++){
   int64_t left=0,right=0;
@@ -511,7 +519,7 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
     mono=bound(mono,-9500,9500);
    }
    if(mix_muted[v->channel])continue;
-   const int32_t vol=mix_vol[v->channel],pan=mix_pan[v->channel];
+   const int32_t vol=mix_vol[v->channel];
    mono=(int32_t)(((int64_t)mono*vol*s->step_gain[v->channel])/10000);
    if(v->active && vol && s->step_gain[v->channel]){
     active_voices++;if(!v->released)foreground++;
@@ -520,8 +528,8 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
    uint32_t peak=(uint32_t)(mono<0?-(int64_t)mono:mono);
    if(peak>32767u)peak=32767u;
    if(peak>track_lane_pcm_peak[v->channel])track_lane_pcm_peak[v->channel]=(uint16_t)peak;
-   left+=((int64_t)mono*(100-pan))/100;
-   right+=((int64_t)mono*(100+pan))/100;
+   left+=((int64_t)mono*pan_left[v->channel])>>8;
+   right+=((int64_t)mono*pan_right[v->channel])>>8;
   }
   /* V0.46: latch the highest *audible* polyphony in the current phrase.
    * An ADSR note-off cannot halve the divisor and boost the final sustained
@@ -529,7 +537,7 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
    * increases (~1 ms) so concurrent onsets cannot jump the normalization. */
   if(foreground>s->phrase_max_voices)s->phrase_max_voices=foreground;
   if(!active_voices)s->phrase_max_voices=0u;
-  uint32_t target=(1u+(uint32_t)s->phrase_max_voices/2u)*256u;
+  uint32_t target=beetle_voice_divisor(s->phrase_max_voices);
   if(!s->phrase_div_q8)s->phrase_div_q8=256u;
   if(s->phrase_div_q8<target){
    uint32_t next=(uint32_t)s->phrase_div_q8+8u;

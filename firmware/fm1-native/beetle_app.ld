@@ -14,7 +14,7 @@ MEMORY
     RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0x6000
     UACRAM (rw)  : ORIGIN = 0x01C06000, LENGTH = 0x1F00 /* preserves debug mailbox at 0x01C07F00 */
     RAM    (rwx) : ORIGIN = 0x01C08000, LENGTH = 96K
-    POOL   (rw)  : ORIGIN = 0x01C20000, LENGTH = 0x54000
+    POOL   (rw)  : ORIGIN = 0x01C20000, LENGTH = 0x54C00
     NOINIT (rw)  : ORIGIN = 0x01C7C000, LENGTH = 0x3D50
 }
 SECTIONS
@@ -37,7 +37,7 @@ SECTIONS
     .beetle_edit_scratch (NOLOAD) : { . = ALIGN(16); _beetle_edit_start = .;
        KEEP(*(.beetle_edit_scratch)); . = ALIGN(16); _beetle_edit_end = .; } > NOINIT
     ASSERT(_beetle_edit_end <= ORIGIN(NOINIT) + LENGTH(NOINIT), "BEETLE: edit scratch overlaps boot mailbox")
-    _guard0 = 0x01C74000; _ustack_lo = 0x01C74100; _ustack_top = 0x01C7A000;
+    _guard0 = 0x01C74C00; _ustack_lo = 0x01C74D00; _ustack_top = 0x01C7A000;
     _guard1 = 0x01C7A000; _sstack_lo = 0x01C7A100; _sstack_top = 0x01C7C000;
     ASSERT((_beetle_mem_gap_end - _beetle_mem_gap_start) >= 128, "BEETLE: memory isolation gap missing")
     ASSERT(_beetle_song_end <= _beetle_mem_gap_start, "BEETLE: sequencer/state overlap")

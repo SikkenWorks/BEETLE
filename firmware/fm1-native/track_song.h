@@ -39,5 +39,8 @@ int track_song_record(struct track_song_bank *bank,uint8_t pattern,uint8_t step,
 int track_song_record_value(struct track_song_bank *bank,uint8_t pattern,uint8_t step,uint8_t fx,uint8_t kind,uint8_t value);
 uint8_t track_song_effect_parameter(const struct track_song_bank *bank,uint8_t pat,uint8_t step,uint8_t fx,uint8_t fallback);
 /* Reconstruct active recorded effects at a step (applies on step boundaries). */
+void track_song_clear_punch_fx(struct track_song_bank *bank,uint8_t pattern,uint8_t fx);
 uint8_t track_song_effect_mask(const struct track_song_bank *bank,uint8_t pattern,uint8_t step);
+/* At first transport step/new Song row, never infer a key pressed in a previous loop. */
+uint8_t track_song_effect_mask_boundary(const struct track_song_bank *bank,uint8_t pattern,uint8_t step,uint8_t allow_wrap);
 #endif
