@@ -12,19 +12,23 @@
   <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html"><img src="https://img.shields.io/badge/▲_INSTALL_BEETLE-000000?style=for-the-badge" alt="Install BEETLE"></a>
   <a href="https://sikkenworks.github.io/BEETLE/simulator.html"><img src="https://img.shields.io/badge/▶_WEB_SIMULATOR-000000?style=for-the-badge" alt="Open BEETLE Web Simulator"></a>
   <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html"><img src="https://img.shields.io/badge/▶_PROJECT_MANAGER-000000?style=for-the-badge" alt="Open BEETLE Project Manager"></a>
-  <br>
+  <a href="https://sikkenworks.github.io/BEETLE/BEETLE-MANAGER.html"><img src="https://img.shields.io/badge/▶_ALL--IN--ONE_MANAGER-000000?style=for-the-badge" alt="BEETLE All-in-One Manager"></a>
   <a href="https://thefirmwarehub.com/?q=sikkenworks"><img src="https://img.shields.io/badge/▶_THE_FIRMWARE_HUB-000000?style=for-the-badge" alt="The Firmware Hub"></a>
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.3.6 firmware and Workbench</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.3.7 firmware and Workbench</strong> · <a href="CHANGELOG.md">Release history</a></sub>
 </p>
 
 ---
 
-**BEETLE V1.3.6** uses the revised Workbench provided by the project author. The physical keyboard including all black keys enters correct chromatic notes in TRACKER (while preserving contextual shortcuts). PER STEP FX now makes **FX1, FX2 and FX3 independent**. **K1** moves up/down between the three FX rows, **K2** changes the selected effect type, and **K3** adjusts its parameter. All three rows are usable even if earlier slots are empty. OCT+ still advances the selected FX row, OCT− removes only the selected effect, and CH6 NOTE1/NOTE2 changes with SELECT on the FX screen. The **48-record FX storage pool** and `FX STORAGE FULL` overlay remain active. The **V22** TRK1 project format records each extra slot's identity and can load prior V21/V20/V19 projects; older firmware cannot open V22 projects. This release includes a new experimental firmware build and updated installer. USB-C multitrack, all eight instruments, Song Mode and existing hardware features remain present. As with prior versions, physical FM1 USB/DAW, flashing, full-load audio performance and recovery are not validated.
+**BEETLE V1.3.7** uses the revised Workbench provided by the project author. The physical keyboard including all black keys enters correct chromatic notes in TRACKER (while preserving contextual shortcuts). PER STEP FX now makes **FX1, FX2 and FX3 independent**. **K1** moves up/down between the three FX rows, **K2** changes the selected effect type, and **K3** adjusts its parameter. All three rows are usable even if earlier slots are empty. OCT+ still advances the selected FX row, OCT− removes only the selected effect, and CH6 NOTE1/NOTE2 changes with SELECT on the FX screen. The **48-record FX storage pool** and `FX STORAGE FULL` overlay remain active. The **V22** TRK1 project format records each extra slot's identity and can load prior V21/V20/V19 projects; older firmware cannot open V22 projects. This release includes a new experimental firmware build and updated installer. USB-C multitrack, all eight instruments, Song Mode and existing hardware features remain present. As with prior versions, physical FM1 USB/DAW, flashing, full-load audio performance and recovery are not validated.
 
-**V1.3.6 HOME/SETTINGS fix:** HOME opens PROJECTS; K1 highlights SETTINGS; SEL enters SETTINGS and a further SEL toggles USB Multitrack without returning to the tracker. The Workbench HOME/REC button state is now initialized correctly.
+**V1.3.7 physical FM1 SETTINGS fix:** SETTINGS was page 38 but the native screen validator considered pages above 37 invalid. Selecting SETTINGS therefore jumped back to TRACKER on the physical unit. The validation now accepts page 38, including during the LCD redraw; the SEL open/release/toggle transaction is regression-tested. Physical FM1 verification is still required.
+
+**V1.3.7 USB mode clarification:** In the browser, SETTINGS only previews the USB multitrack toggle. The WebSimulator cannot enumerate itself as a six-channel USB audio device. On the physical FM1, the native firmware contains USB Audio Class descriptors for either a stereo input or six mono inputs, and it requests USB re-enumeration when the setting changes; actual host/DAW operation remains hardware-unverified. `BEETLE-MANAGER.html` is now an offline single-file tabbed page embedding the matching emulator, Project Manager and WebInstaller for every release. Separate HTML files remain available.
+
+**V1.3.6 HOME/SETTINGS fix (retained):** HOME opens PROJECTS; K1 highlights SETTINGS; SEL enters SETTINGS and a further SEL toggles USB Multitrack without returning to the tracker. The Workbench HOME/REC button state is now initialized correctly.
 
 **BEETLE V1.3.4 (historical):** added the original three-FX implementation with **V21** persistence and a 48-entry extra-FX storage pool. That version required FX1 to be filled before FX2/FX3; V1.3.5 removes that restriction and corrects the FX control mapping and playback.
 
@@ -258,3 +262,10 @@ BEETLE is developed by **SikkenWorks (Joppe Sikken)**. It builds on earlier open
 **Source licence and redistribution.** BEETLE's native firmware and derivatives are distributed under **GNU GPL v3 only (`GPL-3.0-only`)**, preserving the licence of the Felucca-derived source. The full text is provided in [`LICENSE`](LICENSE). When distributing modified firmware, provide the complete corresponding source and applicable copyright, SPDX and upstream licence notices. A binary, WebInstaller or bootloader alone does not satisfy source-offer obligations. For detailed file-level provenance and third-party notices, see [`docs/CREDITS-AND-LICENSES.md`](docs/CREDITS-AND-LICENSES.md), [`LICENSES/FELUCCA-LICENSING.txt`](LICENSES/FELUCCA-LICENSING.txt) and the source-file headers. Where lineage is uncertain, retain upstream notices rather than claiming exclusive authorship.
 
 <p align="center"><strong>BEETLE · SikkenWorks · Born out of passion.</strong></p>
+
+
+### V1.3.7 native FM1 SETTINGS & All-in-One Manager
+
+- **Physical FM1 controls:** Open `HOME > PROJECTS`, turn K1 to **SETTINGS**, and press the **SEL button**. The native input transaction explicitly consumes this keypress; the USB toggle is armed only after SEL is released. Press SEL again to switch 2-channel stereo ↔ 6-channel mono capture, then reconnect/reopen the host USB audio device. HOME returns to PROJECTS. This is a firmware change, not just an emulator fix.
+- `BEETLE-MANAGER.html` is the **offline all-in-one** containing this release's actual simulator, Project Manager, and WebInstaller. The three standalone `.html` tools are shipped separately as well.
+- The simulator is a software preview, **not proof** that physical FM1 USB re-enumeration and DAW multitrack input work. Firmware flashing and recoverability require testing on a physical device with a proven recovery path.

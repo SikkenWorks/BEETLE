@@ -11,6 +11,7 @@
 #include "track_sustain_fx.h"
 #include "track_name.h"
 #include "track_navigation.h"
+#include "beetle_settings_nav.h"
 #include "track_lane_clipboard.h"
 #include "beetle_step_selection.h"
 #include "beetle_pattern_edit.h"
@@ -140,6 +141,7 @@ static uint32_t track_old_note_mask;
 static struct track_name_editor track_editor;
 static char track_title[TRACK_NAME_MAX+1u];
 static uint8_t track_named,track_page,track_menu_index,track_fx_cursor,track_osc_cursor,track_osc_bank;
+static struct beetle_settings_nav track_settings_nav; /* FM1 physical SEL press/release transaction */
 static uint8_t track_fx_slot; /* FX1/FX2/FX3, chosen in PER STEP FX */
 static uint32_t track_fx_full_until; /* visible full-capacity overlay, no destructive writes */
 /* Reverse scale search is transient UI state. No new project fields/schema. */
@@ -619,7 +621,7 @@ static void track_runtime_validate(void){
   track_state.active.length=16u;faulty=1u;
  }
  /* RC1.0.4: reverse-key search is page 32. Do not mistake it for corrupt state. */
- if(track_page>30u && track_page!=32u && (track_page<33u || track_page>37u)){track_page=0u;faulty=1u;}
+ if(!beetle_ui_page_valid(track_page)){track_page=0u;faulty=1u;}
  /* Live Mixer is exclusively a Song Mode performance page. If a project
   * transition disables SONG, return before processing any mixer key. */
  if(!track_song.enabled){if(track_page==30u)track_page=9u;
@@ -2826,23 +2828,35 @@ static void track_fm1_poll(void){
   if(pressed&(1u<<8)){track_page=25u;track_home_fired=1u;track_home_since=now;changed=1u;}
   (void)fm1_input_note_edges();if(changed||now-track_last_paint>=650u){screen();track_last_paint=now;}return;
  }
- /* Enter SETTINGS from the Projects menu on the SEL *press edge*.
-  * Consume that edge here, before it reaches any generic tracker / menu
-  * shortcut. Crucially, entering SETTINGS must not also toggle its value,
-  * and the subsequent SEL release must never dismiss the screen. */
- if(track_page==1u && track_menu_index==6u && (pressed&(1u<<3))){
-  track_page=38u;changed=1u;
+ /* Read the real K1 menu movement before consuming SEL. A fast turn and
+  * click can appear in the same 18ms foreground poll; checking the previous
+  * menu index first would select an adjacent item or accidentally LOAD. */
+ if(track_page==1u && k1){
+  int32_t next=(int32_t)track_menu_index+k1;
+  if(next<0)next=0;if(next>8)next=8;
+  track_menu_index=(uint8_t)next;k1=0;changed=1u;
+ }
+ /* Handle SETTINGS via the real FM1 key matrix (SEL = button 3), ahead
+  * of all generic project handlers and tracker shortcuts. Always use the
+  * ENTERING page so an input cannot be interpreted twice. */
+ if(beetle_settings_enter(&track_settings_nav,track_page,track_menu_index,
+                         buttons,pressed,released)){
+  track_page=BEETLE_SETTINGS_PAGE;track_sel_tracker_ready=0u;
+  changed=1u;
   (void)fm1_input_note_edges();
   screen();track_last_paint=now;
   return;
  }
- /* USB audio mode is system-only and never changes project storage.
-  * Switching UAC input count requires a genuine USB re-enumeration. */
- if(track_page==38u){
+ /* Settings consumes ALL input. In particular, the SEL press which opened
+  * this page may still be physically held; require its full release and a
+  * second press before the actual USB mode changes. HOME returns to PROJECTS. */
+ if(track_page==BEETLE_SETTINGS_PAGE){
 #if ETCH_NATIVE_UAC
-  if(pressed&(1u<<3)){
+  if(beetle_settings_toggle(&track_settings_nav,buttons,pressed,released)){
    fm1_irq_off();usb_multitrack_switch((uint8_t)!uac_multitrack);fm1_irq_enable_all();changed=1u;
   }
+#else
+  (void)beetle_settings_toggle(&track_settings_nav,buttons,pressed,released);
 #endif
   if(pressed&(1u<<8)){track_page=1u;track_home_fired=1u;track_home_since=now;changed=1u;}
   if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
@@ -3704,9 +3718,6 @@ static void track_fm1_poll(void){
     int32_t v=(int32_t)track_state.project_slot+k4;
     if(v<0)v=0;if(v>=(int32_t)TRACK_PROJECTS)v=TRACK_PROJECTS-1;track_state.project_slot=(uint8_t)v;
    }
-   if(track_page==1u && k1){
-    int32_t m=(int32_t)track_menu_index+k1;if(m<0)m=0;if(m>8)m=8;track_menu_index=(uint8_t)m;
-   }
    if(track_page==1u && (pressed&(1u<<3))){
     if(track_menu_index==8u){
      track_wipe_yes=0u;track_page=33u;changed=1u;
@@ -3719,7 +3730,7 @@ static void track_fm1_poll(void){
     }else if(track_menu_index==7u){
      track_rc_tab=0u;track_page=27u;changed=1u;
     }else if(track_menu_index==6u){
-     track_page=38u;changed=1u;
+     /* SETTINGS already handled above; never mistake this menu index for LOAD. */
     }else if(track_menu_index==5u){
      track_page=28u;changed=1u;
     }else if(track_menu_index==4u){

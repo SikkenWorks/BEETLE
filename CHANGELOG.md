@@ -1,3 +1,16 @@
+### V1.3.7 physical FM1 SEL/SETTINGS fix
+
+- Implemented a dedicated native physical SEL button transaction. SETTINGS entry now consumes the select edge, has a trailing-edge fallback for an interrupted poll, and blocks USB toggles until a separate SEL press after release.
+- Added a host regression for physical matrix bit 3, short press, slow press, release, duplicate prevention, and unrelated PROJECTS/SEQ/HOME navigation.
+- The exact user-provided BEETLE-MANAGER.html design now embeds V1.3.7 versions of all three tools.
+
+## V1.3.7 — USB settings clarification / unified 3-in-1 Manager (20 October 2026)
+
+- Corrected native FM1 screen validation: **SETTINGS page 38** was accidentally rejected by a stale whitelist ending at page 37, immediately forcing the hardware back to TRACKER. Native LCD validation and input polling now explicitly recognize SETTINGS. Added a compiled test for the physical SEL press/release transaction.
+- Replaced ambiguous **SIMULATION ONLY** on the WebSimulator USB Settings page with browser-specific labeling; the browser cannot capture FM1 USB multitrack, but the native firmware still carries the real 2/6-channel UAC1 switching code. No claim of verified FM1/DAW operation.
+- Author-provided `BEETLE-MANAGER.html` becomes an always-included fourth HTML deliverable, with the exact matching emulator, Project Manager and embedded-firmware WebInstaller packaged inside one self-contained page. All three remain available as separate HTML files.
+- Retained V22 project compatibility, three independent step FX, HOME/SETTINGS navigation and native six-stem capture logic. No deliberate audio DSP or USB descriptor behavior changes.
+
 ## V1.3.6 — HOME / SETTINGS navigation fix (20 October 2026)
 
 - Fixed an undefined HOME/REC press-timing variable in the author's embedded BEETLE Workbench. This caused HOME to throw a browser error and left subsequent SEL handling in the wrong screen.
