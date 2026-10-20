@@ -17,7 +17,7 @@ for label,src in [('emulator',simulator),('projectmanager',projectmanager),('ins
  match=re.search(p,html)
  assert match and base64.b64decode(match[0].split('>',1)[1].split('</script>')[0])==src.read_bytes()
  print(f'{label}: {len(src.read_bytes())} bytes sha256 {hashlib.sha256(src.read_bytes()).hexdigest()}')
-html=html.replace('V1.3.5','V1.3.7').replace('V1.3.6','V1.3.7')
-assert html.count('V1.3.7')>=3
+html=re.sub(r'V1\.3\.[0-9]+', 'V1.3.8', html)
+assert html.count('V1.3.8')>=3
 output.write_text(html,'utf-8')
 print('ALL-IN-ONE',output,len(html))

@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>BEETLE Workbench · V1.3.7</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>BEETLE Workbench · V1.3.8</title>
 <style>
 :root{color-scheme:dark;font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;background:#121518;color:#e2e7e9;--accent:#aae4c8;--muted:#859293}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 25%,#252c2c80,transparent 65%);min-height:100vh}main{max-width:1160px;margin:auto;padding:34px 36px 24px}header{display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:11px;letter-spacing:.16em;color:var(--muted)}header b{color:#d5dedc;letter-spacing:.2em}.version-tag{font:10px/1.4 Consolas,"Liberation Mono",monospace;letter-spacing:.08em}h1{font-size:32px;letter-spacing:-.04em;margin:20px 0 2px;font-weight:600}h2{font-size:22px;margin:0 0 10px}h3{font-size:18px}p{color:#99a7a8}main>p{margin:4px 0 22px;font-size:13px}a{color:var(--accent)}button,input,select{font:inherit}button{border:1px solid #465150;border-radius:7px;padding:9px 15px;cursor:pointer;background:#293230;color:#dde5e1;margin:5px 6px 5px 0;transition:background .12s,border-color .12s}button:hover{background:#384541;border-color:#758a80}button.primary{background:var(--accent);color:#172e24;border-color:var(--accent);font-weight:650}button.primary:hover{background:#c4f3da}button:disabled{opacity:.4;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}[hidden]{display:none!important}nav{display:flex;gap:3px;border-bottom:1px solid #333c3b;margin-bottom:22px}nav button{background:transparent;border:0;border-radius:0;margin:0 22px 0 0;padding:10px 1px 13px;font-size:13px;color:#889a98;border-bottom:2px solid transparent}nav button[aria-selected=true]{color:#d1eee0;border-bottom-color:var(--accent)}section{padding:22px;border:1px solid #343e3d;border-radius:12px;background:#1b2221;margin:20px 0}#tab-sim{border:0;background:none;padding:0;margin:0}#tab-library,#tab-update{max-width:720px;margin:28px auto}.sim-toolbar{display:flex;gap:10px;align-items:center;margin:0 0 18px;flex-wrap:wrap}.sim-toolbar button{margin:0;font-size:12px;padding:8px 14px}.sim-health{display:flex;align-items:center;gap:9px;font-size:11px;color:#96a8a0}.sim-health:before{content:"";width:6px;height:6px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px #aae4c844}.sim-health span+span{border-left:1px solid #46534d;padding-left:9px;color:#6f8379}.sim-toolbar label{margin:0 0 0 auto;display:flex;gap:8px;align-items:center;font-size:11px;color:#879b93}.sim-toolbar input{width:85px;accent-color:var(--accent)}
@@ -89,12 +89,17 @@ select,input[type=file],input[type=text]{background:#161219;border:1px solid #63
 .wb-screen-overlay[hidden]{display:none}#sim-screen{cursor:crosshair}
 @media(max-width:1030px){.workbench-projectbar{gap:7px}.wb-proj-title{flex:1 1 100%}.wb-slot-label{flex:1 1 180px}.wb-slot-label select{flex:1;min-width:120px}.wb-separator{display:none}}
 @media(max-width:600px){main{padding:14px 13px}.site-header{gap:10px;flex-wrap:wrap}.site-header h1{font-size:13px}.release-badge{font-size:10px}.workbench-projectbar{padding:10px;gap:7px}.workbench-projectbar button{padding:8px;flex:1 1 auto}.wb-slot-label{flex:1 1 100%}}
-</style><style>/* V1.3.7 chromatic keybed: accidentals are real, interactive keys. */
+</style><style>/* V1.3.8 chromatic keybed: accidentals are real, interactive keys. */
 .piano-key.black{z-index:4}
 .piano-key.white{z-index:3}
 .piano-key.black:focus-visible{outline:2px solid #ff00d7;outline-offset:1px}
+</style><style id="beetle-fullscreen-style">
+/* BEETLE V1.3.8: true integer nearest-neighbour fullscreen of the 240x240 LCD only. */
+.lcd-surface:fullscreen{display:flex;align-items:center;justify-content:center;width:100vw!important;height:100vh!important;background:#000!important;overflow:hidden}
+.lcd-surface:fullscreen #sim-screen{display:block;flex:none;max-width:none;max-height:none;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;border:0;background:#000;margin:auto}
+.lcd-surface:fullscreen::backdrop{background:#000}
 </style></head><body><main>
-<header class="site-header"><div class="brand"><svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><path d="M4 16h4l3-9 5 18 5-18 3 9h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><b>BEETLE<span>SIKKENWORKS</span></b></div><h1>WORKBENCH</h1><span class="release-badge">V1.3.7</span></header>
+<header class="site-header"><div class="brand"><svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><path d="M4 16h4l3-9 5 18 5-18 3 9h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><b>BEETLE<span>SIKKENWORKS</span></b></div><h1>WORKBENCH</h1><span class="release-badge">V1.3.8</span></header>
 <div class="workbench-projectbar" role="group" aria-label="Project files and emulator slots">
   <div class="wb-proj-title"><strong id="current-project">UNTITLED</strong><small id="project-note">BROWSER PROJECT</small></div>
   <label class="wb-slot-label" for="slot-select">SLOT <select id="slot-select" aria-label="Choose a local project slot"><option value="0">01 · EMPTY</option></select></label>
@@ -103,20 +108,22 @@ select,input[type=file],input[type=text]{background:#161219;border:1px solid #63
   <button id="save-btn" type="button" title="Save current project to the selected browser slot">SAVE</button>
   <span class="wb-separator" aria-hidden="true"></span>
   <button id="import-btn" type="button" title="Import a .beetle file into the selected slot">IMPORT .BEETLE</button>
+  <button id="beetle-fullscreen" type="button" title="Pixel-perfect fullscreen LCD; press ESC to exit">FULLSCREEN LCD</button>
+  <button id="beetle-record-tab" type="button" title="Record a selected browser tab with its audio as WebM (Chrome/Edge: enable Share tab audio)">REC TAB + AUDIO</button>
   <button id="export-btn" type="button" class="primary" title="Export the current project as native .beetle">EXPORT .BEETLE</button>
   <input id="project-import-file" class="wb-hiddenfile" type="file" accept=".beetle,.json,application/json" aria-label="Choose BEETLE project file">
 </div>
 <div class="performance-stage">
  <div class="device-scroll" tabindex="0" aria-label="BEETLE FM1 device, scroll horizontally if necessary"><div id="sim-device" class="sim-device" aria-label="BEETLE FM1 emulator controls">
- <div class="device-brand">FM–1 <span>BEETLE V1.3.7</span></div><span class="case-mark">SIKKENWORKS · 6-LANE TRACKER</span>
+ <div class="device-brand">FM–1 <span>BEETLE V1.3.8</span></div><span class="case-mark">SIKKENWORKS · 6-LANE TRACKER</span>
  <i class="screw tl"></i><i class="screw tr"></i><i class="screw bl"></i><i class="screw br"></i>
  <div class="screen-bezel"><div class="lcd-surface"><canvas id="sim-screen" width="240" height="240" tabindex="0" aria-label="BEETLE FM1 tracker display"></canvas></div><div class="wb-screen-overlay" id="screen-overlay">INITIALIZING BEETLE</div></div>
  <div class="screen-caption"><span>BEETLE</span><span>240 × 240</span></div><div id="sim-keyboard" class="keyboard" aria-label="FM1 keyboard"></div>
  </div></div>
- <div id="workbench-status" class="sim-status" aria-live="polite" role="status">Initializing V1.3.7…</div>
+ <div id="workbench-status" class="sim-status" aria-live="polite" role="status">Initializing V1.3.8…</div>
 </div>
 <footer class="wb-footer">BEETLE Workbench is built on M-VAVE FM1 Open Workbench.</footer>
-</main><iframe id="beetle-engine" title="Embedded BEETLE V1.3.7 audio and firmware simulator" tabindex="-1" aria-hidden="true" style="position:fixed;left:-30000px;top:0;width:1050px;height:1350px;opacity:0;pointer-events:none;border:0"></iframe>
+</main><iframe id="beetle-engine" title="Embedded BEETLE V1.3.8 audio and firmware simulator" tabindex="-1" aria-hidden="true" style="position:fixed;left:-30000px;top:0;width:1050px;height:1350px;opacity:0;pointer-events:none;border:0"></iframe>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
@@ -128,7 +135,7 @@ window.addEventListener('message',e=>{if(e.source===frame.contentWindow&&e.data?
 frame.addEventListener('load',()=>setTimeout(activate,40));
 function status(message){$('workbench-status').textContent=message;}
 function activate(){try{core=frame.contentWindow?.BEETLE_WORKBENCH_BRIDGE;if(!core||ready)return;ready=true;
- $('screen-overlay').hidden=true;renderScreen();refreshSlots(true);setInterval(refreshState,250);status('BEETLE V1.3.7 READY');}
+ $('screen-overlay').hidden=true;renderScreen();refreshSlots(true);setInterval(refreshState,250);status('BEETLE V1.3.8 READY');}
  catch(err){status('Emulator failed to initialize: '+err.message);}}
 function call(name,...args){if(!core){status('Simulator still starting.');return null;}
  try{return core[name](...args);}catch(err){status('ERROR · '+err.message);console.error(err);return null;}}
@@ -230,5 +237,61 @@ window.addEventListener('blur',()=>{for(const k of pressedKeys)call('physicalKey
 document.addEventListener('contextmenu',event=>event.preventDefault(),true);
 document.addEventListener('selectstart',event=>event.preventDefault(),true);
 document.addEventListener('dragstart',event=>{if(!(event.target instanceof HTMLInputElement))event.preventDefault();},true);
+})();
+</script><script id="beetle-fullscreen-script">
+/* User-gesture fullscreen; never resample the 240x240 source canvas. */
+(()=>{'use strict';
+ const button=document.getElementById('beetle-fullscreen');
+ const lcd=document.querySelector('.lcd-surface');
+ const canvas=document.getElementById('sim-screen');
+ if(!button||!lcd||!canvas)return;
+ function resize(){
+  if(document.fullscreenElement!==lcd){canvas.style.removeProperty('width');canvas.style.removeProperty('height');button.textContent='FULLSCREEN LCD';return;}
+  const factor=Math.max(1,Math.floor(Math.min(innerWidth,innerHeight)/240));
+  canvas.style.width=String(240*factor)+'px';canvas.style.height=String(240*factor)+'px';
+  button.textContent='EXIT FULLSCREEN';
+ }
+ button.addEventListener('click',async()=>{
+  try{if(document.fullscreenElement===lcd)await document.exitFullscreen();else await lcd.requestFullscreen();}
+  catch(e){const status=document.getElementById('workbench-status');if(status)status.textContent='FULLSCREEN: '+e.message+' (open Workbench directly if embedded)';}
+ });
+ document.addEventListener('fullscreenchange',resize);
+ addEventListener('resize',resize);
+})();
+</script><script id="beetle-tab-recorder-script">
+/* Browser tab capture, optional, only after an explicit user gesture. Never claim USB audio capture. */
+(()=>{'use strict';
+ const btn=document.getElementById('beetle-record-tab');
+ if(!btn)return;
+ const status=document.getElementById('workbench-status');
+ let stream=null,recorder=null,parts=[];
+ const note=(s)=>{if(status)status.textContent=s;};
+ function stop(){if(recorder&&recorder.state!=='inactive')recorder.stop();if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}}
+ btn.addEventListener('click',async()=>{
+  if(recorder&&recorder.state==='recording'){stop();return;}
+  if(!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder==='undefined'){
+   note('RECORD: Browser tab capture requires HTTPS/localhost and current Chrome/Edge.');return;
+  }
+  try{
+   const picked=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:60},audio:true});
+   if(!picked.getAudioTracks().length){
+    picked.getTracks().forEach(t=>t.stop());
+    note('RECORD: NO TAB AUDIO. Select THIS BROWSER TAB and enable SHARE TAB AUDIO, then retry.');return;
+   }
+   stream=picked;parts=[];
+   const types=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+   const mimeType=types.find(t=>MediaRecorder.isTypeSupported(t));
+   recorder=new MediaRecorder(stream,mimeType?{mimeType,videoBitsPerSecond:9000000}:undefined);
+   recorder.ondataavailable=e=>{if(e.data?.size)parts.push(e.data);};
+   recorder.onstop=()=>{
+    const file=new Blob(parts,{type:recorder.mimeType||'video/webm'});
+    if(file.size){const url=URL.createObjectURL(file);const a=document.createElement('a');a.href=url;a.download='BEETLE-V1.3.8-LCD-TAB-AUDIO.webm';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+    btn.textContent='REC TAB + AUDIO';note('Tab recording finished. WebM saved.');recorder=null;parts=[];
+   };
+   picked.getVideoTracks()[0]?.addEventListener('ended',stop,{once:true});
+   recorder.start(1000);btn.textContent='STOP RECORDING';
+   note('Recording browser tab + shared tab audio. Use FULLSCREEN LCD; avoid switching to other tabs.');
+  }catch(e){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}btn.textContent='REC TAB + AUDIO';note('RECORD: '+e.message);}
+ });
 })();
 </script></body></html>

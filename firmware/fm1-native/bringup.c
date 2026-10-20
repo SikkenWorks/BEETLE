@@ -173,7 +173,8 @@ static volatile uint32_t native_nested_ticks, native_nested_count;
 #define ETCH_NATIVE_OTA 0
 #endif
 #define FELUCCA_OTA ETCH_NATIVE_OTA
-#define FELUCCA_ID "FM-1_2113"
+#define BEETLE_PRODUCT_ID "FM-1_2123"
+#define FELUCCA_ID BEETLE_PRODUCT_ID /* USB-MIDI SysEx identity == FWSC product */
 #define ETCH_UI_VERSION "V043"
 #define FELUCCA_OTA_DRYRUN 0
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")

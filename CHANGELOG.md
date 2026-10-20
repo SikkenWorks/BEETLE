@@ -1,3 +1,12 @@
+## V1.3.8 · 2026-10-20
+
+- Fixed native USB-MIDI SysEx firmware ID: match FM-1_2123 to actual FWSC package (prior V1.3.7 app erroneously reported FM-1_2113).
+- Installer now waits for the expected identity following reboot rather than rejecting the first stale firmware reply; preserves protocol handshakes and loader/hash verification.
+- All-in-One BEETLE MANAGER uses same-origin Blob documents, an explicit top-level AUTHORIZE FM1 MIDI prompt and direct-opening option for browser Web-MIDI permission limitations. MIDI/fullscreen allowed in embedded tools.
+- WebSimulator/Workbench adds fullscreen 240x240 LCD with integer nearest-neighbor scaling and optional REC TAB + AUDIO (MediaRecorder WebM, requires explicit tab audio grant; not hardware USB audio).
+- README badge added for The Firmware Hub. V22 project format remains unchanged; firmware OTA gate remains fail-closed for untrusted loader layouts.
+- Builds/tests: software only; physical FM1 flash/recovery unverified.
+
 ### V1.3.7 physical FM1 SEL/SETTINGS fix
 
 - Implemented a dedicated native physical SEL button transaction. SETTINGS entry now consumes the select edge, has a trailing-edge fallback for an interrupted poll, and blocks USB toggles until a separate SEL press after release.
