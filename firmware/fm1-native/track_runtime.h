@@ -2826,6 +2826,16 @@ static void track_fm1_poll(void){
   if(pressed&(1u<<8)){track_page=25u;track_home_fired=1u;track_home_since=now;changed=1u;}
   (void)fm1_input_note_edges();if(changed||now-track_last_paint>=650u){screen();track_last_paint=now;}return;
  }
+ /* Enter SETTINGS from the Projects menu on the SEL *press edge*.
+  * Consume that edge here, before it reaches any generic tracker / menu
+  * shortcut. Crucially, entering SETTINGS must not also toggle its value,
+  * and the subsequent SEL release must never dismiss the screen. */
+ if(track_page==1u && track_menu_index==6u && (pressed&(1u<<3))){
+  track_page=38u;changed=1u;
+  (void)fm1_input_note_edges();
+  screen();track_last_paint=now;
+  return;
+ }
  /* USB audio mode is system-only and never changes project storage.
   * Switching UAC input count requires a genuine USB re-enumeration. */
  if(track_page==38u){

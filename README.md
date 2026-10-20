@@ -12,17 +12,17 @@
   <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html"><img src="https://img.shields.io/badge/▲_INSTALL_BEETLE-000000?style=for-the-badge" alt="Install BEETLE"></a>
   <a href="https://sikkenworks.github.io/BEETLE/simulator.html"><img src="https://img.shields.io/badge/▶_WEB_SIMULATOR-000000?style=for-the-badge" alt="Open BEETLE Web Simulator"></a>
   <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html"><img src="https://img.shields.io/badge/▶_PROJECT_MANAGER-000000?style=for-the-badge" alt="Open BEETLE Project Manager"></a>
-  <br>
-  <a href="https://thefirmwarehub.com/?q=sikkenworks"><img src="https://img.shields.io/badge/▶_THE_FIRMWARE_HUB-000000?style=for-the-badge" alt="The Firmware Hub"></a>
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.3.5 firmware and Workbench</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.3.6 firmware and Workbench</strong> · <a href="CHANGELOG.md">Release history</a></sub>
 </p>
 
 ---
 
-**BEETLE V1.3.5** uses the revised Workbench provided by the project author. The physical keyboard including all black keys enters correct chromatic notes in TRACKER (while preserving contextual shortcuts). PER STEP FX now makes **FX1, FX2 and FX3 independent**. **K1** moves up/down between the three FX rows, **K2** changes the selected effect type, and **K3** adjusts its parameter. All three rows are usable even if earlier slots are empty. OCT+ still advances the selected FX row, OCT− removes only the selected effect, and CH6 NOTE1/NOTE2 changes with SELECT on the FX screen. The **48-record FX storage pool** and `FX STORAGE FULL` overlay remain active. The **V22** TRK1 project format records each extra slot's identity and can load prior V21/V20/V19 projects; older firmware cannot open V22 projects. This release includes a new experimental firmware build and updated installer. USB-C multitrack, all eight instruments, Song Mode and existing hardware features remain present. As with prior versions, physical FM1 USB/DAW, flashing, full-load audio performance and recovery are not validated.
+**BEETLE V1.3.6** uses the revised Workbench provided by the project author. The physical keyboard including all black keys enters correct chromatic notes in TRACKER (while preserving contextual shortcuts). PER STEP FX now makes **FX1, FX2 and FX3 independent**. **K1** moves up/down between the three FX rows, **K2** changes the selected effect type, and **K3** adjusts its parameter. All three rows are usable even if earlier slots are empty. OCT+ still advances the selected FX row, OCT− removes only the selected effect, and CH6 NOTE1/NOTE2 changes with SELECT on the FX screen. The **48-record FX storage pool** and `FX STORAGE FULL` overlay remain active. The **V22** TRK1 project format records each extra slot's identity and can load prior V21/V20/V19 projects; older firmware cannot open V22 projects. This release includes a new experimental firmware build and updated installer. USB-C multitrack, all eight instruments, Song Mode and existing hardware features remain present. As with prior versions, physical FM1 USB/DAW, flashing, full-load audio performance and recovery are not validated.
+
+**V1.3.6 HOME/SETTINGS fix:** HOME opens PROJECTS; K1 highlights SETTINGS; SEL enters SETTINGS and a further SEL toggles USB Multitrack without returning to the tracker. The Workbench HOME/REC button state is now initialized correctly.
 
 **BEETLE V1.3.4 (historical):** added the original three-FX implementation with **V21** persistence and a 48-entry extra-FX storage pool. That version required FX1 to be filled before FX2/FX3; V1.3.5 removes that restriction and corrects the FX control mapping and playback.
 

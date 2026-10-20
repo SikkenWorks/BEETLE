@@ -1,3 +1,12 @@
+## V1.3.6 — HOME / SETTINGS navigation fix (20 October 2026)
+
+- Fixed an undefined HOME/REC press-timing variable in the author's embedded BEETLE Workbench. This caused HOME to throw a browser error and left subsequent SEL handling in the wrong screen.
+- The native firmware now routes PROJECTS → SETTINGS via a dedicated SEL press-edge guard, preventing the opening press from reaching another screen action. The existing USB Multitrack ON/OFF switch remains inside SETTINGS.
+- Fixed an existing V22 WebSimulator import crash caused by modifying a `const` FX type during binary decode.
+- On-device HELP and the embedded WebSimulator document K1 highlighting a menu item, SEL entering it, and SEL toggling USB mode inside SETTINGS.
+- No changes to project schema (V22), synth/drum audio, FX, Song Chains, USB descriptors or project slots.
+- Software-only regression tests and native builds; physical FM1 navigation, USB enumeration and flashing/recovery have not been verified.
+
 ## V1.3.5 — Independent FX1/FX2/FX3 and revised Workbench (20 October 2026)
 
 - Adopted the author's revised `simulator(2).html` Workbench, preserving device geometry, styling and native `.beetle` project slots and import/export. Its embedded engine is refreshed from matching V1.3.5 source.

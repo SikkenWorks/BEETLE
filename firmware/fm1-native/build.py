@@ -17,7 +17,7 @@ if args.pilot: args.updater=True
 # TRACK must NEVER enable the old ETCH flash writer without a fully
 # audited tracker-specific 4x48-bank mapping and successful recovery tests.
 if args.storage or args.extended_store or args.multi_project:
- ap.error('BEETLE V1.3.5: legacy ETCH flash writes remain disabled. Only an isolated OTA LAB build is allowed.')
+ ap.error('BEETLE V1.3.6: legacy ETCH flash writes remain disabled. Only an isolated OTA LAB build is allowed.')
 
 if args.beetle_storage_lab and not args.updater: ap.error("--beetle-storage-lab requires --updater; OTA recovery must remain present")
 if args.usb_audio_48k:args.usb_audio=True
@@ -53,7 +53,7 @@ subprocess.run([sys.executable,str(root/'tools/fm1_elf_to_app.py'),str(elf),str(
 subprocess.run([sys.executable,str(root/'tools/fm1_app_validate.py'),str(out/'app.bin'),'--elf',str(elf),'--toolchain',str(tc),'--report',str(out/'app.bin.audit.json')],check=True)
 if read_only:
  subprocess.run([sys.executable,str(root/'tools/check_readonly_images.py'),'--elf',str(elf)],check=True,env={**os.environ,'JIELI_TOOLCHAIN':str(tc)})
-print('Compiled BEETLE V1.3.5', 'OTA-LAB' if args.updater else 'READ-ONLY', '; BEETLE persistent storage experimental:',args.beetle_storage_lab,'; updater writes:',args.updater,'; hardware validation is performed by project maintainer separately.')
+print('Compiled BEETLE V1.3.6', 'OTA-LAB' if args.updater else 'READ-ONLY', '; BEETLE persistent storage experimental:',args.beetle_storage_lab,'; updater writes:',args.updater,'; hardware validation is performed by project maintainer separately.')
 
 import json,hashlib
 (out/'native-build-options.json').write_text(json.dumps({'app_sha256':hashlib.sha256((out/'app.bin').read_bytes()).hexdigest(),'beetle_storage_experimental':args.beetle_storage_lab,'storage_writes':args.storage,'ota_writes':args.updater,'readonly_hardware_test':args.hardware_test,'flash_read_only':read_only,'version':'BEETLE-V1.3','pilot_ota_enabled_no_project_writes':args.pilot, 'storage_requires_destructive_user_consent':args.beetle_storage_lab,'overwrites_prior_ETCH_Felucca_user_storage':args.beetle_storage_lab,'hardware_verified':None,'intended_use':'Pilot OTA test - no project storage writes. Hardware test status: maintainer release process.' if args.pilot else ('EXPERIMENTAL BEETLE-only A/B flash writes gated by 5s physical confirmation' if args.beetle_storage_lab else 'OTA lab; BEETLE project flash writes locked'),'usb_audio_44100':args.usb_audio,'usb_audio_48000_experimental':args.usb_audio_48k,'extended_store_experimental':args.extended_store,'multi_project_experimental':args.multi_project,'product':'FM-1_2115','brand':'BEETLE','legacy_project_format':'TRACK-compatible'},indent=2)+'\n')
