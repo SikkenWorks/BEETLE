@@ -56,7 +56,16 @@ static uint8_t track_store_preflight(const struct track_store_project *p){
  }
  for(uint8_t k=0u;k<TRACK_PATTERNS;k++){
   const struct track_pattern *pat=&p->song.patterns[k];
-  if(pat->length<1u || pat->length>TRACK_STEPS)return 0u;
+  if(pat->length<1u || pat->length>TRACK_STEPS || p->song.extras.count>TRACK_EXTRA_FX_CAP)return 0u;
+  for(uint8_t x=0u;x<p->song.extras.count;x++){
+   const struct track_extra_fx *f=&p->song.extras.data[x];
+   if(f->pattern!=k)continue;
+   uint8_t key=f->id,lane=(uint8_t)((key&127u)/TRACK_STEPS),row=(uint8_t)((key&127u)%TRACK_STEPS);
+   if(lane>=TRACK_CHANNELS||((key&128u)!=0u&&lane!=TRACK_DRUM_CHANNEL)||
+      f->effect==0u||f->effect>=TRACK_FX_COUNT||f->value>100u)return 0u;
+   if(!(key&128u)?!pat->ch[lane][row].effect:!pat->note2_fx[row].effect)return 0u;
+   if(track_extra_count(&p->song,k,key)>2u)return 0u;
+  }
   for(uint8_t s=0u;s<TRACK_STEPS;s++)
    if(pat->note2_fx[s].effect>=TRACK_FX_COUNT||pat->note2_fx[s].value>100u)return 0u;
  }
@@ -135,6 +144,15 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
   wr16(out+i,fx2_mask);i+=2u;
   for(s=0;s<TRACK_STEPS;s++)if(fx2_mask&(1u<<s)){
    PUT1(pat->note2_fx[s].effect);PUT1(pat->note2_fx[s].value);
+  }
+  /* V21: per-pattern sparse slice of the global FX pool. */
+  uint8_t extra_count=0u;
+  for(uint8_t x=0u;x<p->song.extras.count;x++)
+   if(p->song.extras.data[x].pattern==r)extra_count++;
+  PUT1(extra_count);
+  for(uint8_t x=0u;x<p->song.extras.count;x++){
+   const struct track_extra_fx *f=&p->song.extras.data[x];if(f->pattern!=r)continue;
+   PUT1(f->id);PUT1(f->effect);PUT1(f->value);
   }
   const struct track_song_clip *clip=&p->song.clips[r];if(clip->count>TRACK_SONG_FX_EVENTS)return -1;
   PUT1(clip->count);
@@ -245,7 +263,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -324,6 +342,20 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
    for(s=0;s<TRACK_STEPS;s++)if(mask&(1u<<s)){
     GET1(pat->note2_fx[s].effect);GET1(pat->note2_fx[s].value);
     if(pat->note2_fx[s].effect>=TRACK_FX_COUNT||pat->note2_fx[s].value>100u)return -3;
+   }
+  }
+  /* Decode sparse per-pattern FX entries into the shared bank. */
+  if(rd16(data+4u)>=21u){
+   uint8_t count;GET1(count);
+   if(count>TRACK_EXTRA_FX_CAP || p->song.extras.count+count>TRACK_EXTRA_FX_CAP)return -3;
+   for(uint8_t x=0u;x<count;x++){
+    uint8_t key,fx,value;GET1(key);GET1(fx);GET1(value);
+    uint8_t lane=(uint8_t)((key&127u)/16u),row=(uint8_t)((key&127u)%16u);
+    if(lane>=TRACK_CHANNELS||((key&128u)!=0u&&lane!=TRACK_DRUM_CHANNEL)||
+       !fx||fx>=TRACK_FX_COUNT||value>100u||
+       (!(key&128u)?!pat->ch[lane][row].effect:!pat->note2_fx[row].effect) ||
+       track_extra_count(&p->song,r,key)>=2u)return -3;
+    p->song.extras.data[p->song.extras.count++]=(struct track_extra_fx){r,key,fx,value};
    }
   }
   struct track_song_clip *clip=&p->song.clips[r];GET1(clip->count);

@@ -22,7 +22,59 @@ struct track_song_bank {
  struct track_song_entry chain[TRACK_SONG_ENTRIES];
  uint8_t count,position,repeat_index,loop,enabled;
  uint8_t edit_row,edit_column,composite_active;
+ /* Shared project-wide sparse FX pool: each record belongs to a pattern. */
+ struct track_extra_bank {
+  uint8_t count;
+  struct track_extra_fx {uint8_t pattern,id,effect,value;} data[TRACK_EXTRA_FX_CAP];
+ } extras;
 };
+static inline uint8_t track_extra_count(const struct track_song_bank *b,uint8_t pattern,uint8_t key){
+ uint8_t n=0u;if(!b)return 0u;
+ for(uint8_t i=0u;i<b->extras.count && i<TRACK_EXTRA_FX_CAP;i++)
+  if(b->extras.data[i].pattern==pattern&&b->extras.data[i].id==key)n++;
+ return n;
+}
+static inline struct track_extra_fx *track_extra_get(struct track_song_bank *b,uint8_t pattern,uint8_t key,uint8_t slot){
+ if(!b||slot>=2u)return 0;
+ for(uint8_t i=0u;i<b->extras.count&&i<TRACK_EXTRA_FX_CAP;i++)
+  if(b->extras.data[i].pattern==pattern&&b->extras.data[i].id==key){
+   if(!slot)return &b->extras.data[i];slot--;
+  }
+ return 0;
+}
+static inline const struct track_extra_fx *track_extra_find(const struct track_song_bank *b,uint8_t pattern,uint8_t key,uint8_t slot){
+ return track_extra_get((struct track_song_bank*)b,pattern,key,slot);
+}
+static inline void track_extra_remove(struct track_song_bank *b,uint8_t pattern,uint8_t key,uint8_t slot){
+ if(!b||slot>=2u)return;
+ for(uint8_t i=0u,matched=0u;i<b->extras.count;i++)
+  if(b->extras.data[i].pattern==pattern&&b->extras.data[i].id==key){
+   if(matched++==slot){for(uint8_t j=i;j+1u<b->extras.count;j++)b->extras.data[j]=b->extras.data[j+1u];
+    b->extras.count--;return;}
+  }
+}
+static inline void track_extra_clear(struct track_song_bank *b,uint8_t pattern,uint8_t key){
+ while(track_extra_count(b,pattern,key))track_extra_remove(b,pattern,key,0u);
+}
+static inline int track_extra_add(struct track_song_bank *b,uint8_t pattern,uint8_t key,uint8_t slot,uint8_t fx,uint8_t value){
+ if(!b||pattern>=TRACK_PATTERNS||slot>=2u||fx==0u||fx>=TRACK_FX_COUNT||value>100u)return -2;
+ if(track_extra_get(b,pattern,key,slot))return 0;
+ if(track_extra_count(b,pattern,key)!=slot)return -2;
+ if(b->extras.count>=TRACK_EXTRA_FX_CAP)return -1;
+ b->extras.data[b->extras.count++]=(struct track_extra_fx){pattern,key,fx,value};return 1;
+}
+/* Remove stale extra FX after editing/clearing the primary FX field. */
+static inline void track_extra_prune(struct track_song_bank *b,uint8_t pattern,const struct track_pattern *p){
+ if(!b||!p)return;
+ for(uint8_t i=0u;i<b->extras.count;){
+  struct track_extra_fx *f=&b->extras.data[i];
+  if(f->pattern!=pattern){i++;continue;}
+  uint8_t lane=(uint8_t)((f->id&127u)/TRACK_STEPS),row=(uint8_t)((f->id&127u)%TRACK_STEPS);
+  uint8_t primary=lane<TRACK_CHANNELS?((f->id&128u)?p->note2_fx[row].effect:p->ch[lane][row].effect):0u;
+  if(!primary){for(uint8_t j=i;j+1u<b->extras.count;j++)b->extras.data[j]=b->extras.data[j+1u];b->extras.count--;}
+  else i++;
+ }
+}
 void track_song_init(struct track_song_bank *bank,const struct track_engine *engine);
 /* Switches active pattern without touching persistent flash. On failure active pattern remains unchanged. */
 int track_song_switch(struct track_song_bank *bank,struct track_engine *engine,uint8_t index);

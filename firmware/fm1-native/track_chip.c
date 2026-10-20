@@ -208,6 +208,8 @@ static void track_chip_tune_voice(struct track_chip_voice *v,const struct track_
  const struct track_va_patch *p=&s->patches[v->instrument];
  int32_t pitch=0;
  if(s->fx_type[v->channel]==11u)pitch=(int32_t)((uint32_t)s->fx_value[v->channel]*24u/100u)-12;
+ for(uint8_t j=0u;j<2u;j++)if(s->fx_extra_type[v->channel][j]==11u)
+  pitch+=(int32_t)((uint32_t)s->fx_extra_value[v->channel][j]*24u/100u)-12;
  int32_t a=(int32_t)v->note+(int32_t)p->coarse+pitch+(int32_t)s->punch_octave;
  int32_t b=(int32_t)v->note+(int32_t)p->coarse_b+pitch+(int32_t)s->punch_octave;
  if(a<0)a=0;if(a>127)a=127;
@@ -328,9 +330,12 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
  /* VIBRATO changes the live note pitch. The broader +/-9% maximum
   * excursion produces a clearly audible step effect, even at medium depth. */
  uint32_t step=v->step,step2=v->step2;
- if(s->fx_type[v->channel]==6u){
+ uint8_t vib=0u;
+ if(s->fx_type[v->channel]==6u)vib=s->fx_value[v->channel];
+ for(uint8_t j=0u;j<2u;j++)if(s->fx_extra_type[v->channel][j]==6u)vib=s->fx_extra_value[v->channel][j];
+ if(vib){
   int32_t wave=(int32_t)track_va_sine[(uint8_t)(lfo_phase>>24u)];
-  int32_t cents=(wave*(int32_t)s->fx_value[v->channel]*9)/13000;
+  int32_t cents=(wave*(int32_t)vib*9)/13000;
   int32_t mul=10000+cents;
   step=(uint32_t)(((uint64_t)step*(uint32_t)mul)/10000u);
   step2=(uint32_t)(((uint64_t)step2*(uint32_t)mul)/10000u);
@@ -485,8 +490,8 @@ void track_chip_fx_reset(void){
  memset(beetle_step_write,0,sizeof(beetle_step_write));
  memset(beetle_step_phase,0,sizeof(beetle_step_phase));
 }
-static int32_t beetle_step_fx_voice(int32_t mono,const struct track_chip_engine *s,uint8_t channel){
- const uint8_t fx=s->fx_type[channel],v=s->fx_value[channel];
+static int32_t beetle_step_fx_process(int32_t mono,const struct track_chip_engine *s,
+ uint8_t channel,uint8_t fx,uint8_t v){
  if(!fx)return mono;
  if(fx==9u){ /* Tremolo LFO; 0 slow, 100 fast */
   uint32_t rate=23u+(uint32_t)v*25u;
@@ -510,6 +515,14 @@ static int32_t beetle_step_fx_voice(int32_t mono,const struct track_chip_engine 
   beetle_step_delay[channel][write]=(int16_t)bound((mono+old*feed/100),-32767,32767);
   beetle_step_write[channel]=(uint16_t)((write+1u)&(BEETLE_STEP_DELAY_FRAMES-1u));
   mono=tap;
+ }
+ return mono;
+}
+static int32_t beetle_step_fx_voice(int32_t mono,const struct track_chip_engine *s,uint8_t channel){
+ mono=beetle_step_fx_process(mono,s,channel,s->fx_type[channel],s->fx_value[channel]);
+ for(uint8_t slot=0u;slot<2u;slot++){
+  uint8_t fx=s->fx_extra_type[channel][slot];
+  if(fx)mono=beetle_step_fx_process(mono,s,channel,fx,s->fx_extra_value[channel][slot]);
  }
  return mono;
 }
@@ -597,9 +610,12 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
    if(s->fx_samples[ch]!=0xFFFFFFFFu)s->fx_samples[ch]++;
   /* One LFO clock per sample regardless of synth voice count. */
   for(uint8_t ch=0;ch<TRACK_SYNTH_CHANNELS;ch++){
-   uint8_t kind=s->fx_type[ch];
+   uint8_t kind=s->fx_type[ch],depth=s->fx_value[ch];
+   for(uint8_t j=0u;j<2u;j++)if(s->fx_extra_type[ch][j]==6u||s->fx_extra_type[ch][j]==9u){
+    kind=s->fx_extra_type[ch][j];depth=s->fx_extra_value[ch][j];
+   }
    if(kind==6u||kind==9u){
-    uint32_t rate=23u+(uint32_t)s->fx_value[ch]*25u;
+    uint32_t rate=23u+(uint32_t)depth*25u;
     beetle_step_phase[ch]+=rate*512u;
    }
   }

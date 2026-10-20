@@ -57,6 +57,7 @@ struct track_chip_engine {
  uint8_t env_attack[TRACK_CHIP_SLOTS],env_decay[TRACK_CHIP_SLOTS],env_sustain[TRACK_CHIP_SLOTS],env_release[TRACK_CHIP_SLOTS];
  struct track_va_patch patches[TRACK_CHIP_SLOTS]; /* per instrument, not per channel */
  uint8_t fx_type[TRACK_CHANNELS],fx_value[TRACK_CHANNELS];
+ uint8_t fx_extra_type[TRACK_CHANNELS][2],fx_extra_value[TRACK_CHANNELS][2];
  uint8_t step_gain[TRACK_CHANNELS]; /* persistent per-channel 0..100% volume automation */
  uint8_t mono; /* 1: held last note priority; 0: up to 8 voices */
  uint8_t realtime_voice_budget; /* 8 normally; 4..8 only during DMA deadline pressure */

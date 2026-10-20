@@ -18,6 +18,7 @@
 struct beetle_pattern_image {
  struct track_pattern pattern;
  struct track_song_clip punch;
+ struct track_extra_bank extras; /* atomic Undo/Redo for FX1/FX2/FX3 */
 };
 struct beetle_history_entry {
  struct beetle_pattern_image state;
@@ -27,7 +28,10 @@ struct beetle_pattern_editor {
  struct beetle_history_entry history[BEETLE_UNDO_CAP];
  struct beetle_pattern_image *pending,*whole_clip;
  struct track_step *block;
- uint8_t cursor,count,pending_valid,pending_index,pending_kind,whole_valid,block_valid,block_count;
+ /* Copy/paste FX2/3 together with the selected block, not just FX1. */
+ struct track_extra_fx block_fx[TRACK_EXTRA_FX_CAP];
+ uint8_t block_fx_count;
+ uint8_t cursor,count,pending_valid,pending_index,pending_kind,whole_valid,whole_index,block_valid,block_count;
  uint8_t first,last,action;
  int8_t amount;
  uint8_t status;
@@ -35,7 +39,7 @@ struct beetle_pattern_editor {
 static inline void beetle_edit_reset(struct beetle_pattern_editor *ed){
  if(!ed)return;
  ed->cursor=ed->count=ed->pending_valid=ed->whole_valid=ed->block_valid=0u;
- ed->block_count=ed->first=ed->last=ed->action=ed->status=0u;ed->amount=1;
+ ed->block_count=ed->block_fx_count=ed->first=ed->last=ed->action=ed->status=0u;ed->amount=1;
 }
 static inline uint8_t beetle_image_different(const struct beetle_pattern_image *a,const struct beetle_pattern_image *b){
  const uint8_t *p=(const uint8_t*)a,*q=(const uint8_t*)b;
@@ -43,7 +47,7 @@ static inline uint8_t beetle_image_different(const struct beetle_pattern_image *
  return 0u;
 }
 static inline void beetle_edit_capture(struct beetle_pattern_image *img,const struct track_song_bank *bank,const struct track_engine *eng){
- img->pattern=eng->active;img->punch=bank->clips[eng->pattern_slot];
+ img->pattern=eng->active;img->punch=bank->clips[eng->pattern_slot];img->extras=bank->extras;
 }
 static inline void beetle_edit_begin(struct beetle_pattern_editor *ed,const struct track_song_bank *bank,const struct track_engine *eng){
  if(!ed||!bank||!eng||ed->pending_valid)return;
@@ -99,6 +103,10 @@ static inline int beetle_edit_commit(struct beetle_pattern_editor *ed,const stru
   after=(const uint8_t*)&bank->clips[eng->pattern_slot];
   for(uint32_t i=0u;i<sizeof(ed->pending->punch);i++)if(before[i]!=after[i]){changed=1u;break;}
  }
+ if(!changed){
+  before=(const uint8_t*)&ed->pending->extras;after=(const uint8_t*)&bank->extras;
+  for(uint32_t i=0u;i<sizeof(bank->extras);i++)if(before[i]!=after[i]){changed=1u;break;}
+ }
  if(!changed)return 0;
  beetle_edit_push(ed);return 1;
 }
@@ -108,7 +116,7 @@ static inline int beetle_edit_apply_image(struct track_song_bank *bank,struct tr
  eng->active=img->pattern;bank->patterns[pat]=img->pattern;
  if(eng->active.length>=1u&&eng->active.length<=TRACK_STEPS && eng->transport.edit_step>=eng->active.length)
   eng->transport.edit_step=(uint8_t)(eng->active.length-1u);
- bank->clips[pat]=img->punch;eng->dirty=1u;return 1;
+ bank->clips[pat]=img->punch;bank->extras=img->extras;eng->dirty=1u;return 1;
 }
 /* Undo/redo use the same snapshot slot. On every move, swap its pattern
  * image against the pattern currently in RAM. Only one history image/action. */
@@ -131,7 +139,7 @@ static inline int beetle_edit_redo(struct beetle_pattern_editor *ed,struct track
 }
 static inline void beetle_edit_copy_pattern(struct beetle_pattern_editor *ed,const struct track_song_bank *bank,const struct track_engine *eng){
  if(!ed)return;
- beetle_edit_capture(ed->whole_clip,bank,eng);ed->whole_valid=1u;
+ beetle_edit_capture(ed->whole_clip,bank,eng);ed->whole_index=eng->pattern_slot;ed->whole_valid=1u;
 }
 static inline int beetle_edit_paste_pattern(struct beetle_pattern_editor *ed,struct track_song_bank *bank,struct track_engine *eng){
  if(!ed||!ed->whole_valid)return 0;
@@ -140,6 +148,26 @@ static inline int beetle_edit_paste_pattern(struct beetle_pattern_editor *ed,str
  if(eng->active.length>=1u&&eng->active.length<=TRACK_STEPS && eng->transport.edit_step>=eng->active.length)
   eng->transport.edit_step=(uint8_t)(eng->active.length-1u);
  bank->clips[eng->pattern_slot]=ed->whole_clip->punch;
+ uint8_t previous=0u,needed=0u;
+ for(uint8_t i=0u;i<bank->extras.count;i++)previous+=(bank->extras.data[i].pattern==eng->pattern_slot);
+ for(uint8_t i=0u;i<ed->whole_clip->extras.count;i++)needed+=(ed->whole_clip->extras.data[i].pattern==ed->whole_index);
+ if(bank->extras.count-previous+needed>TRACK_EXTRA_FX_CAP){
+  /* Refuse the whole paste: no partial FX loss when storage is full. */
+  eng->active=ed->pending->pattern;bank->clips[eng->pattern_slot]=ed->pending->punch;
+  ed->pending_valid=0u;return 0;
+ }
+ for(uint8_t i=0u;i<bank->extras.count;){
+  if(bank->extras.data[i].pattern==eng->pattern_slot){
+   for(uint8_t j=i;j+1u<bank->extras.count;j++)bank->extras.data[j]=bank->extras.data[j+1u];
+   bank->extras.count--;
+  }else i++;
+ }
+ for(uint8_t i=0u;i<ed->whole_clip->extras.count;i++){
+  const struct track_extra_fx *f=&ed->whole_clip->extras.data[i];
+  if(f->pattern!=ed->whole_index)continue;
+  struct track_extra_fx copy=*f;copy.pattern=eng->pattern_slot;
+  bank->extras.data[bank->extras.count++]=copy;
+ }
  if(beetle_edit_commit(ed,bank,eng)){eng->dirty=1u;return 1;}
  return 0;
 }
@@ -148,11 +176,21 @@ static inline uint8_t beetle_block_bound_length(int32_t v,uint8_t length){
  return (uint8_t)(v<0?0:v>=(int32_t)length?length-1u:v);
 }
 static inline uint8_t beetle_block_bound(int32_t v){return beetle_block_bound_length(v,TRACK_STEPS);}
-static inline void beetle_edit_block_copy(struct beetle_pattern_editor *ed,const struct track_engine *eng){
+static inline void beetle_edit_block_copy(struct beetle_pattern_editor *ed,const struct track_song_bank *bank,const struct track_engine *eng){
  if(!ed||!eng)return;
  uint8_t a=ed->first<ed->last?ed->first:ed->last;
  uint8_t b=ed->first>ed->last?ed->first:ed->last;
  for(uint8_t s=a;s<=b;s++)ed->block[s-a]=eng->active.ch[eng->transport.edit_channel][s];
+ ed->block_fx_count=0u;
+ if(bank)for(uint8_t i=0u;i<bank->extras.count;i++){
+  const struct track_extra_fx *f=&bank->extras.data[i];
+  uint8_t lane=(uint8_t)((f->id&127u)/TRACK_STEPS),row=(uint8_t)((f->id&127u)%TRACK_STEPS);
+  /* Block operations edit NOTE1 on drums, not the independent NOTE2 field. */
+  if(f->pattern!=eng->pattern_slot||lane!=eng->transport.edit_channel||(f->id&128u)||row<a||row>b)continue;
+  if(ed->block_fx_count>=TRACK_EXTRA_FX_CAP)break;
+  struct track_extra_fx copy=*f;copy.pattern=0u;copy.id=(uint8_t)(row-a);
+  ed->block_fx[ed->block_fx_count++]=copy;
+ }
  ed->block_count=(uint8_t)(b-a+1u);ed->block_valid=1u;
 }
 static inline void beetle_edit_blank(struct track_step *st){
@@ -171,13 +209,29 @@ static inline int beetle_edit_block_execute(struct beetle_pattern_editor *ed,str
  const uint8_t a=ed->first<ed->last?ed->first:ed->last;
  const uint8_t b=ed->first>ed->last?ed->first:ed->last;
  const uint8_t ch=eng->transport.edit_channel;
- if(ed->action==0u){beetle_edit_block_copy(ed,eng);ed->status=1u;return 1;}
+ if(ed->action==0u){beetle_edit_block_copy(ed,bank,eng);ed->status=1u;return 1;}
  if(ed->action==5u){ed->status=(uint8_t)(beetle_edit_undo(ed,bank,eng)?2u:4u);return ed->status==2u;}
  if(ed->action==6u){ed->status=(uint8_t)(beetle_edit_redo(ed,bank,eng)?3u:4u);return ed->status==3u;}
  if(ed->action==1u&&!ed->block_valid){ed->status=4u;return 0;}
  beetle_edit_begin(ed,bank,eng);
  if(ed->action==1u){
-  for(uint8_t i=0u;i<ed->block_count&&ed->first+i<len;i++)eng->active.ch[ch][ed->first+i]=ed->block[i];
+  uint8_t count=(uint8_t)(ed->block_count<len-ed->first?ed->block_count:len-ed->first);
+  uint8_t old=0u,needed=0u;
+  for(uint8_t i=0u;i<bank->extras.count;i++){
+   const struct track_extra_fx *f=&bank->extras.data[i];
+   uint8_t lane=(uint8_t)((f->id&127u)/TRACK_STEPS),row=(uint8_t)((f->id&127u)%TRACK_STEPS);
+   if(f->pattern==eng->pattern_slot&&lane==ch&&!(f->id&128u)&&row>=ed->first&&row<ed->first+count)old++;
+  }
+  for(uint8_t i=0u;i<ed->block_fx_count;i++)needed+=(uint8_t)(ed->block_fx[i].id<count);
+  if(bank->extras.count-old+needed>TRACK_EXTRA_FX_CAP){ed->pending_valid=0u;ed->status=4u;return 0;}
+  for(uint8_t i=0u;i<count;i++)eng->active.ch[ch][ed->first+i]=ed->block[i];
+  for(uint8_t i=0u;i<count;i++)track_extra_clear(bank,eng->pattern_slot,track_extra_key(ch,(uint8_t)(ed->first+i),0u));
+  for(uint8_t i=0u;i<ed->block_fx_count;i++){
+   const struct track_extra_fx *f=&ed->block_fx[i];if(f->id>=count)continue;
+   uint8_t key=track_extra_key(ch,(uint8_t)(ed->first+f->id),0u);
+   uint8_t slot=track_extra_count(bank,eng->pattern_slot,key);
+   (void)track_extra_add(bank,eng->pattern_slot,key,slot,f->effect,f->value);
+  }
  }else if(ed->action==2u){
   for(uint8_t i=a;i<=b;i++)beetle_edit_blank(&eng->active.ch[ch][i]);
  }else if(ed->action==3u && ch!=(TRACK_CHANNELS-1u)){
@@ -189,7 +243,22 @@ static inline int beetle_edit_block_execute(struct beetle_pattern_editor *ed,str
  }else if(ed->action==4u){
   if(ed->amount>0){for(uint8_t i=b;i>a;i--)eng->active.ch[ch][i]=eng->active.ch[ch][i-1u];beetle_edit_blank(&eng->active.ch[ch][a]);}
   else if(ed->amount<0){for(uint8_t i=a;i<b;i++)eng->active.ch[ch][i]=eng->active.ch[ch][i+1u];beetle_edit_blank(&eng->active.ch[ch][b]);}
+  /* Move secondary FX with the original step, never leave ghost events in
+   * the vacated position. The pre-edit snapshot is the immutable source. */
+  for(uint8_t row=a;row<=b;row++)track_extra_clear(bank,eng->pattern_slot,track_extra_key(ch,row,0u));
+  const struct track_extra_bank *old=&ed->pending->extras;
+  for(uint8_t i=0u;i<old->count;i++){
+   const struct track_extra_fx *f=&old->data[i];
+   uint8_t lane=(uint8_t)((f->id&127u)/TRACK_STEPS),row=(uint8_t)((f->id&127u)%TRACK_STEPS);
+   if(f->pattern!=eng->pattern_slot||lane!=ch||(f->id&128u)||row<a||row>b)continue;
+   int32_t dst=(int32_t)row+(ed->amount>0?1:ed->amount<0?-1:0);
+   if(dst<a||dst>b)continue;
+   uint8_t key=track_extra_key(ch,(uint8_t)dst,0u);
+   uint8_t slot=track_extra_count(bank,eng->pattern_slot,key);
+   (void)track_extra_add(bank,eng->pattern_slot,key,slot,f->effect,f->value);
+  }
  }
+ track_extra_prune(bank,eng->pattern_slot,&eng->active);
  if(beetle_edit_commit(ed,bank,eng)){eng->dirty=1u;ed->status=2u;return 1;}
  ed->status=4u;return 0;
 }

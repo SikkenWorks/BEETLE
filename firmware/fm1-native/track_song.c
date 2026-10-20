@@ -23,6 +23,7 @@ void track_song_init(struct track_song_bank *b,const struct track_engine *e){
 void track_song_capture(struct track_song_bank *b,const struct track_engine *e){
  if(!b||!e||b->composite_active||e->pattern_slot>=TRACK_PATTERNS)return;
  b->patterns[e->pattern_slot]=e->active;
+ track_extra_prune(b,e->pattern_slot,&e->active);
 }
 int track_song_switch(struct track_song_bank *b,struct track_engine *e,uint8_t index){
  if(!b||!e||index>=TRACK_PATTERNS)return -1;
@@ -73,6 +74,8 @@ static void track_song_compose(struct track_song_bank *b,struct track_engine *e)
    }
   }
  }
+ /* Extra FX are looked up from each source lane while Song Mode is active.
+  * Do not merge several patterns into a limited 16-entry scratch pool. */
  out->length=length;
  if(e->transport.edit_step>=length)e->transport.edit_step=(uint8_t)(length-1u);
 }

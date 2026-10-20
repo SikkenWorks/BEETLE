@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>BEETLE V1.3.3 · SikkenWorks</title><style>:root{color-scheme:dark;font-family:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;background:#070707;color:#f1f1f1;font-size:13px}*{box-sizing:border-box}body{margin:0}.app{max-width:1110px;margin:0 auto;padding:22px 18px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #372134;padding-bottom:16px;gap:12px}header strong{font-size:25px;letter-spacing:2px}header strong span{font-size:14px;color:#ff00ce}header small{display:block;margin-top:6px;color:#a8879c;font-size:10px;letter-spacing:1px}.status{font-size:11px;color:#f49ddc;text-align:right}.workbench{display:grid;grid-template-columns:minmax(300px,550px) minmax(330px,1fr);gap:32px;padding-top:25px}.screen-wrap{min-width:0}.display{width:min(100%,520px);aspect-ratio:1;position:relative;background:#000;border:3px solid #3d1936;box-shadow:0 0 36px #a9047218;image-rendering:pixelated}.display canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}.splash{position:absolute;inset:0;background:#000;display:grid;place-items:center;z-index:3}.splash.hidden{display:none}.splash img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}.play-idle,.playback{display:none;position:absolute;left:2.4%;bottom:2.5%;width:8%;height:8%;object-fit:contain;object-position:center center;image-rendering:pixelated}.play-idle.visible,.playback.visible{display:block}#hint{font-size:10px;color:#ab789a;line-height:1.7;letter-spacing:.4px}.panel{min-width:0}.panel-title{margin:0 0 10px;color:#fa48d0;font-size:12px;font-weight:bold;letter-spacing:1px}.panel-title small{float:right;font-size:9px;color:#9b7b92;letter-spacing:0}.button-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:22px}.hw{border:1px solid #343034;background:#101010;min-height:41px;color:#666;font:inherit;cursor:pointer}.hw.light{color:#fff;border-color:#9f287c;background:#2a0724;box-shadow:inset 0 0 10px #ab147427,0 0 7px #aa23701c}.hw.light:active,.hw.active{background:#ed00bb!important;color:#090009!important;border-color:#ff78de!important;box-shadow:0 0 20px #f000bd6b!important}.hw:disabled{cursor:not-allowed}.encoders{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:22px}.enc{border:1px solid #342234;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:5px}.enc span{color:#ccb1c4;font-size:10px}.enc div{display:flex;gap:5px}.enc button,.extra button,.import{border:1px solid #79436c;background:#211020;color:#fff;cursor:pointer;font:inherit;padding:7px 10px}.enc button{width:29px;padding:8px 4px}.enc button:hover,.extra button:hover{background:#5b174d}.black-mutes{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:5px 0}.black-mutes button{font:inherit;font-size:10px;background:#161016;color:#fff;border:1px solid #5f2150;padding:8px 2px;cursor:pointer}.black-mutes button.active{background:#ff00d6;color:#080008}.white-key.solo-active{background:#ff00d6!important;color:#080008!important;box-shadow:0 0 8px #ff00d6}.keyboard{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;height:105px}.white-key{color:#1c101c;background:#f2eef0;border:1px solid #ddd;display:flex;flex-direction:column;align-items:center;justify-content:space-between;cursor:pointer;font-size:10px;user-select:none;touch-action:none;padding:9px 0}.white-key span{font-weight:bold}.white-key b{font-size:10px;color:#802165}.white-key.down{background:#f600d5;color:#000;box-shadow:0 0 13px #ff00d999}.keyhint{color:#a9879b;font-size:10px;line-height:1.5}.extra{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:14px}.extra button,.import{font-size:11px;text-align:center;padding:11px 5px}.import{position:relative;cursor:pointer}.import input{display:none}footer{display:flex;justify-content:space-between;color:#98788f;font-size:10px;border-top:1px solid #392238;margin-top:22px;padding-top:16px;gap:10px}@media(max-width:800px){.workbench{grid-template-columns:1fr}.display{max-width:500px}.app{padding:12px}header{flex-wrap:wrap}.panel{max-width:520px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>BEETLE V1.3.4 · SikkenWorks</title><style>:root{color-scheme:dark;font-family:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;background:#070707;color:#f1f1f1;font-size:13px}*{box-sizing:border-box}body{margin:0}.app{max-width:1110px;margin:0 auto;padding:22px 18px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #372134;padding-bottom:16px;gap:12px}header strong{font-size:25px;letter-spacing:2px}header strong span{font-size:14px;color:#ff00ce}header small{display:block;margin-top:6px;color:#a8879c;font-size:10px;letter-spacing:1px}.status{font-size:11px;color:#f49ddc;text-align:right}.workbench{display:grid;grid-template-columns:minmax(300px,550px) minmax(330px,1fr);gap:32px;padding-top:25px}.screen-wrap{min-width:0}.display{width:min(100%,520px);aspect-ratio:1;position:relative;background:#000;border:3px solid #3d1936;box-shadow:0 0 36px #a9047218;image-rendering:pixelated}.display canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}.splash{position:absolute;inset:0;background:#000;display:grid;place-items:center;z-index:3}.splash.hidden{display:none}.splash img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}.play-idle,.playback{display:none;position:absolute;left:2.4%;bottom:2.5%;width:8%;height:8%;object-fit:contain;object-position:center center;image-rendering:pixelated}.play-idle.visible,.playback.visible{display:block}#hint{font-size:10px;color:#ab789a;line-height:1.7;letter-spacing:.4px}.panel{min-width:0}.panel-title{margin:0 0 10px;color:#fa48d0;font-size:12px;font-weight:bold;letter-spacing:1px}.panel-title small{float:right;font-size:9px;color:#9b7b92;letter-spacing:0}.button-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:22px}.hw{border:1px solid #343034;background:#101010;min-height:41px;color:#666;font:inherit;cursor:pointer}.hw.light{color:#fff;border-color:#9f287c;background:#2a0724;box-shadow:inset 0 0 10px #ab147427,0 0 7px #aa23701c}.hw.light:active,.hw.active{background:#ed00bb!important;color:#090009!important;border-color:#ff78de!important;box-shadow:0 0 20px #f000bd6b!important}.hw:disabled{cursor:not-allowed}.encoders{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:22px}.enc{border:1px solid #342234;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:5px}.enc span{color:#ccb1c4;font-size:10px}.enc div{display:flex;gap:5px}.enc button,.extra button,.import{border:1px solid #79436c;background:#211020;color:#fff;cursor:pointer;font:inherit;padding:7px 10px}.enc button{width:29px;padding:8px 4px}.enc button:hover,.extra button:hover{background:#5b174d}.black-mutes{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:5px 0}.black-mutes button{font:inherit;font-size:10px;background:#161016;color:#fff;border:1px solid #5f2150;padding:8px 2px;cursor:pointer}.black-mutes button.active{background:#ff00d6;color:#080008}.white-key.solo-active{background:#ff00d6!important;color:#080008!important;box-shadow:0 0 8px #ff00d6}.keyboard{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;height:105px}.white-key{color:#1c101c;background:#f2eef0;border:1px solid #ddd;display:flex;flex-direction:column;align-items:center;justify-content:space-between;cursor:pointer;font-size:10px;user-select:none;touch-action:none;padding:9px 0}.white-key span{font-weight:bold}.white-key b{font-size:10px;color:#802165}.white-key.down{background:#f600d5;color:#000;box-shadow:0 0 13px #ff00d999}.keyhint{color:#a9879b;font-size:10px;line-height:1.5}.extra{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:14px}.extra button,.import{font-size:11px;text-align:center;padding:11px 5px}.import{position:relative;cursor:pointer}.import input{display:none}footer{display:flex;justify-content:space-between;color:#98788f;font-size:10px;border-top:1px solid #392238;margin-top:22px;padding-top:16px;gap:10px}@media(max-width:800px){.workbench{grid-template-columns:1fr}.display{max-width:500px}.app{padding:12px}header{flex-wrap:wrap}.panel{max-width:520px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 .play-idle,.playback{display:none!important}#track-simulator-panel[hidden],#track-installer-panel[hidden]{display:none!important}.white-key.guide:not(.down){background:#ef9bde;border-color:#ff00d7;box-shadow:inset 0 0 0 2px #b2008a}.hw.boot-wave,.enc button.boot-wave,.white-key.boot-wave{background:#ff00d6!important;border-color:#fff!important;color:#080008!important;box-shadow:0 0 14px #ff00d6b0!important}
 .hw.boot-tail,.enc button.boot-tail,.white-key.boot-tail{background:#7a1766!important;color:#fff!important;box-shadow:0 0 5px #ff00d678!important}
 </style><script>document.addEventListener('selectstart',e=>e.preventDefault());document.addEventListener('contextmenu',e=>e.preventDefault());</script></head>
-<body><nav style="background:#080208;padding:12px 16px;border-bottom:1px solid #993276;color:#ff00d7;letter-spacing:1px">BEETLE V1.3.3 · WEB SIMULATOR · NO FLASH ACCESS</nav><main class="app" id="track-simulator-panel">
-<header><div><strong>BEETLE <span>V1.3.3</span></strong><small>5 SYNTH LANES + 1 SAMPLE DRUM LANE · WEB SIMULATOR · SIMULATED AUDIO · NATIVE FM1 DSP IN SOURCE</small></div><div class="status" id="status">AUDIO: WAITING FOR PLAY</div></header>
+<body><nav style="background:#080208;padding:12px 16px;border-bottom:1px solid #993276;color:#ff00d7;letter-spacing:1px">BEETLE V1.3.4 · WEB SIMULATOR · NO FLASH ACCESS</nav><main class="app" id="track-simulator-panel">
+<header><div><strong>BEETLE <span>V1.3.4</span></strong><small>5 SYNTH LANES + 1 SAMPLE DRUM LANE · WEB SIMULATOR · SIMULATED AUDIO · NATIVE FM1 DSP IN SOURCE</small></div><div class="status" id="status">AUDIO: WAITING FOR PLAY</div></header>
 <section class="workbench">
 <div class="screen-wrap"><div class="display" id="display">
   <canvas id="screen" width="240" height="240" aria-label="BEETLE FM1 display simulator" tabindex="0"></canvas>
@@ -87,7 +87,7 @@ function freshDrumComponents(){return DRUM_FACTORY.map(v=>[v[0],v[1],v[2],v[3],v
 
 const NEW_MASTER=()=>({comp_threshold:75,comp_ratio:40,comp_gain:50,comp_attack:28,reverb_wet:15,reverb_feedback:32,reverb_tone:50,reverb_spread:50,enabled:[true,true,true],order:[0,1,2]});
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-function emptyStep(){return {note:null,inst:0,chd:0,fx:0,amount:50,dyn:0,groove:0};}
+function emptyStep(){return {note:null,inst:0,chd:0,fx:0,amount:50,extraFx:[],dyn:0,groove:0};}
 function emptyPattern(){return {length:16,channels:Array.from({length:CHANNELS},(_,ch)=>Array.from({length:STEPS},()=>({...emptyStep(),inst:ch===5?3:ch}))),punch:[]};}
 function freshProject(name=''){return {version:1,name,bpm:120,selectedPattern:0,patterns:{},instruments:Array.from({length:8},(_,i)=>({type:DEFAULT_TYPES[i],attack:i===5?0.18:0.01,decay:i===4?0.25:i===5?0.32:0.14,sustain:i===4?0.70:i===5?0.80:0.55,release:i===4?0.18:i===5?0.48:0.16,duty:0.5,cutoff:i===4?3200:i===5?8400:7000,volume:0.66,lfoRate:5,lfoDepth:0,waveA:i===5?3:0,waveB:i===4?3:1,coarse:0,fine:0,coarseB:i===4?-12:0,fineB:i===5?7:0,detune:i===4?8:i===5?22:12,mix:i===4?35:i===5?60:50,pulseWidth:50,pulseWidthB:50,morph:i===5?30:0,drive:i===4?10:i===5?2:0,sub:i===4?18:0,noise:0,fmDepth:0})),typeBanks:Array.from({length:8},()=>({})),library:Array(8).fill(null),master:NEW_MASTER(),mixer:Array.from({length:CHANNELS},(_,i)=>({volume:i===5?0.8:0.5,pan:0,mute:false,solo:false})),song:[songNewRow(0)],songLoop:true,drumComponents:freshDrumComponents(),drumMapVersion:2,harmony:{root:0,mode:0,keylock:0},recordQuantize:true,quantizeMutes:false,snapshots:[null,null,null,null],muteGroups:[0,0,0,0]};}
 /* V19: independent six-lane song rows. Old JSON project rows migrate on load. */
@@ -141,8 +141,8 @@ function stepChange(s,field,delta,drum=false,harmony=null){if(!delta)return;if(d
  if(field===1){let v=(s.note===null?-1:s.note)+delta;if(v>=DRUM_NAMES.length)v=-1;if(v< -1)v=DRUM_NAMES.length-1;s.note=v<0?null:v;}
  else if(field===2){s.chd=((s.chd+delta)%(DRUM_NAMES.length+2)+(DRUM_NAMES.length+2))%(DRUM_NAMES.length+2);}
  else if(field===3){/* CH6 has a dedicated drum kit, not a synth patch number. */}
- else if(field===4){s.fx=((s.fx+delta)%STEP_FX.length+STEP_FX.length)%STEP_FX.length;}
- return;}switch(field){case 1:s.note=harmony?.keylock===2?scaleScroll(s.note,delta,harmony):(s.note===null?(delta>0?60:59):clamp(s.note+delta,0,127));break;case 2:s.inst=clamp(s.inst+delta,0,7);break;case 3:s.chd=((s.chd+delta)%CHORDS.length+CHORDS.length)%CHORDS.length;break;case 4:s.fx=((s.fx+delta)%STEP_FX.length+STEP_FX.length)%STEP_FX.length;break;}}
+ else if(field===4){s.fx=((s.fx+delta)%STEP_FX.length+STEP_FX.length)%STEP_FX.length;if(s.fx===0)s.extraFx=[];}
+ return;}switch(field){case 1:s.note=harmony?.keylock===2?scaleScroll(s.note,delta,harmony):(s.note===null?(delta>0?60:59):clamp(s.note+delta,0,127));break;case 2:s.inst=clamp(s.inst+delta,0,7);break;case 3:s.chd=((s.chd+delta)%CHORDS.length+CHORDS.length)%CHORDS.length;break;case 4:s.fx=((s.fx+delta)%STEP_FX.length+STEP_FX.length)%STEP_FX.length;if(s.fx===0)s.extraFx=[];break;}}
 function serialize(project){return JSON.stringify(project);}
 function parseProject(json){let p=typeof json==='string'?JSON.parse(json):json;if(!p||p.version!==1||typeof p!=='object'||!p.patterns||!Array.isArray(p.instruments)||![4,8].includes(p.instruments.length)||!Array.isArray(p.mixer)||p.mixer.length!==6||!Array.isArray(p.song))throw new Error('Invalid BEETLE project');if(Object.keys(p.patterns).some(n=>+n<0||+n>=PATTERN_COUNT))throw new Error('Pattern slot out of bounds');
  if(p.drumMapVersion!==2){for(const pat of Object.values(p.patterns)){for(const st of pat.channels?.[3]||[]){if(st.note!==null&&st.note!==undefined)st.note=OLD_DRUM_TO_NEW[st.note]??null;if(st.chd>0)st.chd=(OLD_DRUM_TO_NEW[st.chd-1]??0)+1;}}p.drumMapVersion=2;}
@@ -527,7 +527,12 @@ class TrackAudio {
    let duration=gate?Math.max(.001,durationStep*gate/16):Math.min(durationStep*.91,.31);
    duration=Math.min(duration,gap*.95);
    if(this.live.has(0))duration*=.48;
-   for(let r=0;r<repeats;r++)for(const n of notes)this.voice(c,n,time+micro+r*gap,duration,inst,st.fx,st.amount,project,velocity);
+   for(let r=0;r<repeats;r++)for(const n of notes){
+     const effects=[{fx:st.fx,amount:st.amount},...(st.extraFx||[])];
+     const vol=effects.filter(x=>x.fx===10).reduce((n,x)=>n*x.amount/100,1);
+     const fx=effects.find(x=>x.fx&&x.fx!==10)||{fx:st.fx,amount:st.amount};
+     this.voice(c,n,time+micro+r*gap,duration,inst,fx.fx,fx.amount,project,Math.max(0,Math.round(velocity*vol)));
+    }
   }
  }
 
@@ -552,7 +557,7 @@ return {TrackAudio};
 })(TRACK_CORE);
 (({CHANNELS,PATTERN_COUNT,PROJECT_COUNT,STEPS,songLanes,songNewRow,songLength,FIELDS,DRUM_FIELDS,DRUM_NAMES,DRUM_SAMPLES,DRUM_PARAMS,DRUM_FACTORY,freshDrumComponents,CHORDS,CHORD_SHORT,STEP_FX,PUNCH_FX,SCALES,NOTE_NAMES,TYPES,emptyStep,emptyPattern,pattern,step,stepChange,noteLabel,quantize,freshProject,serialize,parseProject,byteSize},{TrackAudio})=>{
 const $=s=>document.querySelector(s), clamp=(v,a,b)=>Math.min(b,Math.max(a,v)), c=$('#screen'),ctx=c.getContext('2d',{alpha:false});ctx.imageSmoothingEnabled=false;
-const model={rangeSelection:null,usbMultitrack:false,project:freshProject(),inputInstrument:[0,1,2,3,4,0],inputExplicit:[false,false,false,false,false,false],patchSlotsFull:false,slot:null,dirty:false,ch:0,row:0,col:1,screen:'boot',saveReturn:'tracker',presetFocus:null,drumComponent:0,drumField:0,dynFocus:0,grooveFocus:0,presetLast:60,presetLast2:1,fxRow:0,fxParam:0,fxDrumLane:0,punchEditStep:0,punchEditIndex:0,editPoly:false,keyboardOctave:0,editHeld:new Set(),menuIndex:0,wipeYes:false,helpOffset:0,helpChapter:0,loadGuardUntil:0,queuedPattern:null,muteQueue:{},live:{mute:{},solo:{},pendingMute:{},pendingSolo:{},qMute:true,qSolo:true},snapshotRow:0,groupRow:0,groupLane:0,librarySlot:0,libraryAction:0,libraryTarget:0,libraryCopyDest:0,libraryCursor:0,libraryEditingName:"",mixerRow:0,mixerCol:0,masterFocus:0,instRow:0,instBank:0,songRow:0,songCol:0,lfoRow:0,playedRow:0,playing:false,record:false,songMode:false,prePlay:null,punchHeld:new Set(),punchParams:[50,20,50,50,50,50,50,50],punchFocus:-1,punchRecorded:new Map(),punchEdited:new Set(),toast:'',toastUntil:0};
+const model={fxSlot:0,fxFull:false,rangeSelection:null,usbMultitrack:false,project:freshProject(),inputInstrument:[0,1,2,3,4,0],inputExplicit:[false,false,false,false,false,false],patchSlotsFull:false,slot:null,dirty:false,ch:0,row:0,col:1,screen:'boot',saveReturn:'tracker',presetFocus:null,drumComponent:0,drumField:0,dynFocus:0,grooveFocus:0,presetLast:60,presetLast2:1,fxRow:0,fxParam:0,fxDrumLane:0,punchEditStep:0,punchEditIndex:0,editPoly:false,keyboardOctave:0,editHeld:new Set(),menuIndex:0,wipeYes:false,helpOffset:0,helpChapter:0,loadGuardUntil:0,queuedPattern:null,muteQueue:{},live:{mute:{},solo:{},pendingMute:{},pendingSolo:{},qMute:true,qSolo:true},snapshotRow:0,groupRow:0,groupLane:0,librarySlot:0,libraryAction:0,libraryTarget:0,libraryCopyDest:0,libraryCursor:0,libraryEditingName:"",mixerRow:0,mixerCol:0,masterFocus:0,instRow:0,instBank:0,songRow:0,songCol:0,lfoRow:0,playedRow:0,playing:false,record:false,songMode:false,prePlay:null,punchHeld:new Set(),punchParams:[50,20,50,50,50,50,50,50],punchFocus:-1,punchRecorded:new Map(),punchEdited:new Set(),toast:'',toastUntil:0};
 // V0.70 unified six-step Undo/Redo for pattern + instrument + mixer + song + master + library.
 // Stored only in browser session; never serialized into projects.
 const editTools={history:[],cursor:0,whole:null,lane:null,block:null,groove:null,first:0,last:0,action:0,amount:1,status:''};
@@ -693,7 +698,7 @@ function commitName(slot,name){model.project.name=name;pendingName=null;overwrit
 
 const PINK='#ff00d7',SOFT='#fbb8f1',WHITE='#fdfdfd',DARK='#2e0027',ROW='#35002e';
 function mark(){model.dirty=true;render();}
-function announce(msg){model.toast=msg;model.toastUntil=performance.now()+1900;$('#info').textContent=msg;render();}
+function announce(msg){model.toast=msg;model.toastUntil=performance.now()+1900;$('#info').textContent=msg;render();if(msg==='FX STORAGE FULL')setTimeout(()=>{model.fxFull=false;render();},1900);}
 function text(s,x,y,color=WHITE,size=8,align='left'){pixelText(String(s),x,y,color,align);}
 const TRACK_PIXEL_GLYPHS={"P":[30,17,17,30,16,16,16],"L":[16,16,16,16,16,16,31],"A":[14,17,17,31,17,17,17],"Y":[17,17,10,4,4,4,4],"D":[30,17,17,17,17,17,30],"R":[30,17,17,30,20,18,17],"W":[17,17,17,21,21,21,10],"B":[30,17,17,30,17,17,30],"C":[15,16,16,16,16,16,15],"S":[15,16,16,14,1,1,30],"V":[17,17,17,17,17,10,4],"E":[31,16,16,30,16,16,31],"F":[31,16,16,30,16,16,16],"I":[14,4,4,4,4,4,14],"O":[14,17,17,17,17,17,14],"K":[17,18,20,24,20,18,17],"M":[17,27,21,21,17,17,17],"N":[17,25,21,19,17,17,17],"U":[17,17,17,17,17,17,14],"T":[31,4,4,4,4,4,4],"0":[14,17,19,21,25,17,14],"1":[4,12,4,4,4,4,14],"2":[14,17,1,2,4,8,31],"3":[30,1,1,14,1,1,30],"4":[2,6,10,18,31,2,2],"5":[31,16,16,30,1,1,30],"6":[14,16,16,30,17,17,14],"7":[31,1,2,4,8,8,8],"8":[14,17,17,14,17,17,14],"9":[14,17,17,15,1,1,14],"X":[17,17,10,4,10,17,17],"G":[14,17,16,23,17,17,14],"H":[17,17,17,31,17,17,17],"Z":[31,1,2,4,8,16,31],"Q":[14,17,17,17,21,18,13],"J":[1,1,1,1,17,17,14],"-":[0,0,0,31,0,0,0],"_":[0,0,0,0,0,0,31],"#":[10,31,10,31,10,0,0],":":[0,4,0,0,4,0,0],"+":[0,4,4,31,4,4,0],"/":[1,2,4,8,16,0,0],"%":[0,0,0,0,0,6,6],".":[0,0,0,0,0,6,6],"<":[2,4,8,16,8,4,2],">":[8,4,2,1,2,4,8],"!":[4,4,4,4,4,0,4],"?":[14,17,1,2,4,0,4],"=":[0,31,0,31,0,0,0],"(":[2,4,8,8,8,4,2],")":[8,4,2,2,2,4,8]};
 function pixelText(s,x,y,color=WHITE,align='center'){s=String(s).toUpperCase();let width=s.length*6-1;let left=Math.round(x-(align==='center'?width/2:align==='right'?width:0));ctx.fillStyle=color;for(let i=0;i<s.length;i++){const g=(s[i]==="["?[31,16,16,16,16,16,31]:s[i]==="]"?[31,1,1,1,1,1,31]:TRACK_PIXEL_GLYPHS[s[i]]);if(!g)continue;for(let ry=0;ry<7;ry++){let bits=g[ry];for(let cx=0;cx<5;cx++)if(bits&(16>>cx))ctx.fillRect(left+i*6+cx,y+ry,1,1);}}}
@@ -715,23 +720,35 @@ function tracker(){top();const pat=pattern(model.project,model.project.selectedP
       rect(21,y-2,201,13,'#f500c7');rect(23,y,197,9,'#8d006f');
     }
     let st=step(model.project,model.project.selectedPattern,model.ch,r,false);
-    const vals=model.ch===5 ? [String(r).padStart(2,'0'),st.note===null?'---':st.note===254?'STP':DRUM_NAMES[st.note]||'---',st.chd===15?'STP':st.chd?DRUM_NAMES[st.chd-1]||'---':'---','ROM',st.fx===0?'---':STEP_FX[st.fx].substring(0,3)] : [String(r).padStart(2,'0'),noteLabel(st.note),st.note===null?'--':String(st.inst+1).padStart(2,'0'),CHORD_SHORT[st.chd]||'---',st.fx===0?'---':STEP_FX[st.fx].substring(0,3)];
+    const vals=model.ch===5 ? [String(r).padStart(2,'0'),st.note===null?'---':st.note===254?'STP':DRUM_NAMES[st.note]||'---',st.chd===15?'STP':st.chd?DRUM_NAMES[st.chd-1]||'---':'---','ROM',(st.extraFx?.length||st.extraFx2?.length)?'MUL':(st.fx?STEP_FX[st.fx].substring(0,3):'---')] : [String(r).padStart(2,'0'),noteLabel(st.note),st.note===null?'--':String(st.inst+1).padStart(2,'0'),CHORD_SHORT[st.chd]||'---',st.fx===0?'---':(st.extraFx?.length?'MUL':STEP_FX[st.fx].substring(0,3))];
     vals.forEach((v,k)=>cell(v,xs[k],y));
   }
   if(model.col===3&&model.ch!==5){const st=step(model.project,model.project.selectedPattern,model.ch,model.row,false);text('CHD: '+(CHORDS[st.chd]?.[0]||'EMPTY'),48,216,SOFT,9);}
   text((model.queuedPattern!==null?'NEXT '+String(model.queuedPattern+1).padStart(2,'0'):'PAT '+String(model.project.selectedPattern+1).padStart(2,'0'))+' / 48',129,224,PINK,8);
 }
 function list(items,selection,start=53,spacing=16){for(let i=0;i<items.length;i++){let y=start+i*spacing;if(selection===i)rect(24,y-2,194,Math.min(spacing-2,16),'#4b003f');text((selection===i?'> ':'  ')+items[i],29,y,selection===i?SOFT:WHITE,9);}}
+const FX_EXTRA_LIMIT=48;
+function fxExtras(st,drum2=false){if(drum2)return st.extraFx2??(st.extraFx2=[]);return st.extraFx??(st.extraFx=[]);}
+function fxPoolCount(p){let n=0;for(const pat of Object.values(p.patterns||{}))for(let ch=0;ch<6;ch++)for(const st of pat.channels[ch]||[]){n+=(st.extraFx?.length||0)+(st.extraFx2?.length||0);}return n;}
+function fxTarget(st){const drum2=model.ch===5&&model.fxDrumLane===1;
+ if(drum2){const p=pattern(model.project,model.project.selectedPattern,true);const f=p.note2Fx??(p.note2Fx=Array.from({length:16},()=>({effect:0,value:50})));return {root:f[model.row],list:fxExtras(st,true),second:true};}
+ return {root:st,list:fxExtras(st),second:false};
+}
+function fxFullOverlay(){model.fxFull=true;announce('FX STORAGE FULL');}
 function fxEditor(){top('PER STEP FX');line(42);
  const st=step(model.project,model.project.selectedPattern,model.ch,model.row,true);
  const drum=model.ch===5,hit=drum?(model.fxDrumLane===0?st.note:(st.chd>0?st.chd-1:null)):st.note;
  const labelHit=drum?(hit==null||hit<0||hit>=DRUM_NAMES.length?'---':DRUM_NAMES[hit]):noteLabel(hit);
- text('STEP '+String(model.row).padStart(2,'0')+'  '+(drum?'NOTE'+(model.fxDrumLane+1):'NOTE'),16,52,PINK,9);
+ text('STEP '+String(model.row).padStart(2,'0')+' '+(drum?'NOTE'+(model.fxDrumLane+1):'NOTE'),16,52,PINK,9);
  text(labelHit,174,52,SOFT,10);
- list(['TYPE '+STEP_FX[st.fx],'AMOUNT '+st.amount+'%'],model.fxParam,86,28);
+ const tgt=fxTarget(st),rows=[tgt.second?{fx:tgt.root.effect,amount:tgt.root.value}:{fx:st.fx,amount:st.amount},...tgt.list];
+ const options=Array.from({length:3},(_,j)=>{const x=rows[j]??{fx:0,amount:50};return 'FX'+(j+1)+' '+STEP_FX[x.fx||0]+' '+(x.amount??50);});
+ list(options,model.fxSlot,78,26);
  text('K1 PARAM  K3 CHANGE',15,176,PINK,8);
- if(drum)text('K2 NOTE1 / NOTE2',15,187,PINK,8);
- text('FX > PUNCH-IN',15,200,WHITE,8);
+ text('OCT+ SLOT  OCT- REMOVE',15,189,PINK,8);
+ text(drum?'K2 NOTE1/NOTE2':'K2 FX SLOT',15,201,WHITE,8);
+ text('FX STORAGE '+fxPoolCount(model.project)+'/48',15,214,PINK,8);
+ if(model.fxFull){rect(13,95,214,53,'#20051c');rect(13,95,214,2,PINK);text('FX STORAGE FULL',120,109,WHITE,9,'center');text('REMOVE FX TO FREE SPACE',120,127,PINK,8,'center');}
 }
 function punchScreen(){top('PUNCH-IN FX');line(43);PUNCH_FX.forEach((name,i)=>{let x=17+(i%2)*106,y=58+Math.floor(i/2)*32;let active=model.punchHeld.has(i);rect(x,y,99,26,active?'#ec00c0':'#3e0035');text(String(i+1)+' '+name,x+4,y+6,active?'#000':WHITE,8);if(active&&i<5){const str=i===4?'BPM '+['/8','/4','/2','X1','X2','X4','X8'][clamp(Math.round(model.punchParams[4]*6/100),0,6)]:'K1  '+String(model.punchParams[i]).padStart(3,'0');text(str,x+4,y+16,'#fff',7);}});text('HOLD KEY + K1: INTENSITY',12,190,PINK,7);text(model.record?'REC: ON':'REC: OFF',12,202,model.record?PINK:WHITE,8);text('WHITE KEYS  HOLD TO PLAY',12,221,SOFT,7);}
 function punchEventEditor(){
@@ -984,7 +1001,7 @@ function projects(){top('PROJECTS');line(43);
  pixelText('K1 MENU  SEL OPEN',20,202,WHITE,'left');
  pixelText('HOME MENU  SEQ TRACKER',12,219,PINK,'left');
 }
-const HELP_LINES=["# TRACKER BASICS","K1 STEP   K2 CELL  K3 VALUE","HELP: K2 CHAPTER K1 SCROLL","K4 BPM  SEQ+K4 PAT LEN 1-16","PLAY+ALG: QUEUE NEXT PATTERN","SELECT: CHANNEL 1-6","ALGORITHM: PATTERN 1-48","PRESET: NOTE / EMPTY / STP","ENV: INSERT STOP [STP]","DRUM NOTE2+ENV: NOTE2 STP","SEL: CLEAR SELECTED STEP","KEYS WRITE NOTE FROM ANY CELL","OCT-/+: SELECTED NOTE +/-12","SEL+K1 RANGE; OCT SHIFTS ALL","SEQ+OCT-/+: ALSO TRANSPOSE","EMPTY STEP: OCT SHIFTS KEYBOARD","OCT LED: LIVE KEY OCT SHIFT","SEQ+ALGORITHM: SHIFT LANE +/-","SEQ+ALG LEFT UP, RIGHT DOWN","CH6 NOTE/NOTE2 SHIFT SEPARATE","DRUM NOTE1/NOTE2 FX SEPARATE","SEL+K1: INCLUDE START STEP","# PATTERN EDITING","SEQ+OP1: COPY RANGE OR LANE","SEQ+OP2: PASTE AT CURSOR","SEQ+OP3: COPY WHOLE PATTERN","SEQ+OP4: PASTE PATTERN + PUNCH FX","SEQ+OP5: UNDO ALL EDITORS","SEQ+OP6: REDO ALL EDITORS","SEQ+RIGHTMOST BLACK: CLEAR LANE","CLEAR LANE: K1 YES/NO, SEL","CLEAR LANE: HOME CANCEL","SEQ+SEL: BLOCK EDIT MENU","# STEP DYNAMICS / GROOVE","SEQ+FX: STEP VELOCITY/GATE","SEQ+ENV: STEP GROOVE EDIT","GROOVE K1 STEP K2 PARAM K3 VAL","MICRO 0-7/64 STEP (LATE)","RATCHET 1-4 PROB 100/75/50/25","IN GROOVE: SEQ+OP1 COPY STEP","IN GROOVE: SEQ+OP2 PASTE STEP","IN GROOVE: SEQ+OP3 FILL LANE","IN GROOVE: SEQ+OP4 CLEAR LANE","PRESET NOTE2: DRUM/---/STP","CH6 NOTE2 KEY: SECOND HIT","DYNAMICS K1 STEP K2 VEL/GATE","DYNAMICS K3 VALUE SEL RESET","GATE 0 LEGATO, 1-15 SHORT","BLOCK: K4 START, K1 END","BLOCK: K2 ACTION K3 AMOUNT","BLOCK: SEL APPLY","# INSTRUMENT / KEYBOARD","EDIT: EIGHT SYNTH PATCH SLOTS","INST 1-8: FIXED SYNTH PATCHES","TRACKER INST NUMBER = EDIT NUMBER","EDIT OPENS PATCH OF CURRENT NOTE","PATCH EDIT AFFECTS ALL ITS NOTES","DEFAULT 1 PULSE, 2 RETRO WAVE","DEFAULT 3 VA, 4 VA OSC2","DEFAULT 5 VA BASS, 6 VA PAD","DEFAULT 7 SID 6581, 8 NES PULSE","K1 ROW  K2 PAGE  K3 VALUE","OCT - / +: LIVE KEYBOARD","EDIT: BOTH OCT = MONO/POLY","EDIT: SEQ+EDIT LIBRARY","LIBRARY: 8 STORED PRESETS","LIB: K1 SLOT K2 ACTION","LIB: K3 ACTIVE INST 1-8","LIB: K4 COPY DEST SLOT","LIB: SEL STORE/LOAD/COPY/NAME","NAME: K1 POS K2 CHAR SEL SAVE","LIB: HOME EDIT SEQ TRACKER","UNDO: PATCH / LIBRARY CHANGES","UNDO: MASTER / MIXER CHANGES","OCT SHIFTS SAVED SELECTED NOTES","# PROJECTS","HOME: PROJECTS MENU","SAVE: SAVE CURRENT PROJECT","SAVE AS: CHOOSE NAME / SLOT","LOAD: SELECT A SAVED SLOT","DISCARD OPENS PROJECT LIST","NEW: START EMPTY PROJECT","SEQ: RETURN TO TRACKER","# LIVE FX / RECORD","PLAY: START OR STOP","REC: ARM PUNCH-IN FX","FX: EDIT STEP EFFECTS","HOLD FX KEY + K1: CHANGE FX","REPEAT/RING/FILTER/TAPE: K1 +/-1","RING MOD DEFAULT 20","STUTTER DEFAULT BPM X1","REC + PLAY: RECORD PUNCH FX","NEW FX TAKE REPLACES SAME FX LANE","SONG: PUNCH REC USES CH1 PAT","# SONG CHAINS","POS: SONG ROW NUMBER 01-64","CH1 CH2 CH3 CH4 CH5 DR REP","K1: ROW  K2: CHANNEL/REP","K3: PAT 01-48 OR -- SILENCE","REP: REPEAT EACH SONG ROW","OCT+: ADD POSITION-PAT ROW","POS02 -> DEFAULT ALL P02","OCT-: DELETE CURRENT ROW","OLD ROWS KEEP OWN PATTERNS","SEL: SONG ON/OFF","EACH CH PLAYS ITS OWN PATTERN","SHORT PATTERNS LOOP IN ROW","GLOBAL PUNCH SOURCE: CH1","REC SONG: WRITES ACTIVE CH1 PAT","FX NEW SONG ROW: NO GHOST CARRY","V18 SONGS AUTO-MIGRATE V19","# LIVE MIXER / SOLO","ARP: LIVE WHEN SONG ON","LIVE MIXER: BLACK 1-6 MUTE","WHITE KEYS BELOW: SOLO 1-6","SOLO KEY LED = SOLO ACTIVE","LIVE SOLO: [X] S / [Q S]","SONG OFF: LIVE MUTES/SOLOS BYPASS","OCT-: Q MUTE ON/OFF","OCT+: Q SOLO ON/OFF","Q ON: NEXT PAT; OFF: DIRECT","NORMAL MIXER Q DEFAULT OFF","MIXER VOLUME: 0-120%","UNDO: SONG ARRANGEMENT EDITS","# MIXER / PERFORMANCE","GLO: MIXER","MIXER SEL: QUANT MUTES ON/OFF","MIXER SEQ+SEL: PERFORMANCE","SNAPS: K1 SLOT  K2 SAVE","SNAPS: K3/SEL RECALL","SNAPS: FX MUTE GROUPS","GROUPS: K1 GROUP K2 MEMBER","GROUPS: SEL ADD/REMOVE LANE","GROUPS: K3 MUTE/UNMUTE ALL","GROUPS: HOME TO SNAPSHOTS","GROUPS FOLLOW QUANT MUTES","SNAPS: HOME MIXER SEQ TRACKER","SLOT COLORS: PINK MUTED WHITE ON","Q ON: PLAY MUTES AT NEXT BAR","Q OFF: MUTES APPLY DIRECTLY","Q1 PENDING MUTE / Q0 UNMUTE","SWITCH OFF: APPLY QUEUED NOW","STOP CANCELS PENDING MUTES","# MASTER FX","LFO: MASTER EQ / FX","MASTER SELECT: FX SCROLL","MASTER SEL: FX ON/OFF","MASTER K1-K4: PARAMETERS","SEQ+K4: REORDER MASTER FX","# GUIDE / NAVIGATION","HOLD HOME: SCALE GUIDE","HOME: OPEN PROJECTS MENU","SEQ: BACK TO TRACKER","# BLOCK INSTRUMENT / DELETE","HOLD SEL + K1: SELECT STEP RANGE","K2 INSTRUMENT COLUMN; K3 CHANGES ALL","SYNTH NOTES IN RANGE (EXCEPT ---/STP)","TAP SEL AGAIN: DELETE ENTIRE RANGE","ONE UNDO FOR EACH RANGE ACTION","# USB-C AUDIO","USB-C: 44.1 KHZ 16-BIT STEREO","PC: FM1 USB AUDIO INPUT","CONNECT WITH A DATA USB-C CABLE","USB AUDIO STARTS WHEN PC RECORDS","ANALOGUE OUT + USB MIDI REMAIN","PROJECTS > SETTINGS > USB MULTITRACK","OFF: STEREO MASTER / PAN / MASTER FX","ON: 6 MONO INPUTS CH1-CH6","CH1-5 SYNTH CH6 DRUMS / DRY STEMS","STEMS PRE MASTER FX AND PUNCH IN","MIX VOLUME/MUTE/SOLO APPLY","USB MODE SWITCH RECONNECTS DEVICE","RESELECT AUDIO INPUTS INSIDE DAW","USB MODE DEFAULTS OFF AT BOOT","USB CAPTURE: V1.2 CLOCK FIX"];
+const HELP_LINES=["# TRACKER BASICS","K1 STEP   K2 CELL  K3 VALUE","HELP: K2 CHAPTER K1 SCROLL","K4 BPM  SEQ+K4 PAT LEN 1-16","PLAY+ALG: QUEUE NEXT PATTERN","SELECT: CHANNEL 1-6","ALGORITHM: PATTERN 1-48","PRESET: NOTE / EMPTY / STP","ENV: INSERT STOP [STP]","DRUM NOTE2+ENV: NOTE2 STP","SEL: CLEAR SELECTED STEP","KEYS WRITE NOTE FROM ANY CELL","OCT-/+: SELECTED NOTE +/-12","SEL+K1 RANGE; OCT SHIFTS ALL","SEQ+OCT-/+: ALSO TRANSPOSE","EMPTY STEP: OCT SHIFTS KEYBOARD","OCT LED: LIVE KEY OCT SHIFT","SEQ+ALGORITHM: SHIFT LANE +/-","SEQ+ALG LEFT UP, RIGHT DOWN","CH6 NOTE/NOTE2 SHIFT SEPARATE","DRUM NOTE1/NOTE2 FX SEPARATE","SEL+K1: INCLUDE START STEP","# PATTERN EDITING","SEQ+OP1: COPY RANGE OR LANE","SEQ+OP2: PASTE AT CURSOR","SEQ+OP3: COPY WHOLE PATTERN","SEQ+OP4: PASTE PATTERN + PUNCH FX","SEQ+OP5: UNDO ALL EDITORS","SEQ+OP6: REDO ALL EDITORS","SEQ+RIGHTMOST BLACK: CLEAR LANE","CLEAR LANE: K1 YES/NO, SEL","CLEAR LANE: HOME CANCEL","SEQ+SEL: BLOCK EDIT MENU","# STEP DYNAMICS / GROOVE","SEQ+FX: STEP VELOCITY/GATE","SEQ+ENV: STEP GROOVE EDIT","GROOVE K1 STEP K2 PARAM K3 VAL","MICRO 0-7/64 STEP (LATE)","RATCHET 1-4 PROB 100/75/50/25","IN GROOVE: SEQ+OP1 COPY STEP","IN GROOVE: SEQ+OP2 PASTE STEP","IN GROOVE: SEQ+OP3 FILL LANE","IN GROOVE: SEQ+OP4 CLEAR LANE","PRESET NOTE2: DRUM/---/STP","CH6 NOTE2 KEY: SECOND HIT","DYNAMICS K1 STEP K2 VEL/GATE","DYNAMICS K3 VALUE SEL RESET","GATE 0 LEGATO, 1-15 SHORT","BLOCK: K4 START, K1 END","BLOCK: K2 ACTION K3 AMOUNT","BLOCK: SEL APPLY","# INSTRUMENT / KEYBOARD","EDIT: EIGHT SYNTH PATCH SLOTS","INST 1-8: FIXED SYNTH PATCHES","TRACKER INST NUMBER = EDIT NUMBER","EDIT OPENS PATCH OF CURRENT NOTE","PATCH EDIT AFFECTS ALL ITS NOTES","DEFAULT 1 PULSE, 2 RETRO WAVE","DEFAULT 3 VA, 4 VA OSC2","DEFAULT 5 VA BASS, 6 VA PAD","DEFAULT 7 SID 6581, 8 NES PULSE","K1 ROW  K2 PAGE  K3 VALUE","OCT - / +: LIVE KEYBOARD","EDIT: BOTH OCT = MONO/POLY","EDIT: SEQ+EDIT LIBRARY","LIBRARY: 8 STORED PRESETS","LIB: K1 SLOT K2 ACTION","LIB: K3 ACTIVE INST 1-8","LIB: K4 COPY DEST SLOT","LIB: SEL STORE/LOAD/COPY/NAME","NAME: K1 POS K2 CHAR SEL SAVE","LIB: HOME EDIT SEQ TRACKER","UNDO: PATCH / LIBRARY CHANGES","UNDO: MASTER / MIXER CHANGES","OCT SHIFTS SAVED SELECTED NOTES","# PROJECTS","HOME: PROJECTS MENU","SAVE: SAVE CURRENT PROJECT","SAVE AS: CHOOSE NAME / SLOT","LOAD: SELECT A SAVED SLOT","DISCARD OPENS PROJECT LIST","NEW: START EMPTY PROJECT","SEQ: RETURN TO TRACKER","# LIVE FX / RECORD","PLAY: START OR STOP","REC: ARM PUNCH-IN FX","FX: EDIT STEP EFFECTS (3 SLOTS)","FX1 PRIMARY; FX2/FX3 ADDITIONAL","FX MENU K2: CHOOSE FX SLOT","FX MENU OCT+: NEXT FX SLOT","FX MENU OCT-: DELETE FX SLOT","FX MENU K1 PARAM K3 ADJUST","CH6 FX: K2 NOTE1/NOTE2","TRK FX: MUL IF 2 OR MORE FX","48 EXTRA FX PROJECT-WIDE","FULL: FX STORAGE FULL OVERLAY","HOLD FX KEY + K1: CHANGE FX","REPEAT/RING/FILTER/TAPE: K1 +/-1","RING MOD DEFAULT 20","STUTTER DEFAULT BPM X1","REC + PLAY: RECORD PUNCH FX","NEW FX TAKE REPLACES SAME FX LANE","SONG: PUNCH REC USES CH1 PAT","# SONG CHAINS","POS: SONG ROW NUMBER 01-64","CH1 CH2 CH3 CH4 CH5 DR REP","K1: ROW  K2: CHANNEL/REP","K3: PAT 01-48 OR -- SILENCE","REP: REPEAT EACH SONG ROW","OCT+: ADD POSITION-PAT ROW","POS02 -> DEFAULT ALL P02","OCT-: DELETE CURRENT ROW","OLD ROWS KEEP OWN PATTERNS","SEL: SONG ON/OFF","EACH CH PLAYS ITS OWN PATTERN","SHORT PATTERNS LOOP IN ROW","GLOBAL PUNCH SOURCE: CH1","REC SONG: WRITES ACTIVE CH1 PAT","FX NEW SONG ROW: NO GHOST CARRY","V18 SONGS AUTO-MIGRATE V19","# LIVE MIXER / SOLO","ARP: LIVE WHEN SONG ON","LIVE MIXER: BLACK 1-6 MUTE","WHITE KEYS BELOW: SOLO 1-6","SOLO KEY LED = SOLO ACTIVE","LIVE SOLO: [X] S / [Q S]","SONG OFF: LIVE MUTES/SOLOS BYPASS","OCT-: Q MUTE ON/OFF","OCT+: Q SOLO ON/OFF","Q ON: NEXT PAT; OFF: DIRECT","NORMAL MIXER Q DEFAULT OFF","MIXER VOLUME: 0-120%","UNDO: SONG ARRANGEMENT EDITS","# MIXER / PERFORMANCE","GLO: MIXER","MIXER SEL: QUANT MUTES ON/OFF","MIXER SEQ+SEL: PERFORMANCE","SNAPS: K1 SLOT  K2 SAVE","SNAPS: K3/SEL RECALL","SNAPS: FX MUTE GROUPS","GROUPS: K1 GROUP K2 MEMBER","GROUPS: SEL ADD/REMOVE LANE","GROUPS: K3 MUTE/UNMUTE ALL","GROUPS: HOME TO SNAPSHOTS","GROUPS FOLLOW QUANT MUTES","SNAPS: HOME MIXER SEQ TRACKER","SLOT COLORS: PINK MUTED WHITE ON","Q ON: PLAY MUTES AT NEXT BAR","Q OFF: MUTES APPLY DIRECTLY","Q1 PENDING MUTE / Q0 UNMUTE","SWITCH OFF: APPLY QUEUED NOW","STOP CANCELS PENDING MUTES","# MASTER FX","LFO: MASTER EQ / FX","MASTER SELECT: FX SCROLL","MASTER SEL: FX ON/OFF","MASTER K1-K4: PARAMETERS","SEQ+K4: REORDER MASTER FX","# GUIDE / NAVIGATION","HOLD HOME: SCALE GUIDE","HOME: OPEN PROJECTS MENU","SEQ: BACK TO TRACKER","# BLOCK INSTRUMENT / DELETE","HOLD SEL + K1: SELECT STEP RANGE","K2 INSTRUMENT COLUMN; K3 CHANGES ALL","SYNTH NOTES IN RANGE (EXCEPT ---/STP)","TAP SEL AGAIN: DELETE ENTIRE RANGE","ONE UNDO FOR EACH RANGE ACTION","# USB-C AUDIO","USB-C: 44.1 KHZ 16-BIT STEREO","PC: FM1 USB AUDIO INPUT","CONNECT WITH A DATA USB-C CABLE","USB AUDIO STARTS WHEN PC RECORDS","ANALOGUE OUT + USB MIDI REMAIN","PROJECTS > SETTINGS > USB MULTITRACK","OFF: STEREO MASTER / PAN / MASTER FX","ON: 6 MONO INPUTS CH1-CH6","CH1-5 SYNTH CH6 DRUMS / DRY STEMS","STEMS PRE MASTER FX AND PUNCH IN","MIX VOLUME/MUTE/SOLO APPLY","USB MODE SWITCH RECONNECTS DEVICE","RESELECT AUDIO INPUTS INSIDE DAW","USB MODE DEFAULTS OFF AT BOOT","USB CAPTURE: V1.2 CLOCK FIX"];
 const HELP_CHAPTERS=HELP_LINES.reduce((out,line,index)=>{
  if(line.startsWith('# ')){
   if(out.length)out[out.length-1].end=index;
@@ -1373,7 +1390,7 @@ function changeLiveMute(lane,desired,forceQuantized=false){
  }else{mixer[lane].mute=desired;audio.setMixer(model.project);}
  mark();
 }
-/* V1.3.3: fixed, directly editable INST 1-8. Never auto-clone an
+/* V1.3.4: fixed, directly editable INST 1-8. Never auto-clone an
  * instrument that occurs in a saved pattern: that used to reassign the
  * editor to a different slot and made patches appear to revert to INST 1. */
 function prepareInstrumentEdit(){
@@ -1410,7 +1427,20 @@ function editValue(delta){const st=step(model.project,model.project.selectedPatt
   model.inputInstrument[model.ch]=target;model.inputExplicit[model.ch]=true;mark();return;
  }
  if(model.col!==0){stepChange(st,model.col,delta,model.ch===5,p.harmony);if(model.col===2&&model.ch<5){model.inputInstrument[model.ch]=st.inst;model.inputExplicit[model.ch]=true;}else if(model.col===1&&model.ch<5&&st.note!==null&&st.note<128)st.inst=model.inputInstrument[model.ch];}mark();}
- else if(model.screen==='stepfx'){if(model.fxParam===0)st.fx=(st.fx+delta+STEP_FX.length)%STEP_FX.length;else st.amount=clamp(st.amount+delta*5,0,100);mark();}
+ else if(model.screen==='stepfx'){
+ const tgt=fxTarget(st),slot=model.fxSlot,old=slot===0?(tgt.second?{fx:tgt.root.effect,amount:tgt.root.value}:{fx:st.fx,amount:st.amount}):tgt.list[slot-1];
+ if(model.fxParam===0){
+  const next=((old?.fx??0)+delta+STEP_FX.length)%STEP_FX.length;
+  if(slot===0){if(tgt.second){tgt.root.effect=next;if(!next)tgt.list.length=0;}else{st.fx=next;if(!next)tgt.list.length=0;}}
+  else if(old){if(next)old.fx=next;else tgt.list.splice(slot-1,1);}
+  else if(next&&(tgt.second?tgt.root.effect:st.fx)){
+   if(tgt.list.length!==slot-1){announce('ADD FX2 FIRST');return;}
+   if(fxPoolCount(p)>=FX_EXTRA_LIMIT){fxFullOverlay();return;}
+   tgt.list.push({fx:next,amount:50});
+  }
+ }else if(old){const val=clamp((old.amount??50)+delta*5,0,100);if(slot===0){if(tgt.second)tgt.root.value=val;else st.amount=val;}else old.amount=val;}
+ mark();
+}
  else if(model.screen==='instrument'&&model.instBank){
   const k=['waveA','waveB','coarse','fine','detune','mix','pulseWidth','morph'][model.instRow];
   const lo=k==='coarse'?-24:k==='fine'?-100:k==='pulseWidth'?5:0;
@@ -1528,7 +1558,7 @@ if(model.screen==='block'){
   model.row=clamp(model.row+dir,0,limit);
   if(selHeld)model.rangeSelection=[selRangeAnchor,model.row];
  }else if(model.screen==='stepfx')model.fxParam=clamp(model.fxParam+dir,0,1);else if(['projects','load','new','saveas','guide'].includes(model.screen))model.menuIndex=clamp(model.menuIndex+dir,0,model.screen==='guide'?2:model.screen==='projects'?8:11);else if(model.screen==='mixer')model.mixerRow=clamp(model.mixerRow+dir,0,model.project.mixer.length-1);else if(model.screen==='song')model.songRow=clamp(model.songRow+dir,0,model.project.song.length-1);else if(model.screen==='instrument')model.instRow=clamp(model.instRow+dir,0,7);else if(model.screen==='env')model.instRow=clamp(model.instRow+dir,1,4);else if(model.screen==='lfo')model.lfoRow=clamp(model.lfoRow+dir,0,1);else if(model.screen==='patterns')model.project.selectedPattern=clamp(model.project.selectedPattern+dir,0,47);}
- else if(knob==='k2'){if(model.screen==='instrument'){model.instBank=1-model.instBank;model.instRow=0;}else if(model.screen==='stepfx'&&model.ch===5){model.fxDrumLane=(model.fxDrumLane+dir+2)%2;}else if(model.screen==='tracker')model.col=clamp(model.col+dir,1,4);else if(model.screen==='mixer')model.mixerCol=clamp(model.mixerCol+dir,0,3);else if(model.screen==='song')model.songCol=clamp(model.songCol+dir,0,6);else if(model.screen==='patterns'){let p=pattern(model.project,model.project.selectedPattern,true);p.length=clamp((p.length||16)+dir,1,16);model.row=clamp(model.row,0,p.length-1);mark();}}
+ else if(knob==='k2'){if(model.screen==='instrument'){model.instBank=1-model.instBank;model.instRow=0;}else if(model.screen==='stepfx'){if(model.ch===5)model.fxDrumLane=(model.fxDrumLane+dir+2)%2;else model.fxSlot=(model.fxSlot+dir+3)%3;}else if(model.screen==='tracker')model.col=clamp(model.col+dir,1,4);else if(model.screen==='mixer')model.mixerCol=clamp(model.mixerCol+dir,0,3);else if(model.screen==='song')model.songCol=clamp(model.songCol+dir,0,6);else if(model.screen==='patterns'){let p=pattern(model.project,model.project.selectedPattern,true);p.length=clamp((p.length||16)+dir,1,16);model.row=clamp(model.row,0,p.length-1);mark();}}
  else if(knob==='k3'){
    if(['tracker','stepfx'].includes(model.screen))rememberEdit(()=>editValue(dir));
    else if(model.screen==='instrument'||model.screen==='env'||model.screen==='lfo'){
@@ -1649,16 +1679,25 @@ function route(action){
   render();return;
  }
  if(model.screen==='guide'&&action==='SEL'){if(model.menuIndex===3){reverseAnalyse();model.screen='reverseguide';}render();return;}
+ if(model.screen==='stepfx'&&(action==='OCT+'||action==='OCT-')){
+  if(action==='OCT+')model.fxSlot=(model.fxSlot+1)%3;
+  else if(!model.playing)rememberEdit(()=>{const st=step(model.project,model.project.selectedPattern,model.ch,model.row,true),t=fxTarget(st);
+    if(model.fxSlot===0){if(t.list.length){const v=t.list.shift();if(t.second){t.root.effect=v.fx;t.root.value=v.amount;}else{st.fx=v.fx;st.amount=v.amount;}}
+      else if(t.second){t.root.effect=0;t.root.value=50;}else{st.fx=0;st.amount=50;}}
+    else t.list.splice(model.fxSlot-1,1);mark();
+  });
+  model.fxFull=false;render();return;
+ }
  if(model.screen==='instrument' &&!['EDIT','OCT+','OCT-'].includes(action))releaseEditVoices();if(model.screen==='boot'){if(action==='SEL')yes();return;}if(action==='HOME'){if(model.screen==='load'&&model.loadFromBoot){model.screen='boot';model.menuIndex=1;}else if(model.screen==='block'||model.screen==='dynamics'||model.screen==='groove'){model.screen='tracker';}else if(model.screen==='overwrite'){overwritePending=null;model.screen=pendingName?'name':'projects';}else{model.screen='projects';model.menuIndex=0;}}else if(action==='LONGHOME'){model.screen='guide';model.menuIndex=0;}else if(action==='SAVE'){directSave();}else if(action==='SEQ'){if(model.screen==='name')pendingName=null;model.screen='tracker';}else if(action==='EDIT'){
   if(model.screen!=='instrument')focusInstrumentAtCursor();
   model.screen=model.ch===5&&(model.screen==='instrument')?'drumeditor':'instrument';
   model.instRow=0;model.instBank=0;
- }else if(action==='FX'){if(model.screen!=='stepfx'&&model.screen!=='punch')model.fxDrumLane=model.ch===5&&model.col===2?1:0;model.screen=model.screen==='stepfx'?'punch':model.screen==='punch'?'stepfx':'stepfx';}else if(action==='ARP'){model.screen=model.screen==='song'?(model.songMode?'livemixer':'song'):model.screen==='livemixer'?'song':'song';if(model.screen==='song'&&!model.songMode)announce('ENABLE SONG MODE WITH SEL FOR LIVE MIXER');}else if(action==='GLO'){model.screen=model.screen==='mixer'?'tracker':'mixer';}else if(action==='ENV'){if(model.screen==='tracker'){rememberEdit(()=>{const st=step(model.project,model.project.selectedPattern,model.ch,model.row,true);if(model.ch===5&&model.col===2)st.chd=15;else{st.note=254;if(model.ch!==5)st.chd=0;}});}else{model.screen='env';model.instRow=1;}}else if(action==='LFO'){model.screen='masterfx';model.masterFocus=0;}else if(action==='PLAY'){play();return;}else if(action==='LONGREC'){model.screen='punchedit';model.punchEditStep=0;model.punchEditIndex=0;}else if(action==='REC'){if(model.record){for(const i of [...model.punchHeld])punch(i,false);}model.record=!model.record;announce(model.record?'PUNCH REC ARMED · KEYS ARE FX':'PUNCH REC OFF · KEYS ARE NOTES');}else if(action==='SEL'){
+ }else if(action==='FX'){if(model.screen!=='stepfx'&&model.screen!=='punch'){model.fxDrumLane=model.ch===5&&model.col===2?1:0;model.fxSlot=0;model.fxFull=false;}model.screen=model.screen==='stepfx'?'punch':model.screen==='punch'?'stepfx':'stepfx';}else if(action==='ARP'){model.screen=model.screen==='song'?(model.songMode?'livemixer':'song'):model.screen==='livemixer'?'song':'song';if(model.screen==='song'&&!model.songMode)announce('ENABLE SONG MODE WITH SEL FOR LIVE MIXER');}else if(action==='GLO'){model.screen=model.screen==='mixer'?'tracker':'mixer';}else if(action==='ENV'){if(model.screen==='tracker'){rememberEdit(()=>{const st=step(model.project,model.project.selectedPattern,model.ch,model.row,true);if(model.ch===5&&model.col===2)st.chd=15;else{st.note=254;if(model.ch!==5)st.chd=0;}});}else{model.screen='env';model.instRow=1;}}else if(action==='LFO'){model.screen='masterfx';model.masterFocus=0;}else if(action==='PLAY'){play();return;}else if(action==='LONGREC'){model.screen='punchedit';model.punchEditStep=0;model.punchEditIndex=0;}else if(action==='REC'){if(model.record){for(const i of [...model.punchHeld])punch(i,false);}model.record=!model.record;announce(model.record?'PUNCH REC ARMED · KEYS ARE FX':'PUNCH REC OFF · KEYS ARE NOTES');}else if(action==='SEL'){
  if(model.screen==='tracker'&&model.rangeSelection){
   const [a,b]=model.rangeSelection;
   rememberEdit(()=>{const pat=pattern(model.project,model.project.selectedPattern,true),lo=clamp(Math.min(a,b),0,pat.length-1),hi=clamp(Math.max(a,b),0,pat.length-1);
    for(let r=lo;r<=hi;r++){const st=step(model.project,model.project.selectedPattern,model.ch,r,true);
-    st.note=null;st.inst=0;st.fx=0;st.amount=0;st.dyn=0;st.groove=0;st.chd=0;}
+    st.note=null;st.inst=0;st.fx=0;st.extraFx=[];st.extraFx2=[];st.amount=0;st.dyn=0;st.groove=0;st.chd=0;}
   });
   model.rangeSelection=null;announce('SELECTION CLEARED');render();return;
  }
@@ -1692,7 +1731,7 @@ const BeetleNative=(()=>{
   const b=raw instanceof Uint8Array?raw:new Uint8Array(raw);
   if(b.length<42||b.length>24576||ascii(b.subarray(0,4))!=='TRK1')throw Error('Not a native FM1 TRK1 project.');
   const schema=u16(b,4),slot=u16(b,6);
-  if(schema<12||schema>20)throw Error('Native project schema V'+schema+' is not supported by this simulator importer (V12–V20).');
+  if(schema<12||schema>21)throw Error('Native project schema V'+schema+' is not supported by this simulator importer (V12–V21).');
   if(slot>=12||u32(b,8)!==b.length||u32(b,12)!==crc(b.subarray(24))||u32(b,16)!==crc(b.subarray(0,16)))throw Error('Native project CRC, length, or slot is invalid.');
   let pos=24;
   const need=n=>{if(pos+n>b.length)throw Error('Truncated native project.');};
@@ -1724,6 +1763,19 @@ const BeetleNative=(()=>{
    if(schema>=18){const lo=read(),hi=read(),fxMask=lo|(hi<<8);if(!pat&&fxMask)pat=emptyPattern();
      if(pat)pat.note2Fx=Array.from({length:16},()=>({effect:0,value:50}));
      for(let i=0;i<16;i++)if(fxMask&(1<<i)){const effect=read(),value=read();if(effect>=12||value>100)throw Error('Invalid NOTE2 FX');pat.note2Fx[i]={effect,value};}
+   }
+   if(schema>=21){
+    const count=read();if(count>48)throw Error('Invalid native FX pool count.');
+    if(!pat&&count)pat=emptyPattern();
+    for(let e=0;e<count;e++){
+      const key=read(),fx=read(),amount=read(),row=key%16,ch=(key&127)>>>4,second=!!(key&128);
+      if(ch>=6||(second&&ch!==5)||!fx||fx>=12||amount>100)throw Error('Invalid native extra FX.');
+      const st=pat.channels[ch][row],list=second?(st.extraFx2??(st.extraFx2=[])):(st.extraFx??(st.extraFx=[]));
+      if(list.length>=2)throw Error('More than 3 FX on one step.');
+      const root=second?pat.note2Fx?.[row]?.effect:st.fx;
+      if(!root)throw Error('Orphan native extra FX.');
+      list.push({fx,amount});
+    }
    }
    const events=read();if(events>64)throw Error('Invalid Punch-In event count.');
    for(let e=0;e<events;e++){
@@ -1761,10 +1813,10 @@ const BeetleNative=(()=>{
   beetleVerifyProjectShape(p);
   return p;
  }
- // Serialize the full editor model into the firmware V20 TRK1 wire format.
+ // Serialize the full editor model into the firmware V21 TRK1 wire format.
  // No flash activity; the Project Manager handles all subsequent FM1 safety gates.
  function encode(p){
-  beetleVerifyProjectShape(p);
+  beetleVerifyProjectShape(p);if(fxPoolCount(p)>48)throw Error('FX STORAGE FULL');
   const out=new Uint8Array(12256);let i=24;
   const byte=n=>{if(!Number.isInteger(n)||n<0||n>255)throw Error('Native byte field out of range.');if(i>=out.length)throw Error('FM1 project exceeds 12 KiB.');out[i++]=n;};
   const b16=n=>{byte(n&255);byte((n>>>8)&255);};
@@ -1806,6 +1858,17 @@ const BeetleNative=(()=>{
    for(let k=0;k<16;k++){const fx=fx2[k]||{effect:0,value:50};if((fx.effect||0)!==0||(fx.value!==undefined&&fx.value!==0&&fx.value!==50))fx2Mask|=1<<k;}
    b16(fx2Mask);
    for(let k=0;k<16;k++)if(fx2Mask&(1<<k)){byte(limited(fx2[k].effect||0,0,11,'NOTE2 FX'));byte(limited(fx2[k].value??50,0,100,'NOTE2 FX amount'));}
+   const extra=[];for(let ch=0;ch<6;ch++)for(let row=0;row<16;row++){
+    const st=pat.channels[ch][row];
+    for(const [second,arr] of [[false,st.extraFx],[true,st.extraFx2]]){
+      if(second&&ch!==5)continue;
+      if((arr?.length||0)>2)throw Error('Too many FX per step.');
+      if(arr?.length&&!(second?pat.note2Fx?.[row]?.effect:st.fx))throw Error('FX2/FX3 require FX1.');
+      for(const fx of arr||[])extra.push({key:ch*16+row+(second?128:0),fx:limited(fx.fx,1,11,'extra FX'),amount:limited(fx.amount,0,100,'extra FX value')});
+    }
+   }
+   if(extra.length>48)throw Error('FX STORAGE FULL');
+   byte(extra.length);for(const x of extra){byte(x.key);byte(x.fx);byte(x.amount);}
    const events=pat.punch||[];
    if(events.length>24)throw Error('FM1 only supports 24 Punch-In events per pattern.');
    byte(events.length);
@@ -1870,7 +1933,7 @@ const BeetleNative=(()=>{
   const len=i;if(len>12256)throw Error('FM1 project does not fit in a 12 KiB slot.');
   const write16=(at,n)=>{out[at]=n&255;out[at+1]=(n>>>8)&255;};
   const write32=(at,n)=>{for(let k=0;k<4;k++)out[at+k]=(n>>>(8*k))&255;};
-  out.set(Uint8Array.from([84,82,75,49]),0);write16(4,20);write16(6,slot);write32(8,len);
+  out.set(Uint8Array.from([84,82,75,49]),0);write16(4,21);write16(6,slot);write32(8,len);
   write32(12,crc(out.subarray(24,len)));write32(16,crc(out.subarray(0,16)));
   return out.slice(0,len);
  }
@@ -1969,7 +2032,7 @@ async function beetleMakeBackup(p){
  const source=serialize(p),bytes=new TextEncoder().encode(source).byteLength;
  if(bytes>BEETLE_BACKUP.maxBytes)throw Error('Project too large for a safe browser backup');
  const sha256=await beetleHash(source);
- return {format:BEETLE_BACKUP.format,formatVersion:BEETLE_BACKUP.version,source:'BEETLE WebSimulator V1.3.3',
+ return {format:BEETLE_BACKUP.format,formatVersion:BEETLE_BACKUP.version,source:'BEETLE WebSimulator V1.3.4',
   createdAt:new Date().toISOString(),contentBytes:bytes,sha256,project:JSON.parse(source)};
 }
 async function beetleReadBackup(text){

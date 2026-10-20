@@ -1,3 +1,10 @@
+## V1.3.4 — Three Step FX Slots (experimental, 20 October 2026)
+
+- FX1 + FX2 + FX3 in the existing PER STEP FX menu. Additional effects use a project-wide, 48-record, bounded pool; no silent overwrites. `FX STORAGE FULL` overlay on rejected insertion, `MUL` label for multiple FX, separate CH6 NOTE1/NOTE2 values.
+- Synth DSP sequences primary and secondary effects; drums retain pitch and volume effects. FX edits, clearing lanes/ranges and full-pattern copy/paste include the additional FX and Undo/Redo state.
+- TRK1 V21 project format stores sparse extra FX and supports reading V19/V20. Older firmware cannot read V21. Existing 12,256-byte project-size cap is unchanged.
+- Source-level compilation for three JieLi variants, native audio and compatibility regressions, simulator syntax and package consistency tests. No physical FM1/USB/flash/recovery validation.
+
 ## BEETLE V1.3.3 — USB multitrack recording and range instrument/delete editing
 
 - **USB Multitrack in SETTINGS:** ON enumerates a six-channel 44.1 kHz/16-bit UAC1 recording source, CH1–CH5 mono synth lanes and CH6 mono drums. OFF retains post-master stereo input, stereo panning and global effects. Re-enumeration occurs on toggle; host DAW must reopen its USB inputs. OFF is the power-on default; this mode is *not saved to flash or project data*.

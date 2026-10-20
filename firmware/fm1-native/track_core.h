@@ -12,6 +12,7 @@
 #define TRACK_PROJECTS 12u
 #define TRACK_STEPS 16u
 #define TRACK_FX_COUNT 12u
+#define TRACK_EXTRA_FX_CAP 48u /* project-wide sparse FX2/FX3 capacity */
 #define TRACK_INSTRUMENT_SLOTS 8u
 #define TRACK_FX_DRUM_PITCH 11u
 #define TRACK_NOTE_STOP 254u
@@ -54,8 +55,13 @@ static inline void track_step_set_gate(struct track_step *s,uint8_t v){s->dynami
 _Static_assert(sizeof(struct track_step)==6u,"BEETLE eight-patch step must stay 6 bytes");
 /* NOTE2 has an independent FX/value pair; the 5-byte primary step stays ABI-stable. */
 struct track_note2_fx {uint8_t effect,value;};
+/* Global sparse FX pool is attached to song bank, not the 48 patterns.
+ * Pool lives once per project rather than multiplying every undo snapshot. */
 struct track_pattern {struct track_step ch[TRACK_CHANNELS][TRACK_STEPS];uint8_t length;
  struct track_note2_fx note2_fx[TRACK_STEPS];};
+static inline uint8_t track_extra_key(uint8_t lane,uint8_t row,uint8_t note2){
+ return (uint8_t)(lane*TRACK_STEPS+row+(note2?128u:0u));
+}
 struct track_harmony {uint8_t root,mode,keylock;};
 struct track_transport {uint16_t bpm;uint8_t playing,play_step,edit_step,edit_column,edit_channel,stop_step;uint32_t tick_remainder;};
 struct track_engine {struct track_pattern active;struct track_harmony harmony;struct track_transport transport;uint8_t project_slot,pattern_slot,record_armed,punch_mask,dirty;};

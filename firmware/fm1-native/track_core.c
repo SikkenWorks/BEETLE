@@ -38,7 +38,8 @@ int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step){
  if(!e||channel>=TRACK_CHANNELS||step>=TRACK_STEPS)return -1;
  struct track_step *s=&e->active.ch[channel][step];
  s->note=TRACK_NOTE_EMPTY;s->instrument=(uint8_t)(channel==TRACK_DRUM_CHANNEL?3u:channel);
- s->chord=0u;s->effect=0u;s->value=50u;s->dynamics=0u;s->groove=0u;e->dirty=1u;return 0;
+ s->chord=0u;s->effect=0u;s->value=50u;s->dynamics=0u;s->groove=0u;
+  e->dirty=1u;return 0;
 }
 /* V1.3.3: commit block changes as one history action in the caller.
  * A range is inclusive and bounded to the visible pattern length.
