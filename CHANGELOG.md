@@ -1,3 +1,13 @@
+## BEETLE V1.3.2 — Fixed instrument identity, note/range OCT, Retro Wave audio
+
+- **Patch identity bug fixed:** removed implicit copy-on-write allocation during EDIT. INST 1–8 are stable, fixed shared patches. Editing instrument 3 changes instrument 3 wherever referenced; opening EDIT on an existing note selects that step's INST. Other instruments do not silently become INST 1 or migrate to a free slot.
+- **Eight factory patches confirmed:** 1 RETRO PULSE, 2 RETRO WAVE, 3 VA OSC, 4 VA OSC2, 5 VA BASS (VA OSC / octave B), 6 VA PAD (detuned VA OSC2), 7 SID 6581, 8 NES PULSE. These are editable startup sounds; *waveform types* are independently selectable within each patch. CH6 remains the separate ROM drum kit.
+- **Patch parameters:** Audition (TRACKER + EDIT) and sequencer use the instrument's duty, cutoff and per-patch VOLUME, with the existing factory level (65) treated as unity for backward loudness compatibility.
+- **OCT on stored notes:** when stopped/disarmed, OCT- and OCT+ transpose the selected synth note or all notes within an existing SEL+K1 selection by exactly -/+12 MIDI semitones. Each note is clamped to 0–127; empty/STP rows, instrument numbers, drum notes, other lanes and chord modes are untouched. One edit supports Undo/Redo. Existing SEQ+OCT shortcut also supports ranges. An empty tracker step without an active note/range leaves OCT in its legacy live-keyboard mode.
+- **RETRO WAVE:** 32-step built-in wavetable now uses lightweight linear phase interpolation to mitigate stepped high-frequency/zipper artifacts. It is still retro 4-bit-like synthesis, not high-fidelity sample playback; the audio PCM regression hash changes intentionally.
+- **HELP / WebSimulator / README:** all updated. Simulator offers Shift+click to select a range of steps and OCT buttons for range transposition. Native 12-chapter HELP contains current factory patch and octave instructions.
+- **Project schema remains V20**; V19 compatibility, eight active patches, eight library presets, 64 Song Chains positions, Punch-In recording, USB audio, stereo panning and both VA oscillators are retained. Firmware flashing, USB sound and CPU timing remain unverified on a physical FM1; full-flash backup and independent recovery are required before experimental installation.
+
 ## BEETLE V1.3.1 — Eight active synth instruments, separate drums
 
 - Expanded active synth instrument patch slots from **4 to 8**, each independently editable and addressable by tracker INST 1–8 (0–7 internally); all **12 waveform/oscillator types** remain available in *each* patch, including VA OSC and VA OSC2 with dual A/B waves.

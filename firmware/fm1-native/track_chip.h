@@ -35,6 +35,7 @@ struct track_va_patch {
  uint8_t drive,sub,noise,fm_depth; /* 0..100, timbral VA controls */
 };
 void track_va_patch_default(struct track_va_patch *p);
+void track_va_patch_factory(uint8_t slot,struct track_va_patch *p); /* INST 1..8 zero-based */
 int track_va_patch_valid(const struct track_va_patch *p);
 
 /* Legacy aliases for old test fixtures, not exposed in TRACK instrument UI. */

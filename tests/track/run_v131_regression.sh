@@ -13,7 +13,7 @@ UBSAN_OPTIONS=halt_on_error=1 "$WORK/pan"
 cc $C tests/track/test_rc1011b_audio_stability.c firmware/fm1-native/{track_core,track_song,track_chip,track_drum,beetle_drum_rom,track_mixer}.c -o "$WORK/song"
 UBSAN_OPTIONS=halt_on_error=1 "$WORK/song"
 cc $C tests/track/test_rc1011b_pcm_compat.c firmware/fm1-native/{track_chip,track_mixer}.c -o "$WORK/pcm"
-[ "$($WORK/pcm)" = 'PCM FNV1A32 d98a5e13' ] || { echo 'UNEXPECTED PCM CHANGE'; exit 1; }
+[ "$($WORK/pcm)" = 'PCM FNV1A32 fbda64f6' ] || { echo 'UNEXPECTED PCM CHANGE'; exit 1; }
 cc $C tests/track/test_v12_wave_balance.c firmware/fm1-native/{track_chip,track_mixer}.c -lm -o "$WORK/wave"
 "$WORK/wave"
 cc $C tests/track/test_v12_usb_src.c -lm -o "$WORK/usb"
@@ -33,15 +33,15 @@ for file in ('simulator.html','web/simulator.html'):
  with tempfile.NamedTemporaryFile('w',suffix='.js') as tmp:
   tmp.write('\n'.join(scripts));tmp.flush()
   subprocess.run(['node','--check',tmp.name],check=True)
-raw=Path('BEETLE-V1.3.1-USB-AUDIO-EXPERIMENTAL.fwsc').read_bytes()
+raw=Path('BEETLE-V1.3.2-USB-AUDIO-EXPERIMENTAL.fwsc').read_bytes()
 m=json.loads(Path('FIRMWARE-MANIFEST.json').read_text())
-assert m['identity']=='FM-1_2116' and m['schema']==20
+assert m['identity']=='FM-1_2117' and m['schema']==20
 assert m['sha256']==hashlib.sha256(raw).hexdigest()
 assert all(m['checks'].values())
 w=Path('WebInstaller.html').read_text()
 assert "HASH_ET: '"+m['sha256']+"'" in w
-assert "ID_ET: 'FM-1_2116'" in w
+assert "ID_ET: 'FM-1_2117'" in w
 b64=re.search(r'<script id="firmware-embedded" type="application/octet-stream">\s*(.*?)\s*</script>',w,re.S)
 assert b64 and base64.b64decode(b64.group(1))==raw
-print('PASS V1.3.1: firmware hash, unchanged OTA, 12 HELP chapters, synchronized WebSimulator, syntax and installer')
+print('PASS V1.3.2: firmware hash, unchanged OTA, 12 HELP chapters, synchronized WebSimulator, syntax and installer')
 PY

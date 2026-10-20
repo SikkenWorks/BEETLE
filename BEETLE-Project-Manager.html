@@ -37,7 +37,7 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 </head>
 <body>
 <main class="app">
-<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.3.1 · TOOL V1.7</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
+<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.3.2 · TOOL V1.7</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
 <section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites and true slot deletion. No firmware flashing from this page.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
 <section class="box" aria-label="USB-MIDI connection">
 <div class="box-title">01 / DEVICE CONNECTION <small>USB · WEB MIDI SYSEX</small></div>
@@ -417,7 +417,7 @@ if(action==='backup'){
 }}
 $('connect').onclick=()=>safe(async()=>{setBusy(true);try{await connect();}finally{setBusy(false);}});
 $('copyDiagnostics').onclick=async()=>{
- const report='BEETLE V1.3.1 PROJECT MANAGER · V1.7\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
+ const report='BEETLE V1.3.2 PROJECT MANAGER · V1.7\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
  try{await navigator.clipboard.writeText(report);log('Connection report copied.');}
  catch{log('Could not copy automatically. Select an HTTPS/localhost page and try again.',true);}
 };

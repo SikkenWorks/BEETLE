@@ -373,8 +373,12 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   for(c=4u;c<TRACK_CHIP_SLOTS;c++){
    struct track_store_instrument *v=&p->instruments[c];
    v->type=(uint8_t)(c==4u?TRACK_CHIP_VA_OSC:c==5u?TRACK_CHIP_VA_OSC2:c==6u?TRACK_CHIP_SID_6581:TRACK_CHIP_NES_PULSE);
-   v->attack=1u;v->decay=14u;v->sustain=100u;v->release=16u;
-   v->duty=50u;v->cutoff=7000u;v->volume=65u;track_va_patch_default(&v->va);
+   v->attack=(uint8_t)(c==5u?18u:1u);
+   v->decay=(uint8_t)(c==4u?25u:c==5u?32u:14u);
+   v->sustain=(uint8_t)(c==4u?70u:c==5u?80u:100u);
+   v->release=(uint8_t)(c==4u?18u:c==5u?48u:16u);
+   v->duty=50u;v->cutoff=(uint16_t)(c==4u?3200u:c==5u?8400u:7000u);v->volume=65u;
+   track_va_patch_factory(c,&v->va);
   }
  }
  if(rd16(data+4u)>=7u){

@@ -75,6 +75,24 @@ int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note){
  e->dirty=1u;
  return 0;
 }
+/* A held SEL range and a single focused note use the exact same atomic
+ * transposition path. One semitone delta is applied to EACH stored root note.
+ * Do not touch empty/STP cells, chord shapes, other lanes or instrument IDs.
+ * Clamp instead of wrapping beyond MIDI 0..127. */
+int track_transpose_note_range(struct track_engine *e,uint8_t channel,uint8_t first,uint8_t last,int8_t semitones){
+ if(!e||channel>=TRACK_SYNTH_CHANNELS||first>=TRACK_STEPS||last>=TRACK_STEPS)return -1;
+ if(first>last){uint8_t tmp=first;first=last;last=tmp;}
+ int changed=0;
+ for(uint8_t row=first;row<=last;row++){
+  struct track_step *st=&e->active.ch[channel][row];
+  if(st->note>=TRACK_NOTE_STOP)continue;
+  int n=(int)st->note+(int)semitones;
+  if(n<0)n=0;if(n>127)n=127;
+  if(n!=st->note){st->note=(uint8_t)n;changed++;}
+ }
+ if(changed)e->dirty=1u;
+ return changed;
+}
 int track_adjust_octave(struct track_engine *e,int8_t semitones){if(!e||e->transport.edit_channel>=TRACK_SYNTH_CHANNELS||e->transport.edit_step>=16u)return -1;struct track_step *s=&e->active.ch[e->transport.edit_channel][e->transport.edit_step];if(s->note>=TRACK_NOTE_STOP)return 0;int v=(int)s->note+(int)semitones;if(v<0)v=0;if(v>127)v=127;if(s->note==(uint8_t)v)return 0;s->note=(uint8_t)v;e->dirty=1u;return 1;}
 void track_rotate_select(struct track_engine *e,int8_t direction){if(!e||!direction)return;if(e->transport.edit_column==2u && e->transport.edit_channel!=TRACK_DRUM_CHANNEL){struct track_step *s=&e->active.ch[e->transport.edit_channel][e->transport.edit_step];s->chord=(uint8_t)((s->chord+TRACK_CHORD_COUNT+(direction>0?1u:TRACK_CHORD_COUNT-1u))%TRACK_CHORD_COUNT);e->dirty=1u;}else{e->transport.edit_channel=(uint8_t)((e->transport.edit_channel+TRACK_CHANNELS+(direction>0?1u:TRACK_CHANNELS-1u))%TRACK_CHANNELS);}}
 void track_set_channel(struct track_engine *e,uint8_t ch){if(e&&ch<TRACK_CHANNELS)e->transport.edit_channel=ch;}

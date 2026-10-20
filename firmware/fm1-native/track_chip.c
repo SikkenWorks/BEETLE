@@ -75,6 +75,19 @@ void track_va_patch_default(struct track_va_patch *p){
   .detune=12u,.mix=50u,.pulse_width=50u,.morph=0u,
   .coarse_b=0,.fine_b=0,.pulse_width_b=50u,.drive=0u,.sub=0u,.noise=0u,.fm_depth=0u};
 }
+/* Project-local editable starting presets: INST 5 bass and INST 6 soft pad
+ * deliberately differ from the standard VA OSC / VA OSC2 defaults. */
+void track_va_patch_factory(uint8_t slot,struct track_va_patch *p){
+ track_va_patch_default(p);
+ if(!p)return;
+ if(slot==4u){ /* VA bass: sub octave on B, focused midrange */
+  p->wave_a=0u;p->wave_b=3u;p->coarse_b=-12;p->detune=8u;
+  p->mix=35u;p->sub=18u;p->drive=10u;
+ }else if(slot==5u){ /* VA pad: soft sine/triangle detuned */
+  p->wave_a=3u;p->wave_b=1u;p->detune=22u;p->mix=60u;
+  p->fine_b=7;p->morph=30u;p->drive=2u;
+ }
+}
 int track_va_patch_valid(const struct track_va_patch *p){
  return p&&p->wave_a<TRACK_VA_SHAPES&&p->wave_b<TRACK_VA_SHAPES&&
  p->coarse>=-24&&p->coarse<=24&&p->fine>=-100&&p->fine<=100&&
@@ -105,8 +118,11 @@ void track_chip_init(struct track_chip_engine *s){
  for(unsigned i=0;i<8;i++)s->punch_param[i]=50u;
  s->punch_param[1]=20u;s->punch_param[2]=0u;s->punch_param[4]=50u;
  for(unsigned i=0;i<TRACK_CHANNELS;i++){s->step_gain[i]=100u;s->fx_type[i]=0u;s->fx_value[i]=50u;s->duty[i]=2u;s->cutoff[i]=96u;s->cut_after[i]=0xFFFFFFFFu;}
- for(unsigned i=0;i<TRACK_CHIP_SLOTS;i++){s->osc_type[i]=(uint8_t)(i==4u?TRACK_CHIP_VA_OSC:i==5u?TRACK_CHIP_VA_OSC2:i==6u?TRACK_CHIP_SID_6581:i==7u?TRACK_CHIP_NES_PULSE:i);track_va_patch_default(&s->patches[i]);
-  s->env_attack[i]=1u;s->env_decay[i]=14u;s->env_sustain[i]=100u;s->env_release[i]=16u;}
+ for(unsigned i=0;i<TRACK_CHIP_SLOTS;i++){s->osc_type[i]=(uint8_t)(i==4u?TRACK_CHIP_VA_OSC:i==5u?TRACK_CHIP_VA_OSC2:i==6u?TRACK_CHIP_SID_6581:i==7u?TRACK_CHIP_NES_PULSE:i);track_va_patch_factory((uint8_t)i,&s->patches[i]);
+  s->env_attack[i]=(uint8_t)(i==5u?18u:1u);
+  s->env_decay[i]=(uint8_t)(i==4u?25u:i==5u?32u:14u);
+  s->env_sustain[i]=(uint8_t)(i==4u?70u:i==5u?80u:100u);
+  s->env_release[i]=(uint8_t)(i==4u?18u:i==5u?48u:16u);}
 }
 int track_chip_health(const struct track_chip_engine *s){
  if(!s||s->health_cookie!=TRACK_CHIP_COOKIE||s->voice_count>TRACK_CHIP_VOICES||s->last_voice_index>=TRACK_CHIP_VOICES||s->realtime_voice_budget<4u||s->realtime_voice_budget>TRACK_CHIP_VOICES)return 0;
@@ -343,7 +359,16 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   uint8_t phase=(uint8_t)(v->phase>>29u);
   level=((dmg_duty[s->duty[v->channel]&3u]>>phase)&1u)?1:0;
  }break;
- case TRACK_CHIP_RETRO_WAVE:level=((int32_t)retro_wave[v->phase>>27u]-8)*1800;break;
+ case TRACK_CHIP_RETRO_WAVE:{
+  /* Smooth 32-position wavetable reads rather than jumping abruptly from
+   * one 4-bit sample to the next. Retain the same fixed original ROM wave.
+   * Band-reduced interpolation removes the worst high-note zipper/aliasing. */
+  const uint8_t at=(uint8_t)(v->phase>>27u);
+  const uint32_t frac=(v->phase>>11u)&65535u;
+  const int32_t a=(int32_t)retro_wave[at]-8;
+  const int32_t b=(int32_t)retro_wave[(at+1u)&31u]-8;
+  level=(a+(((b-a)*(int32_t)frac)>>16))*1800;
+ }break;
  case TRACK_CHIP_SID_6581: case TRACK_CHIP_SID_8580:
  case TRACK_CHIP_SID_DIRTY: case TRACK_CHIP_SID_BASS: case TRACK_CHIP_SID_NOISE:{
   const struct track_va_patch *p=&s->patches[v->instrument];

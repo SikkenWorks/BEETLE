@@ -15,12 +15,18 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.3.1</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.3.2</strong> · <a href="CHANGELOG.md">Release history</a></sub>
 </p>
 
 ---
 
-**BEETLE V1.3.1** introduces **eight active synthesizer instrument slots (INST 1–8)** across CH1–CH5. They are independent editable patches, not waveform types or the eight stored Instrument Library presets. You can still select all **12 oscillator types**, including **VA OSC** and **VA OSC2** and their A/B waves, in each patch. The **CH6 drum engine remains a separate ROM kit**; its old "INST 4" label has been replaced with KIT in the tracker. Select a synth note's INST column with K2 and turn K3 to assign 1–8, then press EDIT on CH1–CH5 to edit the active patch. New projects default synth CH1–CH5 to INST 1–5; in Song Mode the same instrument bank is shared across all 48 patterns.
+**BEETLE V1.3.2** fixes instrument selection and makes octave editing work on saved notes. Eight synth patches are **stable fixed slots**; editing a used patch no longer copies it behind the scenes. A patch number in TRACKER always identifies the same patch in EDIT, even when other patterns use it. On an existing synth note, open EDIT to edit exactly that note's assigned patch. EDIT still exposes all **12 oscillator types**, including both dual-oscillator VA modes, per instrument. **CH6 is the independent ROM drum kit.**
+
+**Factory patches in NEW projects:** INST 1 RETRO PULSE · 2 RETRO WAVE · 3 VA OSC · 4 VA OSC2 · 5 VA BASS (dual VA OSC with octave sub) · 6 VA PAD (soft, detuned VA OSC2) · 7 SID 6581 · 8 NES PULSE. These are starting presets, not a limitation on the oscillator types you can select. The eight Instrument Library slots are additional, project-local stored patches, not the same as the eight active slots. Every patch has its own parameters and TYPE banks; changing one fixed INST updates every saved note referencing that slot.
+
+**Octave editing:** Stop playback and disarm REC. In TRACKER, place the cursor on a synth note and press **OCT− / OCT+** to change **that note** by exactly −12 / +12 semitones. For multiple steps, hold **SEL**, turn **K1** to extend the selected range, then use **OCT− / OCT+** to transpose every nonempty note in that range (including boundary rows). Undo/Redo remains available via SEQ+OP5/OP6. SEQ+OCT−/+ still transposes notes too. An empty step without a note/range retains the live keyboard octave function. On the WebSimulator, **Shift+click two tracker rows** selects the range. Drums, empty/STP steps, instrument IDs and other lanes are not transposed.
+
+**RETRO WAVE playback** now interpolates between its existing 32 wavetable points to reduce grainy stepping at higher notes. Physical FM1 sound quality and USB recording remain experimental and should be tested with captured audio.
 
 **Project compatibility:** new firmware stores **V20 TRK1 projects** with eight patch slots and 3-bit instrument references. Existing **V19 projects** load with INST 1–4 intact and initialize INST 5–8 to new defaults. Save backups before updating: older V1.3 firmware does **not** understand the V20 format. Maximum stored project size remains 12,256 bytes and overflow is rejected without erasing storage. Eight active patches are distinct from the preexisting eight *project-local* Instrument Library presets. The 8-voice synth polyphony limit is unchanged. The experimental linker increases `.pool` by 3 KiB and reduces the available stack guard reservation; physical stress tests are still required.
 
