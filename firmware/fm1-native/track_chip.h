@@ -100,6 +100,10 @@ void track_chip_set_realtime_budget(struct track_chip_engine *s,uint8_t budget);
 /* Nonzero means sane. A damaged DSP state is reset without rebooting the FM1. */
 int track_chip_health(const struct track_chip_engine *s);
 void track_chip_recover(struct track_chip_engine *s);
+/* Optional 6x mono pre-MASTER USB tap. Null means zero extra DSP work.
+ * Only audio ISR owns pointer and offset; frame stride is CH1..CH6. */
+extern int16_t *beetle_stem_capture;
+extern uint32_t beetle_stem_offset;
 void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix,int16_t *stereo,uint32_t frames);
 /* Live global punch processing AFTER drums; octave pitch is applied to every synth oscillator voice before rendering. */
 void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *stereo,uint32_t frames);

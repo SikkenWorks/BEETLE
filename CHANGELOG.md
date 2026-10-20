@@ -1,3 +1,13 @@
+## BEETLE V1.3.3 — USB multitrack recording and range instrument/delete editing
+
+- **USB Multitrack in SETTINGS:** ON enumerates a six-channel 44.1 kHz/16-bit UAC1 recording source, CH1–CH5 mono synth lanes and CH6 mono drums. OFF retains post-master stereo input, stereo panning and global effects. Re-enumeration occurs on toggle; host DAW must reopen its USB inputs. OFF is the power-on default; this mode is *not saved to flash or project data*.
+- **Real lane stems:** native C audio engine captures six separate pre-master/pre-global-Punch-FX buses, including lane volume and mute/solo, without turning the stereo output into six copies. Mono stem outputs exclude lane panning by design. The common fractional USB read position keeps all six channels sample-synchronized. Physical USB enumeration, full-load DSP performance and DAW compatibility remain **unverified**.
+- **RAM and USB safety:** allocated 6-channel PCM staging and USB rings in newly verified spare RAMTEXT-region space without reallocating the protected firmware header or OTA loader. Preserved the original 8-bit SIE EP4 register setup while advertising correct UAC1 full-speed 552-byte maximum isochronous packets. Real-hardware register behavior is still unverified.
+- **Block instrument changes:** select a range with SEL+K1, move to instrument column and change K3 to assign one patch across all existing notes in the active synth lane. Does not create notes on empty/STP steps; one Undo/Redo entry.
+- **Block deletion:** short SEL while a range exists clears all selected steps in one Undo/Redo entry, including drum NOTE2 step FX. SEL+K1 while a range exists starts a new range instead of deleting the old one.
+- **Compatibility:** existing V20 project schema, eight active patches, 12 oscillator types, separate CH6 drum engine, 64 Song Chains rows, Punch-In, project transfer, analog stereo, USB MIDI and HELP chapters preserved. HELP has 13 chapters including the new selection and USB instructions.
+- **Validation:** native JieLi read-only, OTA pilot and storage-lab builds; six-lane PCM isolation tests; range tests; app/OTA structural verification and embedded installer SHA-256 verification; JS simulator syntax and HELP parity. **No real FM1 USB/DAW/OTA/recovery validation.** Experimental flashing may cause data loss or render the FM1 unusable.
+
 ## BEETLE V1.3.2 — Fixed instrument identity, note/range OCT, Retro Wave audio
 
 - **Patch identity bug fixed:** removed implicit copy-on-write allocation during EDIT. INST 1–8 are stable, fixed shared patches. Editing instrument 3 changes instrument 3 wherever referenced; opening EDIT on an existing note selects that step's INST. Other instruments do not silently become INST 1 or migrate to a free slot.

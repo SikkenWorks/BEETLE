@@ -271,7 +271,15 @@ etch_native_reset(&native_audio);native_audio.keys=keys&0x7ffffffu;}
 #endif
   }
 #if ETCH_NATIVE_UAC
+#ifdef TRACK_FIRMWARE
+  if(uac.feed){
+   if(uac_multitrack)uac_tap_stems(track_usb_stem_pcm,ETCH_NATIVE_FRAMES);
+   else uac_tap(native_usb_stereo,ETCH_NATIVE_FRAMES);
+  }
+  beetle_stem_capture=0;
+#else
   if(uac.feed)uac_tap(native_usb_stereo,ETCH_NATIVE_FRAMES);
+#endif
 #endif
   /* Publish a completed 1024-sample contiguous audio window every 8 DMA
    halves. The renderer sees a stable waveform instead of arbitrary 128-sample

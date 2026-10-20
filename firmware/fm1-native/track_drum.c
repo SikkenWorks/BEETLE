@@ -146,6 +146,8 @@ static int32_t get_pcm(uint8_t id,uint32_t sample){
  if(off>=beetle_drum_offsets[i+1u])return 0;
  return beetle_ulaw_decode[beetle_drum_rom[off]];
 }
+extern int16_t *beetle_stem_capture;
+extern uint32_t beetle_stem_offset;
 void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix,int16_t *dst,uint32_t frames){
  if(!d||!dst)return;
  const struct track_mixer_channel *m=mix?&mix->ch[TRACK_DRUM_CHANNEL]:0;
@@ -192,6 +194,8 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
   uint32_t peak=(uint32_t)(mono<0?-(int64_t)mono:mono);
   if(peak>32767u)peak=32767u;
   if(peak>track_lane_pcm_peak[TRACK_DRUM_CHANNEL])track_lane_pcm_peak[TRACK_DRUM_CHANNEL]=(uint16_t)peak;
+  if(beetle_stem_capture)
+   beetle_stem_capture[(beetle_stem_offset+f)*TRACK_CHANNELS+TRACK_DRUM_CHANNEL]=(int16_t)mono;
   int32_t l=dst[f*2u]+(int32_t)(((int64_t)mono*pan_left)>>8);
   int32_t r=dst[f*2u+1u]+(int32_t)(((int64_t)mono*pan_right)>>8);
   dst[f*2u]=clamp16(l);dst[f*2u+1u]=clamp16(r);

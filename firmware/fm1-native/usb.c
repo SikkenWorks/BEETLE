@@ -91,10 +91,18 @@ _Static_assert(UA_HI48 + UA_REND48 + UA_MAXF < UA_N, "the ring holds the band, a
 #define UA_MAXF 46u              /* frames in the largest packet */
 #endif
 #define UAC_MAXP (UA_MAXF * 4u)
+#define BEETLE_USB_STEMS 6u
+#define UAC_MT_MAXP (46u * BEETLE_USB_STEMS * 2u)
+_Static_assert(UAC_MT_MAXP<=1023u,"multitrack needs full-speed ISO <=1023B/ms");
 _Static_assert(UA_HI + HALF_FRAMES + UA_MAXF < UA_N, "the ring holds the band, a render and a packet");
 static uint32_t ua_ring[UA_N] __attribute__((section(".usb_audio_ram")));
 static volatile uint32_t ua_w, ua_r;
-static uint32_t ep4tx[UA_MAXF] __attribute__((section(".usb_audio_ram"),aligned(4)));
+/* A six-channel capture uses the same EP4, in a separate USB configuration.
+ * Larger DMA staging goes in POOL, not the already-full 0x1F00 USB SRAM. */
+static uint32_t ep4tx[(UAC_MT_MAXP+3u)/4u] __attribute__((section(".beetle_usb_stems_ram"),aligned(4)));
+static int16_t ua_stem_ring[UA_N][BEETLE_USB_STEMS] __attribute__((section(".beetle_usb_stems_ram"),aligned(4)));
+static int16_t ua_stem_last[BEETLE_USB_STEMS];
+static volatile uint8_t uac_multitrack; /* boot default stereo, SETTINGS switches/re-enumerates */
 static struct {
     volatile uint8_t alt;        /* streaming interface setting: 1 = the host records */
     volatile uint8_t r48;        /* the host's rate (SET_CUR): 1 = 48 kHz, 0 = 44.1 (bus reset) */
@@ -257,6 +265,22 @@ static int midi_out_event(uint32_t pkt)             /* from the audio ISR; 0 = r
 #define D_AC(a) 9, 4, (a), 0, 0, 1, 1, 0, 0, 9, 0x24, 1, 0x00, 0x01, 9, 0, 1, (a) + 1,
 #define D_AS(s)
 #endif
+/* Exactly SIX independent mono PCM inputs (CH1..CH6). Not a fake stereo
+ * duplication. wChannelConfig=0: discrete unordered DAW channels, not 5.1.
+ * UAC1 and full-speed endpoint EP4 support up to 552 bytes per 1-ms packet. */
+#define D_FMT_MT 11, 0x24, 2, 1, BEETLE_USB_STEMS, 2, 16, 1, 0x44, 0xAC, 0x00,
+#define D_AC_MT(a) \
+    9, 4, (a), 0, 0, 1, 1, 0, 0, \
+    10, 0x24, 1, 0x00, 0x01, 31, 0, 2, (a) + 1, (a) + 2, \
+    12, 0x24, 2, 1, 0x03, 0x06, 0, BEETLE_USB_STEMS, 0, 0, 0, 0, \
+    9, 0x24, 3, 2, 0x01, 0x01, 0, 1, 0,
+#define D_AS_MT(s) \
+    9, 4, (s), 0, 0, 1, 2, 0, 0, \
+    9, 4, (s), 1, 1, 1, 2, 0, 0, \
+    7, 0x24, 1, 2, 1, 0x01, 0x00, \
+    D_FMT_MT \
+    9, 5, 0x84, 0x05, UAC_MT_MAXP & 0xFF, UAC_MT_MAXP >> 8, 1, 0, 0, \
+    7, 0x25, 1, 0x01, 0, 0, 0,
 #define D_MIDI(m)                                                                                    \
     9, 4, (m), 0, 2, 1, 3, 0, 0,                                                                     \
     7, 0x24, 1, 0x00, 0x01, 0x41, 0x00,                                                              \
@@ -268,7 +292,8 @@ static int midi_out_event(uint32_t pkt)             /* from the audio ISR; 0 = r
     5, 0x25, 1, 1, 1,                                                                                \
     9, 5, 0x81, 2, 64, 0, 0, 0, 0,                                                                   \
     5, 0x25, 1, 1, 3,
-#define D_AUDIO(a) D_AC(a) D_MIDI((a) + 1) D_AS((a) + 2)   /* audio + MIDI from interface a */
+#define D_AUDIO(a) D_AC(a) D_MIDI((a) + 1) D_AS((a) + 2)
+#define D_AUDIO_MT(a) D_AC_MT(a) D_MIDI((a) + 1) D_AS_MT((a) + 2)   /* audio + MIDI from interface a */
 #define AUD_NIF (2 + FELUCCA_UAC)
 #define AUD_LEN (92 + (63 + FMT_LEN) * FELUCCA_UAC)
 #define D_CDC(c)                                                                                     \
@@ -292,6 +317,13 @@ static int midi_out_event(uint32_t pkt)             /* from the audio ISR; 0 = r
 #define CFG_LEN_PLAIN (9 + AUD_LEN)
 static const uint8_t DEV_DESC_PLAIN[18] = {D_DEV(0x0110, 0, 0, 0, 0)};
 static const uint8_t CFG_DESC_PLAIN[] = {D_CFG(CFG_LEN_PLAIN, AUD_NIF), D_AUDIO(0)};
+#if FELUCCA_UAC
+/* MT is 44.1k only; its descriptor differs from stereo's optional 48k format. */
+#define AUD_LEN_MT (92 + 63 + 11)
+#define CFG_LEN_MT_PLAIN (9 + AUD_LEN_MT)
+static const uint8_t CFG_DESC_MT_PLAIN[]={D_CFG(CFG_LEN_MT_PLAIN,AUD_NIF),D_AUDIO_MT(0)};
+typedef char mt_plain_ok[sizeof CFG_DESC_MT_PLAIN==CFG_LEN_MT_PLAIN?1:-1];
+#endif
 typedef char cfg_plain_len_ok[sizeof CFG_DESC_PLAIN == CFG_LEN_PLAIN ? 1 : -1];
 #if FELUCCA_CDC
 #define CFG_LEN (9 + 8 + AUD_LEN + CDC_LEN)
@@ -322,16 +354,38 @@ static const uint8_t CFG_DESC[] = {
 #endif
 };
 typedef char cfg_len_ok[sizeof CFG_DESC == CFG_LEN ? 1 : -1];
+#if FELUCCA_UAC
+#define CFG_LEN_MT (9 + 8 + AUD_LEN_MT + CDC_LEN)
+static const uint8_t CFG_DESC_MT[]={
+    D_CFG(CFG_LEN_MT,USB_NIF),
+#if FELUCCA_USB_LAYOUT == 1
+    D_CDC(CDC_IF_CDC)
+#endif
+    D_IAD(AUD_IF_CDC,AUD_NIF,1,1,0),D_AUDIO_MT(AUD_IF_CDC)
+#if FELUCCA_USB_LAYOUT != 1
+    D_CDC(CDC_IF_CDC)
+#endif
+};
+typedef char mt_cfg_ok[sizeof CFG_DESC_MT==CFG_LEN_MT?1:-1];
+#endif
 static uint8_t usb_cdc_on = FELUCCA_CDC_DEFAULT != 0;      /* the console is presented (read by the TIMER5 ISR) */
 #define USB_CDC_ON usb_cdc_on
 #define AUD_IF (usb_cdc_on ? AUD_IF_CDC : 0u)
 #else
 #define DEV_DESC DEV_DESC_PLAIN
 #define CFG_DESC CFG_DESC_PLAIN
+#if FELUCCA_UAC
+#define CFG_DESC_MT CFG_DESC_MT_PLAIN
+#endif
 #define USB_CDC_ON 0
 #define AUD_IF 0u
 #endif
 #define UAC_AS_IF (AUD_IF + 2u)
+#if FELUCCA_UAC
+/* New bcdDevice for a different interface topology so host descriptor caching
+ * does not accidentally reuse stereo channel assignments after re-enumeration. */
+static uint8_t dev_mt_plain[18],dev_mt_cdc[18];
+#endif
 static const uint8_t STR0[4] = {4, 3, 0x09, 0x04};
 static const uint8_t STR1[] = {24, 3, 'S', 0, 'i', 0, 'k', 0, 'k', 0, 'e', 0, 'n', 0, 'W', 0, 'o', 0, 'r', 0, 'k', 0, 's', 0};
 #ifdef FELUCCA_LOADER
@@ -341,16 +395,39 @@ static const uint8_t STR2[] = {30, 3, 'F', 0, 'e', 0, 'l', 0, 'u', 0, 'c', 0, 'c
 static const uint8_t STR2[] = {26, 3, 'B', 0, 'E', 0, 'E', 0, 'T', 0, 'L', 0, 'E', 0, ' ', 0, 'A', 0, 'u', 0, 'd', 0, 'i', 0, 'o', 0};
 #endif
 
+#if FELUCCA_UAC
+static const uint8_t STR2_MT[]={36,3,'B',0,'E',0,'E',0,'T',0,'L',0,'E',0,' ',0,
+    'M',0,'u',0,'l',0,'t',0,'i',0,'t',0,'r',0,'a',0,'c',0,'k',0};
+static void usb_multitrack_init_desc(void){
+ for(uint32_t i=0;i<18u;i++){
+  dev_mt_plain[i]=DEV_DESC_PLAIN[i];
+  dev_mt_cdc[i]=USB_CDC_ON?DEV_DESC[i]:DEV_DESC_PLAIN[i];
+ }
+ dev_mt_plain[13]=0x04;dev_mt_cdc[13]=0x04;
+}
+#endif
 static int get_desc(uint32_t wvalue, const uint8_t **d, uint16_t *l)
 {
     switch (wvalue >> 8) {
     case 1:
+#if FELUCCA_UAC
+        *d = uac_multitrack?(USB_CDC_ON?dev_mt_cdc:dev_mt_plain):
+              (USB_CDC_ON?DEV_DESC:DEV_DESC_PLAIN);
+#else
         *d = USB_CDC_ON ? DEV_DESC : DEV_DESC_PLAIN;
+#endif
         *l = 18;
         return 1;
     case 2:
+#if FELUCCA_UAC
+        *d = uac_multitrack?(USB_CDC_ON?CFG_DESC_MT:CFG_DESC_MT_PLAIN):
+             (USB_CDC_ON?CFG_DESC:CFG_DESC_PLAIN);
+        *l = (uint16_t)(uac_multitrack?(USB_CDC_ON?sizeof CFG_DESC_MT:sizeof CFG_DESC_MT_PLAIN):
+                       (USB_CDC_ON?sizeof CFG_DESC:sizeof CFG_DESC_PLAIN));
+#else
         *d = USB_CDC_ON ? CFG_DESC : CFG_DESC_PLAIN;
         *l = (uint16_t)(USB_CDC_ON ? sizeof CFG_DESC : sizeof CFG_DESC_PLAIN);
+#endif
         return 1;
     case 3:
         switch (wvalue & 0xFFu) {
@@ -363,8 +440,12 @@ static int get_desc(uint32_t wvalue, const uint8_t **d, uint16_t *l)
             *l = sizeof STR1;
             return 1;
         case 2:
-            *d = STR2;
-            *l = sizeof STR2;
+#if FELUCCA_UAC
+            *d = uac_multitrack?STR2_MT:STR2;
+            *l = (uint16_t)(uac_multitrack?sizeof STR2_MT:sizeof STR2);
+#else
+            *d = STR2;*l = sizeof STR2;
+#endif
             return 1;
         default:
             return 0;
@@ -427,6 +508,7 @@ static void uac_stream(uint32_t alt)                    /* SET_INTERFACE, config
     uac.last = 0;
     uac.src_step = BEETLE_UAC_SRC_ONE;
     uac.src_fraction = 0u;
+    for(uint32_t c=0;c<BEETLE_USB_STEMS;c++)ua_stem_last[c]=0;
     if (alt) {                                          /* (the fill range of the last stream stays readable) */
         uac.starts++;
         uac.fill_lo = 0xFFFFFFFFu;
@@ -439,7 +521,7 @@ static void uac_stream(uint32_t alt)                    /* SET_INTERFACE, config
  * stream: silence packets until the next render primes the ring at the new rate. */
 static void uac_rate_set(uint32_t hz)
 {
-    uint8_t r48 = FELUCCA_UAC_48K && hz >= (UAC_RATE + 48000u) / 2u;
+    uint8_t r48 = !uac_multitrack && FELUCCA_UAC_48K && hz >= (UAC_RATE + 48000u) / 2u;
     if (r48 == uac.r48)
         return;
     uac.go = 0;
@@ -488,6 +570,9 @@ no_cdc:;
 #if FELUCCA_UAC
     fm1_usb_ep4_txbuf(ep4tx);
     sie_wr(S_INDEX, 4);
+    /* SIE register is written as an 8-bit endpoint size/capability value,
+     * NOT as raw USB payload bytes. Keep verified Felucca EP4 0xFF setup;
+     * the 552-byte maximum lives in the class-specific descriptor. */
     sie_wr(S_TXMAXP, 0xFF);
     uac_ep4_reset();
     fm1_usb_ep_enable(1u << 4);
@@ -1015,8 +1100,11 @@ static __attribute__((noinline)) void uac_render_start(void)   /* audio ISR, bef
             rs.w = rs.ph = 0;
         }
 #endif
-        for (i = 0; i < prime; i++)
+        for (i = 0; i < prime; i++){
             ua_ring[(r + i) & (UA_N - 1u)] = 0;
+            if(uac_multitrack)for(uint32_t c=0;c<BEETLE_USB_STEMS;c++)
+                ua_stem_ring[(r+i)&(UA_N-1u)][c]=0;
+        }
         RING_PUBLISH();
         ua_w = r + prime;
         uac.fill_min = prime;
@@ -1133,6 +1221,47 @@ static __attribute__((noinline)) void uac_tap(const int32_t *out, uint32_t n)   
     ua_w = w + n;
 }
 
+/* One render chunk from the SIX isolated mixer lanes, interleaved PCM16.
+ * Only called in the audio ISR when multitrack is requested/streaming. */
+static __attribute__((noinline)) void uac_tap_stems(const int16_t *stems,uint32_t n){
+ if(!uac.feed || !uac_multitrack || !stems)return;
+ uint32_t w=ua_w;
+ if(UA_N-(w-ua_r)<n){uac.overruns++;return;}
+ for(uint32_t i=0;i<n;i++)for(uint32_t c=0;c<BEETLE_USB_STEMS;c++)
+    ua_stem_ring[(w+i)&(UA_N-1u)][c]=stems[i*BEETLE_USB_STEMS+c];
+ RING_PUBLISH();ua_w=w+n;
+}
+/* USB packet: 6 discrete mono channels CH1..CH6, 44/45 frames per ms.
+ * Clock drift correction uses ONE fractional timebase for all lanes,
+ * preventing inter-track skew. */
+static __attribute__((noinline)) uint32_t uac_packet_stems(uint32_t *dst){
+ uint32_t n=44u;uac.acc+=UAC_RATE%1000u;
+ if(uac.acc>=1000u){uac.acc-=1000u;n++;}
+ int16_t *out=(int16_t*)dst;
+ if(!uac.go){for(uint32_t i=0;i<n*BEETLE_USB_STEMS;i++)out[i]=0;return n;}
+ if(uac.fill_min<=UA_N)uac.src_step=beetle_usb_src_next_step(uac.src_step,uac.fill_min,UA_PRIME);
+ uint32_t r=ua_r,fill=ua_w-r,pos=uac.src_fraction,step=uac.src_step;
+ RING_PUBLISH();
+ for(uint32_t i=0;i<n;i++){
+  uint32_t src=pos>>16u;
+  if(src+1u>=fill){
+   uac.underruns++;
+   for(;i<n;i++)for(uint32_t c=0;c<BEETLE_USB_STEMS;c++)out[i*BEETLE_USB_STEMS+c]=ua_stem_last[c];
+   break;
+  }
+  const int16_t *a=ua_stem_ring[(r+src)&(UA_N-1u)];
+  const int16_t *b=ua_stem_ring[(r+src+1u)&(UA_N-1u)];
+  for(uint32_t c=0;c<BEETLE_USB_STEMS;c++){
+   int32_t v=(int32_t)a[c]+(int32_t)(((int64_t)((int32_t)b[c]-a[c])*(pos&65535u))>>16u);
+   ua_stem_last[c]=out[i*BEETLE_USB_STEMS+c]=(int16_t)uac_s16(v);
+  }
+  pos+=step;
+ }
+ uint32_t k=pos>>16u;if(k>fill-(fill?1u:0u))k=fill-(fill?1u:0u);
+ uac.src_fraction=(uint16_t)pos;RING_PUBLISH();ua_r=r+k;
+ uac.pkts++;uac.frames+=n;return n;
+}
+
 /* the next packet into d: 44 / 45 frames (+-1 to hold the ring's fill), from the ring or, until it is
  * primed, silence. An empty ring repeats the last frame. Returns the frame count. */
 static uint32_t uac_packet(uint32_t *d)
@@ -1233,8 +1362,8 @@ static void uac_service(void)
     }
     uac.queued = 1;
     uac.wait = 0;
-    n = uac_packet(ep4tx);
-    fm1_usb_ep4_send(ep4tx, n * 4u);
+    n = uac_multitrack?uac_packet_stems(ep4tx):uac_packet(ep4tx);
+    fm1_usb_ep4_send(ep4tx, n * (uac_multitrack?12u:4u));
     sie_wr(S_TXCSR1, 0x01);                             /* TxPktRdy (and UnderRun cleared) */
 }
 #endif
@@ -1336,6 +1465,9 @@ static void usb_poll(void)                              /* TIMER5 ISR, 2 kHz */
 
 static void usb_start(void)                             /* boot, or main-loop retry while usb.up == 0 */
 {
+#if FELUCCA_UAC
+    usb_multitrack_init_desc();
+#endif
     usb.timeouts = 0;
     fm1_usb_reset();                                    /* reset whatever the ROM left */
     fm1_delay_ms(25);
@@ -1369,6 +1501,18 @@ static void usb_detach(void)
     usb.up = 0;
     fm1_usb_off();
 }
+
+#if FELUCCA_UAC
+/* Called from main/UI only, outside the audio ISR. The USB mode is device-wide
+ * and alters the host-visible input count, hence a real bus re-enumeration. */
+static void usb_multitrack_switch(uint8_t enabled){
+ enabled=(uint8_t)(enabled!=0u);
+ if(enabled==uac_multitrack)return;
+ usb.up=0u;RING_PUBLISH();fm1_usb_off();
+ usb.config=0u;uac_stream(0u);uac_multitrack=enabled;
+ usb.detached=0u; /* retry from main after the normal 1-second window */
+}
+#endif
 
 #if FELUCCA_CDC
 /* Present the device with or without the serial console (main loop; at boot before usb_start, or later

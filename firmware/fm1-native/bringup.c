@@ -205,6 +205,9 @@ static struct track_mixer track_mix;
 struct etch_native_audio;
 static void track_fm1_audio_process(struct etch_native_audio*,uint32_t,int16_t*);
 #endif
+#if ETCH_NATIVE_UAC && defined(TRACK_FIRMWARE)
+static int16_t track_usb_stem_pcm[HALF_FRAMES*TRACK_CHANNELS] __attribute__((section(".beetle_usb_stems_ram"),aligned(4)));
+#endif
 #include "track_output_gain.h"
 #include "audio_target.c"
 _Static_assert(HALF_FRAMES == ETCH_NATIVE_FRAMES, "USB ring must match DMA half frames");

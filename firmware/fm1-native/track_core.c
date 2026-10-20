@@ -40,6 +40,36 @@ int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step){
  s->note=TRACK_NOTE_EMPTY;s->instrument=(uint8_t)(channel==TRACK_DRUM_CHANNEL?3u:channel);
  s->chord=0u;s->effect=0u;s->value=50u;s->dynamics=0u;s->groove=0u;e->dirty=1u;return 0;
 }
+/* V1.3.3: commit block changes as one history action in the caller.
+ * A range is inclusive and bounded to the visible pattern length.
+ * Note-only instrument edits never create ghost notes on EMPTY/STOP rows. */
+int track_set_instrument_range(struct track_engine *e,uint8_t channel,uint8_t first,uint8_t last,uint8_t instrument){
+ if(!e||channel>=TRACK_SYNTH_CHANNELS||instrument>=TRACK_INSTRUMENT_SLOTS)return 0;
+ uint8_t lo=first<last?first:last,hi=first>last?first:last;
+ if(lo>=e->active.length)return 0;if(hi>=e->active.length)hi=(uint8_t)(e->active.length-1u);
+ int changes=0;
+ for(uint8_t i=lo;i<=hi;i++){
+  struct track_step *step=&e->active.ch[channel][i];
+  if(step->note>=TRACK_NOTE_STOP||step->instrument==instrument)continue;
+  step->instrument=instrument;changes++;
+ }
+ if(changes)e->dirty=1u;
+ return changes;
+}
+int track_clear_step_range(struct track_engine *e,uint8_t channel,uint8_t first,uint8_t last){
+ if(!e||channel>=TRACK_CHANNELS)return 0;
+ uint8_t lo=first<last?first:last,hi=first>last?first:last;
+ if(lo>=e->active.length)return 0;if(hi>=e->active.length)hi=(uint8_t)(e->active.length-1u);
+ int count=0;
+ for(uint8_t i=lo;i<=hi;i++){
+  (void)track_clear_step(e,channel,i);
+  if(channel==TRACK_DRUM_CHANNEL){
+   e->active.note2_fx[i].effect=0u;e->active.note2_fx[i].value=0u;
+  }
+  count++;
+ }
+ return count;
+}
 /* Clear a complete lane including inactive rows, to prevent notes returning when
  * pattern length is increased. Do not modify other channels, metadata, or song. */
 int track_clear_lane(struct track_engine *e,uint8_t channel){

@@ -11,7 +11,11 @@
 MEMORY
 {
     XIP    (rx)  : ORIGIN = 0x02000120, LENGTH = 0x8DFBC
-    RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0x6000
+    RAMTEXT (rwx): ORIGIN = 0x01C00000, LENGTH = 0x1000
+    /* 0x01C01000..0x01C05FFF is verified linker-unoccupied RAMTEXT tail.
+     * Static buffers may use it without reducing audio, project or LCD RAM.
+     * It is NOT flash; do not treat as persistent storage. */
+    BEETLE_USB_STEMS_RAM (rw): ORIGIN = 0x01C01000, LENGTH = 0x5000
     UACRAM (rw)  : ORIGIN = 0x01C06000, LENGTH = 0x1F00 /* preserves debug mailbox at 0x01C07F00 */
     RAM    (rwx) : ORIGIN = 0x01C08000, LENGTH = 96K
     POOL   (rw)  : ORIGIN = 0x01C20000, LENGTH = 0x54C00
@@ -28,6 +32,8 @@ SECTIONS
     /* BEETLE data, guard and LCD pixels are separate and cannot alias. */
     .pool (NOLOAD) : { _pool_start = .; *(.pool*) . = ALIGN(64); } > POOL
     .usb_audio_ram (NOLOAD) : { _usb_audio_start = .; *(.usb_audio_ram*) . = ALIGN(4); _usb_audio_end = .; } > UACRAM
+    .beetle_usb_stems_ram (NOLOAD) : { . = ALIGN(4); _beetle_usb_stems_start = .; *(.beetle_usb_stems_ram*) . = ALIGN(4); _beetle_usb_stems_end = .; } > BEETLE_USB_STEMS_RAM
+    ASSERT(_rt_end <= 0x01C01000, "USB stems RAM overlaps firmware ram_text")
     .beetle_song (NOLOAD) : { . = ALIGN(64); _beetle_song_start = .; KEEP(*(.beetle_song*)); . = ALIGN(64); _beetle_song_end = .; } > POOL
     .beetle_mem_gap (NOLOAD) : { _beetle_mem_gap_start = .; . = . + 128; _beetle_mem_gap_end = .; } > POOL
     .beetle_lcd_frame (NOLOAD) : { . = ALIGN(64); _beetle_frame_start = .; KEEP(*(.beetle_lcd_frame*)); . = ALIGN(64); _beetle_frame_end = .; _pool_end = .; } > POOL

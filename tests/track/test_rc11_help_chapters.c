@@ -5,7 +5,7 @@
 #include "../../firmware/fm1-native/beetle_help.h"
 int main(void){
  unsigned count=beetle_help_chapter_count();
- assert(count==12u);assert(BEETLE_HELP_VISIBLE==9u);
+ assert(count==13u);assert(BEETLE_HELP_VISIBLE==9u);
  assert(!strcmp(beetle_help_lines[0],"# TRACKER BASICS"));
  unsigned covered=0u;
  for(unsigned chapter=0u;chapter<count;chapter++){

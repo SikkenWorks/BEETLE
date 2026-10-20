@@ -15,10 +15,14 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.3.2</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.3.3</strong> · <a href="CHANGELOG.md">Release history</a></sub>
 </p>
 
 ---
+
+**BEETLE V1.3.3** adds experimental **USB-C six-channel recording** and expands block editing. With **HOME → PROJECTS → SETTINGS → USB MULTITRACK → ON** the FM1 presents one USB Audio Class 1 capture device with **six discrete 44.1 kHz, 16-bit mono channels**, corresponding to CH1–CH6 in order. Create six **mono DAW tracks** and set their inputs to channels 1 through 6. **OFF** retains the prior two-channel **stereo master output including mixer panning and MASTER/Punch-In FX**. Mode changes disconnect/re-enumerate the USB audio device: reopen/reselect the interface in your DAW. The mode defaults to OFF on each FM1 restart and does **not** modify projects or flash storage. The **mono stems are captured before global MASTER and Punch-In FX and contain no pan automation**, but do include their respective lane gain, mute/solo and per-step processing. As the source FM1 uses a full-speed USB link and a tight RAM/CPU budget, six-channel recording is unverified on physical hardware; never treat a successful build as a real-device sound test.
+
+**Range editing:** In TRACKER stop transport, hold **SEL** and turn **K1** to select consecutive steps in the current lane. Move **K2** to the INST column and turn **K3** to change the instrument for every **actual synth note** in that selection. Empty and `[STP]` steps remain empty and STOP. Tap **SEL** after a selection to clear all selected steps in one edit. Both operations participate in existing Undo/Redo (SEQ+OP5/OP6). The selection is lane-local. These controls are available in the WebSimulator, where Shift+click is also supported. The browser simulator **does not provide USB audio multitrack hardware**.
 
 **BEETLE V1.3.2** fixes instrument selection and makes octave editing work on saved notes. Eight synth patches are **stable fixed slots**; editing a used patch no longer copies it behind the scenes. A patch number in TRACKER always identifies the same patch in EDIT, even when other patterns use it. On an existing synth note, open EDIT to edit exactly that note's assigned patch. EDIT still exposes all **12 oscillator types**, including both dual-oscillator VA modes, per instrument. **CH6 is the independent ROM drum kit.**
 
@@ -66,17 +70,17 @@ You can learn the workflow in a few minutes using the [Web Simulator](https://si
 
 ## HELP chapters
 
-Press **HOME → HELP**. Turn **K2** to browse the twelve topics. Turn **K1** to scroll *inside the selected chapter*. The scroll position resets at each chapter change, and the bottom counter refers to the current chapter, not the whole manual. **HOME** returns to Projects and **SEQ** returns to Tracker. HELP remains read-only; turning the other encoders will not edit your music.
+Press **HOME → HELP**. Turn **K2** to browse the thirteen topics. Turn **K1** to scroll *inside the selected chapter*. The scroll position resets at each chapter change, and the bottom counter refers to the current chapter, not the whole manual. **HOME** returns to Projects and **SEQ** returns to Tracker. HELP remains read-only; turning the other encoders will not edit your music.
 
-Chapters: Tracker Basics, Pattern Editing, Step Dynamics / Groove, Instrument / Keyboard, Projects, Live FX / Record, Song Chains, Live Mixer / Solo, Mixer / Performance, Master FX, Guide / Navigation and USB-C Audio.
+Chapters: Tracker Basics, Pattern Editing, Step Dynamics / Groove, Instrument / Keyboard, Projects, Live FX / Record, Song Chains, Live Mixer / Solo, Mixer / Performance, Master FX, Guide / Navigation, Block Instrument / Delete and USB-C Audio.
 
-## USB-C stereo audio capture (V1.2, experimental)
+## USB-C audio capture: stereo or six-track mode (V1.3.3, experimental)
 
-Connect the FM1 with a **USB-C data cable**. On Windows, open **Settings → System → Sound → Input** or the audio input selector in a recording application and choose **BEETLE Audio** (device naming depends on the operating system). Set the recording format to **44,100 Hz, stereo, 16-bit** when available. Start playback on the FM1 and recording on the computer. The computer initiates the USB audio stream; there is no extra on-device enable switch. The stream taps BEETLE's final master stereo signal, including the master volume, and leaves the analog output and USB-MIDI path present.
+Connect the FM1 with a **USB-C data cable**. On Windows, open **Settings → System → Sound → Input** or the audio input selector in a recording application and choose **BEETLE Audio** (device naming depends on the operating system). Set the recording format to **44,100 Hz, 16-bit**; use stereo for USB MULTITRACK OFF or six mono inputs for ON when the host DAW/driver supports them. Start playback on the FM1 and recording on the computer. The computer initiates the USB audio stream; there is no extra on-device enable switch. The stream taps BEETLE's final master stereo signal, including the master volume, and leaves the analog output and USB-MIDI path present.
 
-USB-C audio is **audio from FM1 → computer**, not computer → FM1. It is not USB screen capture, audio-file transfer, USB mass storage, or multitrack individual stems. The WebSimulator produces local browser audio and **does not act as a physical USB audio device**.
+USB-C audio is **audio from FM1 → computer**, not computer → FM1. It is not USB screen capture, audio-file transfer or USB mass storage. **Multitrack ON provides six independent mono channels before global master processing; OFF captures the stereo master.** The WebSimulator produces local browser audio and **does not act as a physical USB audio device**.
 
-The USB audio endpoint and the associated ISR originated from Felucca. V1.2 preserves that foundation but changes the 44.1 kHz ring reader to interpolate smoothly across physical FM1/host clock drift, with bounded rate tracking and fixed 44/45-frame packets. BEETLE V1.2 includes this UAC1 capture path in the distributed native build with `--usb-audio` (44.1 kHz only). This is a **software-/linker-validated experimental feature**, not proof that Windows/macOS/Linux enumerates it on a real FM1 or that it runs glitch-free with all six lanes and MASTER FX. Check for a BEETLE Audio input after installing; if the device fails to enumerate, do not assume an OS-level driver change will fix the firmware. See [`docs/V1.2-AUDIO-VALIDATION.md`](docs/V1.2-AUDIO-VALIDATION.md).
+The USB audio endpoint and the associated ISR originated from Felucca. V1.2 preserves that foundation but changes the 44.1 kHz ring reader to interpolate smoothly across physical FM1/host clock drift, with bounded rate tracking and fixed 44/45-frame packets. BEETLE V1.3.3 includes stereo and six-channel UAC1 capture paths in the distributed native build with `--usb-audio` (44.1 kHz only). This is a **software-/linker-validated experimental feature**, not proof that Windows/macOS/Linux enumerates it on a real FM1 or that it runs glitch-free with all six lanes and MASTER FX. Check for a BEETLE Audio input after installing; if the device fails to enumerate, do not assume an OS-level driver change will fix the firmware. See [`docs/V1.2-AUDIO-VALIDATION.md`](docs/V1.2-AUDIO-VALIDATION.md).
 
 Build the distributed USB-audio configuration with:
 

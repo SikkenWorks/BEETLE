@@ -513,6 +513,8 @@ static int32_t beetle_step_fx_voice(int32_t mono,const struct track_chip_engine 
  }
  return mono;
 }
+int16_t *beetle_stem_capture;
+uint32_t beetle_stem_offset;
 void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix,int16_t *stereo,uint32_t frames){
  if(!s||!stereo)return;
  if(!track_chip_health(s))track_chip_recover(s);
@@ -531,6 +533,7 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
  }
  for(uint32_t f=0;f<frames;f++){
   int64_t left=0,right=0;
+  int32_t stems[TRACK_SYNTH_CHANNELS]={0};
   uint8_t foreground=0u,active_voices=0u; /* normal and ADSR-release voices counted separately */
   for(uint8_t i=0;i<s->voice_count;i++){
    struct track_chip_voice *v=&s->voices[i];
@@ -553,6 +556,7 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
    uint32_t peak=(uint32_t)(mono<0?-(int64_t)mono:mono);
    if(peak>32767u)peak=32767u;
    if(peak>track_lane_pcm_peak[v->channel])track_lane_pcm_peak[v->channel]=(uint16_t)peak;
+   if(beetle_stem_capture)stems[v->channel]+=mono;
    left+=((int64_t)mono*pan_left[v->channel])>>8;
    right+=((int64_t)mono*pan_right[v->channel])>>8;
   }
@@ -570,6 +574,13 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
   }else if(s->phrase_div_q8>target){
    uint32_t step=foreground?1u:16u;
    s->phrase_div_q8=(uint16_t)(s->phrase_div_q8-target<step?target:s->phrase_div_q8-step);
+  }
+  if(beetle_stem_capture){
+   int16_t *frame=beetle_stem_capture+(beetle_stem_offset+f)*TRACK_CHANNELS;
+   for(uint8_t ch=0;ch<TRACK_SYNTH_CHANNELS;ch++){
+    int32_t v=(stems[ch]*256)/(int32_t)s->phrase_div_q8;
+    frame[ch]=(int16_t)bound(v,-32768,32767);
+   }
   }
   left=((int32_t)left*256)/(int32_t)s->phrase_div_q8;
   right=((int32_t)right*256)/(int32_t)s->phrase_div_q8;
