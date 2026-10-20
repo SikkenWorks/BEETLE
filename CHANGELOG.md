@@ -1,3 +1,12 @@
+## V1.3.5 — Independent FX1/FX2/FX3 and revised Workbench (20 October 2026)
+
+- Adopted the author's revised `simulator(2).html` Workbench, preserving device geometry, styling and native `.beetle` project slots and import/export. Its embedded engine is refreshed from matching V1.3.5 source.
+- **PER STEP FX:** K1 selects FX1/FX2/FX3 vertically, K2 scrolls available FX types, K3 changes the selected effect's parameter. All three slots can be populated independently from the beginning; OCT+ / OCT− support selection/removal. CH6 NOTE1/NOTE2 changes via SELECT.
+- Fixed the root bug where FX2 required populated FX1 and FX3 required populated FX2. Also corrected missing DSP activation when FX1 is empty, isolated deletion, no ghost slot migration, and correct `MUL` indicator for 2+ active effects.
+- **TRK1 V22** carries the explicit FX2/FX3 identity within the existing record size. V21 projects migrate on load, V19/V20 remain readable; V22 is not backward-readable by older firmware. 48-entry pool and `FX STORAGE FULL` overlay remain in place.
+- The black FM1 piano keys continue to enter true chromatic tracker notes, with existing SEQ/OP and mixer shortcuts preserved.
+- Firmware/installer remain experimental: firmware compilation and software-only regression tests do not replace physical FM1 recovery, flash and audio validation.
+
 ## V1.3.4 — Three Step FX Slots (experimental, 20 October 2026)
 
 - FX1 + FX2 + FX3 in the existing PER STEP FX menu. Additional effects use a project-wide, 48-record, bounded pool; no silent overwrites. `FX STORAGE FULL` overlay on rejected insertion, `MUL` label for multiple FX, separate CH6 NOTE1/NOTE2 values.

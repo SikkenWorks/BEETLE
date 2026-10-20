@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
-const script=fs.readFileSync('simulator.html','utf8');
+const script=fs.readFileSync('web/BEETLE-FirmwareSimulator-V1.3.5.html','utf8');
 const between=(start,end)=>{const i=script.indexOf(start);assert(i>=0,start);const j=script.indexOf(end,i+start.length);assert(j>=0,end);return script.slice(i,j+end.length)};
 const core=between('const TRACK_CORE=(()=>{','\n})();');
 const verify=between('function beetleVerifyProjectShape(p){','\n}\nfunction beetleDownload(').slice(0,-'\nfunction beetleDownload('.length);

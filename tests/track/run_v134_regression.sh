@@ -38,7 +38,7 @@ assert "ID_ET: 'FM-1_2119'" in installer and "HASH_ET: '"+mf['sha256']+"'" in in
 embed=re.search(r'<script id="firmware-embedded" type="application/octet-stream">\s*(.*?)\s*</script>',installer,re.S)
 assert embed and base64.b64decode(embed[1])==raw
 assert Path('web/WebInstaller.html').read_bytes()==Path('WebInstaller.html').read_bytes()
-for f in ('simulator.html','web/simulator.html'):
+for f in ('web/BEETLE-FirmwareSimulator-V1.3.5.html',):
  s=Path(f).read_text();lines=re.search(r'const HELP_LINES=(\[.*?\]);',s)
  assert lines
  import re

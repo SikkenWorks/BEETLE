@@ -7,6 +7,7 @@
 #include "track_song.h"
 #define BEETLE_UNDO_CAP 6u
 #define BEETLE_BLOCK_ACTIONS 7u
+#define BEETLE_EDIT_FX_POOL_FULL 5u /* rejected paste, no partial mutations */
 /* One chronological six-entry history for all edit contexts. Non-pattern
  * snapshots reuse the existing pattern-image bytes; no second history pool. */
 #define BEETLE_EDIT_PATTERN 0u
@@ -143,19 +144,19 @@ static inline void beetle_edit_copy_pattern(struct beetle_pattern_editor *ed,con
 }
 static inline int beetle_edit_paste_pattern(struct beetle_pattern_editor *ed,struct track_song_bank *bank,struct track_engine *eng){
  if(!ed||!ed->whole_valid)return 0;
+ ed->status=0u;
+ /* Check shared FX capacity before touching steps, cursor, or Undo state. */
+ uint8_t previous=0u,needed=0u;
+ for(uint8_t i=0u;i<bank->extras.count;i++)previous+=(bank->extras.data[i].pattern==eng->pattern_slot);
+ for(uint8_t i=0u;i<ed->whole_clip->extras.count;i++)needed+=(ed->whole_clip->extras.data[i].pattern==ed->whole_index);
+ if((uint16_t)bank->extras.count-previous+needed>TRACK_EXTRA_FX_CAP){
+  ed->status=BEETLE_EDIT_FX_POOL_FULL;return 0;
+ }
  beetle_edit_begin(ed,bank,eng);
  eng->active=ed->whole_clip->pattern;
  if(eng->active.length>=1u&&eng->active.length<=TRACK_STEPS && eng->transport.edit_step>=eng->active.length)
   eng->transport.edit_step=(uint8_t)(eng->active.length-1u);
  bank->clips[eng->pattern_slot]=ed->whole_clip->punch;
- uint8_t previous=0u,needed=0u;
- for(uint8_t i=0u;i<bank->extras.count;i++)previous+=(bank->extras.data[i].pattern==eng->pattern_slot);
- for(uint8_t i=0u;i<ed->whole_clip->extras.count;i++)needed+=(ed->whole_clip->extras.data[i].pattern==ed->whole_index);
- if(bank->extras.count-previous+needed>TRACK_EXTRA_FX_CAP){
-  /* Refuse the whole paste: no partial FX loss when storage is full. */
-  eng->active=ed->pending->pattern;bank->clips[eng->pattern_slot]=ed->pending->punch;
-  ed->pending_valid=0u;return 0;
- }
  for(uint8_t i=0u;i<bank->extras.count;){
   if(bank->extras.data[i].pattern==eng->pattern_slot){
    for(uint8_t j=i;j+1u<bank->extras.count;j++)bank->extras.data[j]=bank->extras.data[j+1u];
@@ -223,14 +224,14 @@ static inline int beetle_edit_block_execute(struct beetle_pattern_editor *ed,str
    if(f->pattern==eng->pattern_slot&&lane==ch&&!(f->id&128u)&&row>=ed->first&&row<ed->first+count)old++;
   }
   for(uint8_t i=0u;i<ed->block_fx_count;i++)needed+=(uint8_t)(ed->block_fx[i].id<count);
-  if(bank->extras.count-old+needed>TRACK_EXTRA_FX_CAP){ed->pending_valid=0u;ed->status=4u;return 0;}
+  if(bank->extras.count-old+needed>TRACK_EXTRA_FX_CAP){ed->pending_valid=0u;ed->status=BEETLE_EDIT_FX_POOL_FULL;return 0;}
   for(uint8_t i=0u;i<count;i++)eng->active.ch[ch][ed->first+i]=ed->block[i];
   for(uint8_t i=0u;i<count;i++)track_extra_clear(bank,eng->pattern_slot,track_extra_key(ch,(uint8_t)(ed->first+i),0u));
   for(uint8_t i=0u;i<ed->block_fx_count;i++){
    const struct track_extra_fx *f=&ed->block_fx[i];if(f->id>=count)continue;
    uint8_t key=track_extra_key(ch,(uint8_t)(ed->first+f->id),0u);
-   uint8_t slot=track_extra_count(bank,eng->pattern_slot,key);
-   (void)track_extra_add(bank,eng->pattern_slot,key,slot,f->effect,f->value);
+   uint8_t slot=track_extra_slot(f);
+   (void)track_extra_add(bank,eng->pattern_slot,key,track_extra_slot(f),track_extra_effect(f),f->value);
   }
  }else if(ed->action==2u){
   for(uint8_t i=a;i<=b;i++)beetle_edit_blank(&eng->active.ch[ch][i]);
@@ -254,8 +255,8 @@ static inline int beetle_edit_block_execute(struct beetle_pattern_editor *ed,str
    int32_t dst=(int32_t)row+(ed->amount>0?1:ed->amount<0?-1:0);
    if(dst<a||dst>b)continue;
    uint8_t key=track_extra_key(ch,(uint8_t)dst,0u);
-   uint8_t slot=track_extra_count(bank,eng->pattern_slot,key);
-   (void)track_extra_add(bank,eng->pattern_slot,key,slot,f->effect,f->value);
+   uint8_t slot=track_extra_slot(f);
+   (void)track_extra_add(bank,eng->pattern_slot,key,track_extra_slot(f),track_extra_effect(f),f->value);
   }
  }
  track_extra_prune(bank,eng->pattern_slot,&eng->active);

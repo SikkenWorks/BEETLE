@@ -45,7 +45,7 @@ static inline void beetle_step_fx_multi(struct track_chip_engine *chip,
  uint8_t pitch=0u;
  for(uint8_t j=0u;j<2u;j++){
   const struct track_extra_fx *f=entries[j];if(!f||!f->effect)continue;
-  const uint8_t type=f->effect,value=f->value;
+  const uint8_t type=track_extra_effect(f),value=f->value;
   chip->fx_extra_type[lane][j]=type;chip->fx_extra_value[lane][j]=value;
   if(type==1u)chip->cutoff[lane]=(uint8_t)(4u+(uint32_t)value*2u);
   else if(type==2u && value>chip->drive[lane])chip->drive[lane]=value;

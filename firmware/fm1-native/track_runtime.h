@@ -118,8 +118,8 @@ static void beetle_lane_fx_paste(uint8_t lane,uint8_t first,uint8_t count){
   uint8_t offset=(uint8_t)(f->id&127u);if(offset>=count)continue;
   uint8_t note2=(uint8_t)((f->id&128u)!=0u);
   uint8_t key=track_extra_key(lane,(uint8_t)(first+offset),note2);
-  uint8_t slot=track_extra_count(&track_song,track_state.pattern_slot,key);
-  (void)track_extra_add(&track_song,track_state.pattern_slot,key,slot,f->effect,f->value);
+  uint8_t slot=track_extra_slot(f);
+  (void)track_extra_add(&track_song,track_state.pattern_slot,key,slot,track_extra_effect(f),f->value);
  }
 }
 
@@ -853,11 +853,11 @@ static void track_audio_fire(struct etch_native_audio *audio,uint8_t lane_mask){
     for(uint8_t slot=0u;slot<2u;slot++){
      const struct track_extra_fx *extra=track_audio_extra(TRACK_DRUM_CHANNEL,position,second_hit,slot);
      if(!extra)continue;
-     if(extra->effect==TRACK_FX_DRUM_PITCH){
+     if(track_extra_effect(extra)==TRACK_FX_DRUM_PITCH){
       int32_t pitch=(int32_t)hit->pitch_semitones+(int32_t)extra->value-12;
       if(pitch< -36)pitch=-36;if(pitch>36)pitch=36;
       hit->pitch_semitones=(int8_t)pitch;track_drum_retune_voice(&track_drum,hit);
-     }else if(extra->effect==TRACK_FX_VOLUME)
+     }else if(track_extra_effect(extra)==TRACK_FX_VOLUME)
       hit->gain_q8=(uint16_t)((uint32_t)hit->gain_q8*extra->value/100u);
     }
     hit->gain_q8=(uint16_t)((uint32_t)hit->gain_q8*vel/94u);
@@ -880,11 +880,22 @@ static void track_audio_fire(struct etch_native_audio *audio,uint8_t lane_mask){
   const struct track_instrument_ui_values *ins=&track_ui_inst[instruments[c]];
   uint8_t duty=(uint8_t)(ins->duty<19u?0u:ins->duty<38u?1u:ins->duty<63u?2u:3u);
   uint8_t cutoff=(uint8_t)(ins->cutoff/75u>250u?250u:ins->cutoff/75u);
+  const struct track_extra_fx *extra2=track_audio_extra(c,position,0u,0u);
+  const struct track_extra_fx *extra3=track_audio_extra(c,position,0u,1u);
   beetle_step_fx_event(&track_chip,c,s,duty,cutoff,track_state.transport.bpm);
-  if(s->effect && s->note!=TRACK_NOTE_STOP)
-   beetle_step_fx_multi(&track_chip,c,
-      track_audio_extra(c,position,0u,0u),track_audio_extra(c,position,0u,1u),
-      track_state.transport.bpm);
+  if(s->note!=TRACK_NOTE_STOP){
+   /* FX2/FX3 may start on an empty primary FX1, including an effect-only
+    * row applied to sustained voices. Reset old per-step parameters first. */
+   if((extra2||extra3)&&!s->effect&&s->note==TRACK_NOTE_EMPTY){
+    track_chip.fx_type[c]=0u;track_chip.fx_value[c]=50u;
+    for(uint8_t j=0u;j<2u;j++){
+     track_chip.fx_extra_type[c][j]=0u;track_chip.fx_extra_value[c][j]=50u;}
+    track_chip.duty[c]=duty;track_chip.cutoff[c]=cutoff;
+    track_chip.drive[c]=0u;track_chip.cut_after[c]=0xFFFFFFFFu;
+    track_chip.step_gain[c]=100u;track_chip.fx_samples[c]=0u;
+   }
+   beetle_step_fx_multi(&track_chip,c,extra2,extra3,track_state.transport.bpm);
+  }
   if(s->note==TRACK_NOTE_STOP){track_chip_release_channel(&track_chip,c);track_gate_remaining[c]=0u;continue;}
   velocity[c]=track_patch_volume_velocity(instruments[c],track_mixer_velocity(trigger_mix,c,track_step_velocity(s)));
   if(s->note==TRACK_NOTE_EMPTY || track_groove_clock.lane[c].skip_note || (track_state.punch_mask&(1u<<7)) || velocity[c]==0u)continue;
@@ -1221,12 +1232,21 @@ static void track_fm1_grid(void){
    if(src<TRACK_PATTERNS){source=src;uint8_t len=track_song.patterns[src].length;
     fxrow=(uint8_t)(row%(len?len:TRACK_STEPS));}
   }
-  uint8_t mul=(uint8_t)(track_extra_count(&track_song,source,track_extra_key(track_state.transport.edit_channel,fxrow,0u))>0u);
+  const uint8_t fxkey=track_extra_key(track_state.transport.edit_channel,fxrow,0u);
+  const uint8_t synth_extra=track_extra_count(&track_song,source,fxkey);
+  uint8_t mul=(uint8_t)((st->effect!=0u)+synth_extra>1u);
   if(drum){
    uint8_t note2fx=track_state.active.note2_fx[row].effect;
-   mul|=(uint8_t)(track_extra_count(&track_song,source,track_extra_key(TRACK_DRUM_CHANNEL,fxrow,1u))>0u);
+   uint8_t drum_n2=(uint8_t)((note2fx!=0u)+track_extra_count(&track_song,source,track_extra_key(TRACK_DRUM_CHANNEL,fxrow,1u)));
+   mul|=(uint8_t)(drum_n2>1u);
    if(!st->effect && note2fx){const char *f2=track_web_stepfx[note2fx<TRACK_FX_COUNT?note2fx:0u];
     fx3[0]=f2[0];fx3[1]=f2[1];fx3[2]=f2[2];}
+  }
+  if(!st->effect && !mul && synth_extra){
+   const struct track_extra_fx *single=track_extra_find(&track_song,source,fxkey,0u);
+   if(!single)single=track_extra_find(&track_song,source,fxkey,1u);
+   if(single){const char *label=track_web_stepfx[track_extra_effect(single)];
+    fx3[0]=label[0];fx3[1]=label[1];fx3[2]=label[2];}
   }
   if(mul){fx3[0]='M';fx3[1]='U';fx3[2]='L';}
   track_pix_cell(fx3,xs[4],y);
@@ -1581,7 +1601,8 @@ static void track_fm1_paint(void){
    else lcd_fill((uint16_t)(x+5u),(uint16_t)(y+6u),2u,3u,chosen?TRACK_PINK:TRACK_WHITE);
   }
   track_pix_text(beetle_ed.status==1u?"BLOCK COPIED":beetle_ed.status==2u?"EDIT APPLIED":
-   beetle_ed.status==3u?"REDO OK":beetle_ed.status==4u?"NO CHANGE":"SEL: APPLY",12u,191u,TRACK_PINK);
+   beetle_ed.status==3u?"REDO OK":beetle_ed.status==4u?"NO CHANGE":
+   beetle_ed.status==BEETLE_EDIT_FX_POOL_FULL?"FX STORAGE FULL":"SEL: APPLY",12u,191u,TRACK_PINK);
   lcd_fill(12u,207u,216u,1u,0x4807u);
   track_pix_text("HOME / SEQ: TRACKER",12u,213u,TRACK_WHITE);
   track_pix_text("EDIT WHILE STOPPED",12u,228u,TRACK_PINK);
@@ -1748,7 +1769,7 @@ static void track_fm1_paint(void){
   const uint8_t pv=use2?track_state.active.note2_fx[track_state.transport.edit_step].value:st->value;
   for(uint8_t j=0u;j<3u;j++){
    const struct track_extra_fx *ext=j?track_extra_find(&track_song,track_state.pattern_slot,key,(uint8_t)(j-1u)):0;
-   const uint8_t effect=j?(ext?ext->effect:0u):primary;
+   const uint8_t effect=j?track_extra_effect(ext):primary;
    const uint8_t value=j?(ext?ext->value:50u):pv;
    const char *nm=track_web_stepfx[effect<TRACK_FX_COUNT?effect:0u];
    uint8_t at=0u;item[j][at++]='F';item[j][at++]='X';item[j][at++]=(char)('1'+j);item[j][at++]=' ';
@@ -1758,18 +1779,12 @@ static void track_fm1_paint(void){
    items[j]=item[j];
   }
   track_web_list(items,3u,track_fx_slot,80u,26u);
-  track_pix_text("K1 PARAM  K3 CHANGE",15u,177u,TRACK_PINK);
-  track_pix_text("OCT+ SLOT  OCT- REMOVE",15u,189u,TRACK_PINK);
-  track_pix_text(use2?"K2 NOTE1/NOTE2":"K2 FX SLOT",15u,201u,TRACK_WHITE);
+  track_pix_text("K1 ROW   K2 FX TYPE",15u,177u,TRACK_PINK);
+  track_pix_text("K3 VALUE OCT- REMOVE",15u,189u,TRACK_PINK);
+  track_pix_text("OCT+ NEXT FX SLOT",15u,201u,TRACK_WHITE);
   char cap[30]="FX STORAGE ";track_fmt_int(nv,track_song.extras.count);
   uint8_t at=11u;for(uint8_t k=0u;nv[k]&&at<19u;k++)cap[at++]=nv[k];cap[at++]='/';cap[at++]='4';cap[at++]='8';cap[at]=0;
   track_pix_text(cap,15u,214u,TRACK_PINK);
-  if((int32_t)(track_fx_full_until-etch_ms)>0){
-   lcd_fill(13u,95u,214u,53u,TRACK_DARK);
-   lcd_fill(13u,95u,214u,2u,TRACK_PINK);
-   track_pix_center("FX STORAGE FULL",120u,109u,TRACK_BRIGHT);
-   track_pix_center("REMOVE FX TO FREE SPACE",120u,127u,TRACK_PINK);
-  }
   return;
  }
  if(track_page==4u){
@@ -2118,11 +2133,19 @@ static void track_input_diag_draw(void){
  }
 #endif
 }
+static void track_fx_storage_popup_draw(void){
+ if((int32_t)(track_fx_full_until-etch_ms)<=0)return;
+ /* Draw in both guarded LCD slices, above whichever page rejected an edit. */
+ lcd_fill(13u,95u,214u,53u,TRACK_DARK);
+ lcd_fill(13u,95u,214u,2u,TRACK_PINK);
+ track_pix_center("FX STORAGE FULL",120u,109u,TRACK_BRIGHT);
+ track_pix_center("REMOVE FX TO FREE SPACE",120u,127u,TRACK_PINK);
+}
 static void track_fm1_draw(void){
  track_runtime_validate();
  /* LCD uses only dedicated guarded RAM, never the pattern song bank. */
- track_panel_begin_slice(0u,120u);track_fm1_paint();track_record_banner();track_input_diag_draw();etch_panel_commit();
- track_panel_begin_slice(120u,120u);track_fm1_paint();track_record_banner();track_input_diag_draw();etch_panel_commit();
+ track_panel_begin_slice(0u,120u);track_fm1_paint();track_record_banner();track_input_diag_draw();track_fx_storage_popup_draw();etch_panel_commit();
+ track_panel_begin_slice(120u,120u);track_fm1_paint();track_record_banner();track_input_diag_draw();track_fx_storage_popup_draw();etch_panel_commit();
  /* Reset after BOTH LCD slices, so low-level audio peaks never become stale. */
  if(track_page==6u){fm1_irq_off();for(uint8_t c=0u;c<TRACK_CHANNELS;c++)track_lane_pcm_peak[c]=0u;fm1_irq_enable_all();}
 }
@@ -2608,7 +2631,10 @@ static void track_fm1_poll(void){
     if(beetle_ed.action==5u||beetle_ed.action==6u){
      uint8_t applied=track_history_step((uint8_t)(beetle_ed.action==6u));
      beetle_ed.status=applied?(uint8_t)(beetle_ed.action==6u?3u:2u):4u;
-    }else (void)beetle_edit_block_execute(&beetle_ed,&track_song,&track_state);
+    }else {
+     (void)beetle_edit_block_execute(&beetle_ed,&track_song,&track_state);
+     if(beetle_ed.status==BEETLE_EDIT_FX_POOL_FULL)track_fx_full_until=now+1800u;
+    }
     fm1_irq_enable_all();
    }
    else beetle_ed.status=4u;
@@ -3249,6 +3275,7 @@ static void track_fm1_poll(void){
     }
     if((combo_edges&(1u<<8u)) && !track_state.transport.playing){
      fm1_irq_off();if(beetle_edit_paste_pattern(&beetle_ed,&track_song,&track_state))changed=1u;
+     else if(beetle_ed.status==BEETLE_EDIT_FX_POOL_FULL)track_fx_full_until=now+1800u;
      fm1_irq_enable_all();track_seq_fired=1u;
     }
     if((combo_edges&(1u<<10u)) && !track_state.transport.playing){
@@ -3428,11 +3455,12 @@ static void track_fm1_poll(void){
     }
    }
    if(track_page==3u){
-    if(k2){
-     if(track_state.transport.edit_channel==TRACK_DRUM_CHANNEL)track_fx_drum_lane^=1u;
-     else track_fx_slot=(uint8_t)(((int32_t)track_fx_slot+(k2%3)+3)%3);
-    }
-    if(k1)track_fx_cursor=(uint8_t)((int32_t)track_fx_cursor+k1>0?1u:0u);
+    if(sel&&track_state.transport.edit_channel==TRACK_DRUM_CHANNEL)
+     track_fx_drum_lane=(uint8_t)(((int32_t)track_fx_drum_lane+sel)%2+2)%2;
+    /* K1 selects FX1/FX2/FX3, K2 changes the chosen effect,
+     * K3 changes its value. All three slots are selectable immediately. */
+    if(k1){int32_t row=(int32_t)track_fx_slot+k1;
+     track_fx_slot=(uint8_t)(row<0?0:row>2?2:row);}
     /* OCT buttons operate the selected FX slot ONLY on this page. */
     if(pressed&1u){
      if(!track_state.transport.playing){
@@ -3443,18 +3471,15 @@ static void track_fm1_poll(void){
       struct track_note2_fx *f2=&track_state.active.note2_fx[row];
       uint8_t use2=(uint8_t)(lane==TRACK_DRUM_CHANNEL&&track_fx_drum_lane);
       if(!track_fx_slot){
-       const struct track_extra_fx *first=track_extra_find(&track_song,track_state.pattern_slot,key,0u);
-       if(first){if(use2){f2->effect=first->effect;f2->value=first->value;}
-        else{st->effect=first->effect;st->value=first->value;}
-        track_extra_remove(&track_song,track_state.pattern_slot,key,0u);
-       }else{if(use2){f2->effect=0u;f2->value=50u;}else{st->effect=0u;st->value=50u;}}
+       if(use2){f2->effect=0u;f2->value=50u;}
+       else{st->effect=0u;st->value=50u;}
       }else track_extra_remove(&track_song,track_state.pattern_slot,key,(uint8_t)(track_fx_slot-1u));
       (void)beetle_edit_commit(&beetle_ed,&track_song,&track_state);
       fm1_irq_enable_all();track_state.dirty=1u;
      }
     }
     if(pressed&2u)track_fx_slot=(uint8_t)((track_fx_slot+1u)%3u);
-    if(k3 && !track_state.transport.playing){
+    if((k2||k3) && !track_state.transport.playing){
      fm1_irq_off();beetle_edit_begin(&beetle_ed,&track_song,&track_state);
      uint8_t lane=track_state.transport.edit_channel,row=track_state.transport.edit_step;
      struct track_step *st=&track_state.active.ch[lane][row];
@@ -3463,24 +3488,24 @@ static void track_fm1_poll(void){
      uint8_t key=track_extra_key(lane,row,use2);
      uint8_t primary=use2?f2->effect:st->effect;
      struct track_extra_fx *ex=track_fx_slot?track_extra_get(&track_song,track_state.pattern_slot,key,(uint8_t)(track_fx_slot-1u)):0;
-     uint8_t oldfx=track_fx_slot?(ex?ex->effect:0u):primary;
+     uint8_t oldfx=track_fx_slot?track_extra_effect(ex):primary;
      uint8_t oldval=track_fx_slot?(ex?ex->value:50u):(use2?f2->value:st->value);
-     if(track_fx_cursor==0u){
-      int32_t v=(int32_t)oldfx+k3;
+     if(k2){
+      int32_t v=(int32_t)oldfx+k2;
       uint8_t next=(uint8_t)((v%TRACK_FX_COUNT+TRACK_FX_COUNT)%TRACK_FX_COUNT);
       if(next==TRACK_FX_VOLUME&&oldfx!=TRACK_FX_VOLUME)oldval=100u;
       if(next==TRACK_FX_DRUM_PITCH&&oldfx!=TRACK_FX_DRUM_PITCH)oldval=12u;
       if(!track_fx_slot){
        if(use2){f2->effect=next;f2->value=oldval;}else{st->effect=next;st->value=oldval;}
-       if(!next)track_extra_clear(&track_song,track_state.pattern_slot,key);
+       /* FX2/FX3 stay independent when FX1 is cleared. */
       }else if(ex){
-       if(next){ex->effect=next;ex->value=oldval;}
+       if(next){ex->effect=(uint8_t)(next|((track_fx_slot-1u)<<7u));ex->value=oldval;}
        else track_extra_remove(&track_song,track_state.pattern_slot,key,(uint8_t)(track_fx_slot-1u));
-      }else if(next && primary){
+      }else if(next){
        int rc=track_extra_add(&track_song,track_state.pattern_slot,key,(uint8_t)(track_fx_slot-1u),next,oldval);
        if(rc==-1)track_fx_full_until=etch_ms+1800u;
       } /* An empty FX1 is not a full storage pool. */
-     }else if(track_fx_slot==0u || ex){
+     }else if(k3 && (track_fx_slot==0u || ex)){
       int32_t v=(int32_t)oldval+k3;
       if(v<0)v=0;if(v>(oldfx==TRACK_FX_DRUM_PITCH?24:100))v=oldfx==TRACK_FX_DRUM_PITCH?24:100;
       if(ex)ex->value=(uint8_t)v;

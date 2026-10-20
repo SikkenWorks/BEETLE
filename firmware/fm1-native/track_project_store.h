@@ -10,7 +10,7 @@
 #include "beetle_performance_snapshots.h"
 #include "beetle_mute_groups.h"
 #define TRACK_STORE_MAGIC 0x314B5254u /* little endian "TRK1" */
-#define TRACK_STORE_VERSION 21u
+#define TRACK_STORE_VERSION 22u
 #define TRACK_STORE_MAX 24576u /* include legacy V1-V3 decode capacity */
 #define TRACK_STORE_V4_MAX 12256u /* physical V4 payload budget */
 struct track_store_instrument {

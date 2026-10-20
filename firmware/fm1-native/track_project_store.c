@@ -62,8 +62,7 @@ static uint8_t track_store_preflight(const struct track_store_project *p){
    if(f->pattern!=k)continue;
    uint8_t key=f->id,lane=(uint8_t)((key&127u)/TRACK_STEPS),row=(uint8_t)((key&127u)%TRACK_STEPS);
    if(lane>=TRACK_CHANNELS||((key&128u)!=0u&&lane!=TRACK_DRUM_CHANNEL)||
-      f->effect==0u||f->effect>=TRACK_FX_COUNT||f->value>100u)return 0u;
-   if(!(key&128u)?!pat->ch[lane][row].effect:!pat->note2_fx[row].effect)return 0u;
+      track_extra_effect(f)==0u||track_extra_effect(f)>=TRACK_FX_COUNT||f->value>100u)return 0u;
    if(track_extra_count(&p->song,k,key)>2u)return 0u;
   }
   for(uint8_t s=0u;s<TRACK_STEPS;s++)
@@ -263,7 +262,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=21u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  uint32_t i=24u;uint8_t c,r,s;
  memset(p,0,sizeof(*p));
@@ -352,10 +351,11 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
     uint8_t key,fx,value;GET1(key);GET1(fx);GET1(value);
     uint8_t lane=(uint8_t)((key&127u)/16u),row=(uint8_t)((key&127u)%16u);
     if(lane>=TRACK_CHANNELS||((key&128u)!=0u&&lane!=TRACK_DRUM_CHANNEL)||
-       !fx||fx>=TRACK_FX_COUNT||value>100u||
-       (!(key&128u)?!pat->ch[lane][row].effect:!pat->note2_fx[row].effect) ||
+       !(fx&127u)||(fx&127u)>=TRACK_FX_COUNT||value>100u||
        track_extra_count(&p->song,r,key)>=2u)return -3;
-    p->song.extras.data[p->song.extras.count++]=(struct track_extra_fx){r,key,fx,value};
+    uint8_t slot=(uint8_t)(rd16(data+4u)>=22u?((fx>>7u)&1u):track_extra_count(&p->song,r,key));
+    if(track_extra_get(&p->song,r,key,slot))return -3;
+    p->song.extras.data[p->song.extras.count++]=(struct track_extra_fx){r,key,(uint8_t)((fx&127u)|(slot<<7u)),value};
    }
   }
   struct track_song_clip *clip=&p->song.clips[r];GET1(clip->count);
