@@ -1,27 +1,3 @@
-> **Current experimental firmware candidate: BEETLE V1.4.5 GHOST FIX.** Addresses V1.4.4's persistent playhead marks by matching the full-screen LCD snapshot to the remembered painted step (and Song Mode position). Existing 13-pixel partial updates, Project I/O input quarantine, audio DSP, USB multitrack, Project Manager and the desktop-only global sample library remain. [Technical analysis](docs/V145-PLAYHEAD-GHOST-FIX.md). Both builds and host tests pass; **not physically verified on FM1**. No guarantee of eliminating every DMA glitch or of safe OTA recovery.
-
-# Historical V1.4.2 repository notes (preserved for reference)
-
-**Full root directory restored.** This working tree combines the V1.4.1 native firmware patched by the V1.4.2 DMA Patch 2 source with the V1.4.2 desktop global sample library and preserved earlier BEETLE assets, web tools, scripts, documentation and upstream license notices.
-
-**Historical V1.4.2 firmware**: `BEETLE-V1.4.2-DMA-PATCH2-UNVERIFIED.fwsc`. **NOT HARDWARE-VALIDATED.** A native cross-build and host stress test do not guarantee no real FM1 DMA DEADLINE. Don't flash without a fully verified recovery route.
-
-**Current Project Manager**: `BEETLE-Project-Manager.html` (also `BEETLE-V1.4.2-Project-Manager.html` and `web/BEETLE-Project-Manager.html`). The global `.beetlebank` remains PC-only: no on-device global sample storage.
-
-**Historical V1.4.2 installer status:** the V1.4.2 installer embedded and SHA-256 pinned that former DMA Patch 2 candidate (`FM-1_2123`, 610,086 bytes). They have passed offline verification but **USB flashing and physical FM1 DMA safety have not been proven**. `simulator.html` and `web/simulator.html` are historical **V1.3.3** browser-only visuals/audio, not representations of the new native DSP. Older versioned FWSCs in this history are archived originals.
-
-**Start here:** `docs/DMA-V142-PATCH2-REPORT.md` and `docs/FULL-REPOSITORY-RECONSTRUCTION.md`.
-
-**Installer parity/integrity test:** `python tests/installer/test_v142_dma_installer.py` and `node tests/installer/test_v142_dma_installer.cjs`.
-
-**Tests**: `bash tools/diagnostics/run_dma_host_tests.sh` and `bash tools/diagnostics/run_dma_nuggie_64loops.sh tests/fixtures/NUGGIE-SLOT-07.beetle`; `node tests/test_global_bank.js`.
-
-**No functions were removed from the existing native Patch 2 tree.** The JieLi toolchain is installed separately and is not included or distributed.
-
----
-
-# Earlier repository documentation (V1.3.3 historical guide)
-
 <p align="center">
   <img src="BEETLE.png" alt="BEETLE" width="320">
 </p>
@@ -36,31 +12,15 @@
   <a href="https://sikkenworks.github.io/BEETLE/WebInstaller.html"><img src="https://img.shields.io/badge/▲_INSTALL_BEETLE-000000?style=for-the-badge" alt="Install BEETLE"></a>
   <a href="https://sikkenworks.github.io/BEETLE/simulator.html"><img src="https://img.shields.io/badge/▶_WEB_SIMULATOR-000000?style=for-the-badge" alt="Open BEETLE Web Simulator"></a>
   <a href="https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html"><img src="https://img.shields.io/badge/▶_PROJECT_MANAGER-000000?style=for-the-badge" alt="Open BEETLE Project Manager"></a>
+  <a href="https://sikkenworks.github.io/BEETLE/BEETLE-MANAGER.html"><img src="https://img.shields.io/badge/▶_ALL--IN--ONE_MANAGER-000000?style=for-the-badge" alt="BEETLE All-in-One Manager"></a>
+  <a href="https://thefirmwarehub.com/?q=sikkenworks"><img src="https://img.shields.io/badge/▶_THE_FIRMWARE_HUB-000000?style=for-the-badge" alt="The Firmware Hub"></a>
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.3.3</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.4.5</strong> · <a href="CHANGELOG.md">Release history</a></sub>
 </p>
 
 ---
-
-**BEETLE V1.3.3** adds experimental **USB-C six-channel recording** and expands block editing. With **HOME → PROJECTS → SETTINGS → USB MULTITRACK → ON** the FM1 presents one USB Audio Class 1 capture device with **six discrete 44.1 kHz, 16-bit mono channels**, corresponding to CH1–CH6 in order. Create six **mono DAW tracks** and set their inputs to channels 1 through 6. **OFF** retains the prior two-channel **stereo master output including mixer panning and MASTER/Punch-In FX**. Mode changes disconnect/re-enumerate the USB audio device: reopen/reselect the interface in your DAW. The mode defaults to OFF on each FM1 restart and does **not** modify projects or flash storage. The **mono stems are captured before global MASTER and Punch-In FX and contain no pan automation**, but do include their respective lane gain, mute/solo and per-step processing. As the source FM1 uses a full-speed USB link and a tight RAM/CPU budget, six-channel recording is unverified on physical hardware; never treat a successful build as a real-device sound test.
-
-**Range editing:** In TRACKER stop transport, hold **SEL** and turn **K1** to select consecutive steps in the current lane. Move **K2** to the INST column and turn **K3** to change the instrument for every **actual synth note** in that selection. Empty and `[STP]` steps remain empty and STOP. Tap **SEL** after a selection to clear all selected steps in one edit. Both operations participate in existing Undo/Redo (SEQ+OP5/OP6). The selection is lane-local. These controls are available in the WebSimulator, where Shift+click is also supported. The browser simulator **does not provide USB audio multitrack hardware**.
-
-**BEETLE V1.3.2** fixes instrument selection and makes octave editing work on saved notes. Eight synth patches are **stable fixed slots**; editing a used patch no longer copies it behind the scenes. A patch number in TRACKER always identifies the same patch in EDIT, even when other patterns use it. On an existing synth note, open EDIT to edit exactly that note's assigned patch. EDIT still exposes all **12 oscillator types**, including both dual-oscillator VA modes, per instrument. **CH6 is the independent ROM drum kit.**
-
-**Factory patches in NEW projects:** INST 1 RETRO PULSE · 2 RETRO WAVE · 3 VA OSC · 4 VA OSC2 · 5 VA BASS (dual VA OSC with octave sub) · 6 VA PAD (soft, detuned VA OSC2) · 7 SID 6581 · 8 NES PULSE. These are starting presets, not a limitation on the oscillator types you can select. The eight Instrument Library slots are additional, project-local stored patches, not the same as the eight active slots. Every patch has its own parameters and TYPE banks; changing one fixed INST updates every saved note referencing that slot.
-
-**Octave editing:** Stop playback and disarm REC. In TRACKER, place the cursor on a synth note and press **OCT− / OCT+** to change **that note** by exactly −12 / +12 semitones. For multiple steps, hold **SEL**, turn **K1** to extend the selected range, then use **OCT− / OCT+** to transpose every nonempty note in that range (including boundary rows). Undo/Redo remains available via SEQ+OP5/OP6. SEQ+OCT−/+ still transposes notes too. An empty step without a note/range retains the live keyboard octave function. On the WebSimulator, **Shift+click two tracker rows** selects the range. Drums, empty/STP steps, instrument IDs and other lanes are not transposed.
-
-**RETRO WAVE playback** now interpolates between its existing 32 wavetable points to reduce grainy stepping at higher notes. Physical FM1 sound quality and USB recording remain experimental and should be tested with captured audio.
-
-**Project compatibility:** new firmware stores **V20 TRK1 projects** with eight patch slots and 3-bit instrument references. Existing **V19 projects** load with INST 1–4 intact and initialize INST 5–8 to new defaults. Save backups before updating: older V1.3 firmware does **not** understand the V20 format. Maximum stored project size remains 12,256 bytes and overflow is rejected without erasing storage. Eight active patches are distinct from the preexisting eight *project-local* Instrument Library presets. The 8-voice synth polyphony limit is unchanged. The experimental linker increases `.pool` by 3 KiB and reduces the available stack guard reservation; physical stress tests are still required.
-
-**BEETLE V1.3** fixes Song Mode Punch-In recording, prevents unintended start-of-transport FX events, improves chord-versus-single-note gain staging, and preserves separate left/right stereo mixer panning through the USB capture path. Instrument EDIT shows `INST 1/4` through `INST 4/4` to match the tracker. These changes retain the V19 project format and all V1.2 waveform and USB clock fixes. See [V1.3 validation](docs/V1.3-VALIDATION.md).
-
-**BEETLE V1.2** includes a twelve-chapter on-device HELP system and **USB-C stereo capture** (USB Audio Class 1, 44.1 kHz / 16-bit), with revised clock-drift interpolation to avoid abrupt USB resynchronization. The native oscillator output has fixed, calibrated waveform gains for all twelve types and all five VA waveshapes. This correction is part of the firmware DSP, not an automatic loudness compressor. The analog and USB-MIDI paths are retained. **USB streaming, sustained DSP load and OTA recovery have not been validated on a physical FM1**; consult the [Changelog](CHANGELOG.md) and [V1.2 validation notes](docs/V1.2-AUDIO-VALIDATION.md) before installation.
 
 ## What is BEETLE?
 
