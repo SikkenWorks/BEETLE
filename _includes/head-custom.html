@@ -1,0 +1,92 @@
+
+<style>
+  /* BLACK BACKGROUND */
+  html, body,
+  .page-header,
+  .main-content,
+  .site-footer {
+    background: #000000 !important;
+    background-image: none !important;
+  }
+
+  /* WHITE TEXT */
+  body, p, li, td, th,
+  .main-content,
+  .project-tagline,
+  .site-footer,
+  blockquote {
+    color: #FFFFFF !important;
+  }
+
+  /* PINK HEADINGS */
+  h1, h2, h3, h4, h5, h6,
+  .main-content h1,
+  .main-content h2,
+  .main-content h3,
+  .main-content h4,
+  .main-content h5,
+  .main-content h6,
+  .project-name {
+    color: #FF00D6 !important;
+  }
+
+  /* LINKS */
+  a {
+    color: #FF00D6 !important;
+  }
+
+  a:hover {
+    color: #FFFFFF !important;
+  }
+
+  /* TABLES */
+  table tr,
+  table tr:nth-child(even) {
+    background: #000000 !important;
+  }
+
+  table td, table th {
+    border-color: #333333 !important;
+  }
+
+  /* CODE BLOCKS */
+  pre, code {
+    background: #111111 !important;
+    color: #FFFFFF !important;
+  }
+
+  .page-header {
+    padding: 24px 16px 20px !important;
+  }
+
+  .page-header .project-name {
+    width: 100%;
+    max-width: 820px;
+    height: clamp(190px, 30vw, 320px);
+    margin: 0 auto 12px;
+    background-image: url("{{ '/BEETLE-(banner).png' | relative_url }}") !important;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    text-shadow: none !important;
+  }
+
+  .page-header .project-tagline {
+    margin: 0 auto 16px;
+    font-size: clamp(13px, 1.6vw, 17px);
+    line-height: 1.5;
+  }
+
+  @media (max-width: 600px) {
+    .page-header {
+      padding: 18px 12px !important;
+    }
+
+    .page-header .project-name {
+      height: 210px;
+      margin-bottom: 8px;
+    }
+  }
+</style>

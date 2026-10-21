@@ -1,0 +1,139 @@
+{
+  "title": "BEETLE V1.4.2 DMA Patch 2: native audio hot path optimization",
+  "baseline": "V1.4.1 native application + V1.4.2 desktop sample bank",
+  "hardware_status": "UNVERIFIED: software-only; physical FM1 DMA DEADLINE not proven fixed",
+  "firmware": {
+    "filename": "BEETLE-V1.4.2-DMA-PATCH2-UNVERIFIED.fwsc",
+    "sha256": "a82ddfd02c1f26ee1923fff59ecd864eef8b7cdd806a75f2aa0c403a9089b6aa",
+    "size_bytes": 610086,
+    "product": "FM-1_2123",
+    "app_sha256": "5268e4a4f1724809d69df372c24c722e37668251d2cdf835ef09b62380ba31fb",
+    "app_bytes": 484008
+  },
+  "preserved": {
+    "boot_header_16KiB": true,
+    "ota_loader": true,
+    "project_slots": 12,
+    "user_sample_slots": 13,
+    "sample_library_pc_only": true,
+    "project_format_unchanged": true,
+    "dsp_PCM_bit_identical_to_Patch1_test_matrix": true
+  },
+  "patch2_changes": [
+    "Move lane vibrato / FX scanning out of every voice/sample call into chunk preparation",
+    "Precalculate channel gain and drive multipliers per render chunk",
+    "Add 64-loop NUGGIE reproducer for each of 12 oscillator types"
+  ],
+  "validation": {
+    "JieLi_readonly_build": "PASS",
+    "JieLi_experimental_storage_ota_usb_build": "PASS",
+    "app_elf_audit": "PASS",
+    "fwsc_integrity_and_protected_assets": "PASS",
+    "heavy_host_120s_44k1_ubsan": "PASS (FNV 1183fe60)",
+    "PCM_matrix": "PASS (FNV df02ac8b)",
+    "nuggie_64_loop_all_types_pcm_patch1_identical": true,
+    "nuggie_64_loop_result": [
+      {
+        "ch2_type": -1,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "f1b4bd81"
+      },
+      {
+        "ch2_type": 0,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "478500b7"
+      },
+      {
+        "ch2_type": 1,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "cf0fb6e7"
+      },
+      {
+        "ch2_type": 2,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "d69e53d8"
+      },
+      {
+        "ch2_type": 3,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "7ec6bcc4"
+      },
+      {
+        "ch2_type": 4,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "7545dee7"
+      },
+      {
+        "ch2_type": 5,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "143eb045"
+      },
+      {
+        "ch2_type": 6,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "ff97a35d"
+      },
+      {
+        "ch2_type": 7,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "f1b4bd81"
+      },
+      {
+        "ch2_type": 8,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "beefcf69"
+      },
+      {
+        "ch2_type": 9,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "4b76a59b"
+      },
+      {
+        "ch2_type": 10,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "f57b21f4"
+      },
+      {
+        "ch2_type": 11,
+        "loops": 64,
+        "max_synth": 8,
+        "max_drums": 4,
+        "pcm_fnv32": "3aa1518d"
+      }
+    ]
+  },
+  "limitations": [
+    "no actual FM1 ISR wall-clock measurements",
+    "no uninterrupted hardware audio stress test",
+    "no tested independent physical OTA restoration",
+    "no safe hardware global sample storage or realtime long-sample streaming",
+    "host timings are noisy and not comparable to target timing"
+  ],
+  "private_project_included": false,
+  "external_toolchain_bundled": false,
+  "license": "GPL-3.0-only"
+}

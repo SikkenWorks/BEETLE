@@ -1,0 +1,16 @@
+PCM_MATRIX_FNV df02ac8b
+PASS host 120sec/44100Hz / 12 types / 5 VA shapes / FX / max synth=8 max drums=6 / hash=1183fe60
+NUGGIE project: native project decode, two-loop audio, 12 CH2 oscillator variants
+ch2=-1  loop1_ms=  10.842 loop2_ms=  11.876 maxblock_us= 954.07 maxsynth=8 maxdrums=4 FNV=af55d384
+ch2= 0  loop1_ms=  10.546 loop2_ms=   9.874 maxblock_us= 655.87 maxsynth=8 maxdrums=4 FNV=c46d5909
+ch2= 1  loop1_ms=   8.686 loop2_ms=   9.032 maxblock_us=  61.79 maxsynth=8 maxdrums=4 FNV=1accb7bf
+ch2= 2  loop1_ms=  11.187 loop2_ms=  11.902 maxblock_us= 251.80 maxsynth=8 maxdrums=4 FNV=688c0b3d
+ch2= 3  loop1_ms=  11.118 loop2_ms=  10.737 maxblock_us= 174.48 maxsynth=8 maxdrums=4 FNV=884aedf4
+ch2= 4  loop1_ms=  11.100 loop2_ms=  12.250 maxblock_us= 210.86 maxsynth=8 maxdrums=4 FNV=f206fbf7
+ch2= 5  loop1_ms=   9.436 loop2_ms=   9.953 maxblock_us=  95.63 maxsynth=8 maxdrums=4 FNV=dc0c9d55
+ch2= 6  loop1_ms=  15.783 loop2_ms=  11.970 maxblock_us= 901.00 maxsynth=8 maxdrums=4 FNV=7398b018
+ch2= 7  loop1_ms=  10.983 loop2_ms=  11.168 maxblock_us= 154.87 maxsynth=8 maxdrums=4 FNV=af55d384
+ch2= 8  loop1_ms=  10.745 loop2_ms=  11.020 maxblock_us= 254.60 maxsynth=8 maxdrums=4 FNV=dc254088
+ch2= 9  loop1_ms=   9.596 loop2_ms=   8.983 maxblock_us= 281.08 maxsynth=8 maxdrums=4 FNV=96d268f6
+ch2=10  loop1_ms=   9.759 loop2_ms=  11.069 maxblock_us=1421.91 maxsynth=8 maxdrums=4 FNV=36677f31
+ch2=11  loop1_ms=   8.779 loop2_ms=  10.421 maxblock_us=1112.52 maxsynth=8 maxdrums=4 FNV=03fe17b3

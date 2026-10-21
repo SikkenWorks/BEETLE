@@ -1,0 +1,3 @@
+PCM_MATRIX_FNV df02ac8b
+PASS host 120sec/44100Hz / 12 types / 5 VA shapes / FX / max synth=8 max drums=6 / hash=1183fe60
+Optional project test: decrypt .beetle to a private .raw, then pass it as argument.

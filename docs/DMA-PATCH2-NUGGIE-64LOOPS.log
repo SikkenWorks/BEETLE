@@ -1,0 +1,14 @@
+CRC verified: schema V22, 1724 bytes; raw debug file written locally (do not publish)
+ch2=-1  loops=64 loop1_ms=  11.971 loop2_ms=  13.050 maxblock_us=4786.69 maxsynth=8 maxdrums=4 FNV=f1b4bd81
+ch2= 0  loops=64 loop1_ms=   8.712 loop2_ms=   9.623 maxblock_us= 448.21 maxsynth=8 maxdrums=4 FNV=478500b7
+ch2= 1  loops=64 loop1_ms=   9.055 loop2_ms=   9.102 maxblock_us=1097.55 maxsynth=8 maxdrums=4 FNV=cf0fb6e7
+ch2= 2  loops=64 loop1_ms=   9.623 loop2_ms=  10.144 maxblock_us=1467.25 maxsynth=8 maxdrums=4 FNV=d69e53d8
+ch2= 3  loops=64 loop1_ms=   9.974 loop2_ms=  10.676 maxblock_us= 873.47 maxsynth=8 maxdrums=4 FNV=7ec6bcc4
+ch2= 4  loops=64 loop1_ms=   9.940 loop2_ms=  10.303 maxblock_us=4159.89 maxsynth=8 maxdrums=4 FNV=7545dee7
+ch2= 5  loops=64 loop1_ms=   8.935 loop2_ms=   9.413 maxblock_us= 542.44 maxsynth=8 maxdrums=4 FNV=143eb045
+ch2= 6  loops=64 loop1_ms=  12.618 loop2_ms=  12.295 maxblock_us=4089.10 maxsynth=8 maxdrums=4 FNV=ff97a35d
+ch2= 7  loops=64 loop1_ms=  11.022 loop2_ms=  11.255 maxblock_us=1427.56 maxsynth=8 maxdrums=4 FNV=f1b4bd81
+ch2= 8  loops=64 loop1_ms=  10.192 loop2_ms=  10.809 maxblock_us=49622.52 maxsynth=8 maxdrums=4 FNV=beefcf69
+ch2= 9  loops=64 loop1_ms=   8.493 loop2_ms=   8.893 maxblock_us= 338.84 maxsynth=8 maxdrums=4 FNV=4b76a59b
+ch2=10  loops=64 loop1_ms=   8.444 loop2_ms=   8.845 maxblock_us= 309.92 maxsynth=8 maxdrums=4 FNV=f57b21f4
+ch2=11  loops=64 loop1_ms=   8.481 loop2_ms=   9.500 maxblock_us= 657.45 maxsynth=8 maxdrums=4 FNV=3aa1518d

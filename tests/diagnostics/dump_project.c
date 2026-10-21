@@ -1,0 +1,7 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "track_project_store.h"
+static struct track_store_project p;
+static uint8_t raw[TRACK_STORE_MAX];
+int main(int argc,char**argv){if(argc!=2)return 2;FILE*f=fopen(argv[1],"rb");if(!f)return 3;size_t n=fread(raw,1,sizeof raw,f);fclose(f);int rc=track_store_decode(&p,raw,n);printf("decode=%d bytes=%zu title=%s bpm=%u slot=%u song=%u loop=%u enabled=%u\n",rc,n,p.title,p.bpm,p.slot,p.song.count,p.song.loop,p.song.enabled);if(rc)return 1;for(unsigned i=0;i<TRACK_CHIP_SLOTS;i++){struct track_store_instrument *s=&p.instruments[i];printf("INST%u: type=%u, ADSR=%u/%u/%u/%u, wa=%u wb=%u, morph=%u mix=%u, fm=%u, drive=%u, sub=%u noise=%u\n",i+1,s->type,s->attack,s->decay,s->sustain,s->release,s->va.wave_a,s->va.wave_b,s->va.morph,s->va.mix,s->va.fm_depth,s->va.drive,s->va.sub,s->va.noise);}for(unsigned pat=0;pat<TRACK_PATTERNS;pat++){unsigned count=0;for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned t=0;t<TRACK_STEPS;t++){struct track_step*s=&p.song.patterns[pat].ch[c][t];if(s->note!=TRACK_NOTE_EMPTY)count++;}if(!count)continue;printf("PATTERN %02u steps=%u events=%u\n",pat+1,p.song.patterns[pat].length,count);for(unsigned c=0;c<TRACK_CHANNELS;c++){printf(" CH%u: ",c+1);for(unsigned t=0;t<p.song.patterns[pat].length;t++){struct track_step*s=&p.song.patterns[pat].ch[c][t];if(s->note!=TRACK_NOTE_EMPTY)printf("%u:%u[I%u C%u FX%u D%u G%u] ",t,s->note,s->instrument+1,s->chord,s->effect,s->dynamics,s->groove);}puts("");}}return 0;}

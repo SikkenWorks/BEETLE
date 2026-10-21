@@ -1,0 +1,243 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * BEETLE on-device help: fixed-width, <=36 glyphs at 5x7+1 pixel.
+ * Chapters are delimited by # headings. K2 selects chapter; K1 scrolls only within it.
+ */
+#ifndef BEETLE_HELP_H
+#define BEETLE_HELP_H
+#include <stdint.h>
+#define BEETLE_HELP_VISIBLE 9u
+static const char *const beetle_help_lines[] = {
+ "# TRACKER BASICS",
+ "K1 STEP   K2 CELL  K3 VALUE",
+ "HELP: K2 CHAPTER K1 SCROLL",
+ "K4 BPM  SEQ+K4 PAT LEN 1-16",
+ "PLAY+ALG: QUEUE NEXT PATTERN",
+ "SELECT: CHANNEL 1-6",
+ "ALGORITHM: PATTERN 1-48",
+ "PRESET: NOTE / EMPTY / STP",
+ "ENV: INSERT STOP [STP]",
+ "DRUM NOTE2+ENV: NOTE2 STP",
+ "SEL: CLEAR SELECTED STEP",
+ "KEYS WRITE NOTE FROM ANY CELL",
+ "OCT-/+: SELECTED NOTE +/-12",
+ "SEL+K1 RANGE; OCT SHIFTS ALL",
+ "SEQ+OCT-/+: ALSO TRANSPOSE",
+ "EMPTY STEP: OCT SHIFTS KEYBOARD",
+ "OCT LED: LIVE KEY OCT SHIFT",
+ "SEQ+ALGORITHM: SHIFT LANE +/-",
+ "SEQ+ALG LEFT UP, RIGHT DOWN",
+ "CH6 NOTE/NOTE2 SHIFT SEPARATE",
+ "DRUM NOTE1/NOTE2 FX SEPARATE",
+ "SEL+K1: INCLUDE START STEP",
+ "# PATTERN EDITING",
+ "SEQ+OP1: COPY RANGE OR LANE",
+ "SEQ+OP2: PASTE AT CURSOR",
+ "SEQ+OP3: COPY WHOLE PATTERN",
+ "SEQ+OP4: PASTE PATTERN + PUNCH FX",
+ "SEQ+OP5: UNDO ALL EDITORS",
+ "SEQ+OP6: REDO ALL EDITORS",
+ "SEQ+RIGHTMOST BLACK: CLEAR LANE",
+ "CLEAR LANE: K1 YES/NO, SEL",
+ "CLEAR LANE: HOME CANCEL",
+ "SEQ+SEL: BLOCK EDIT MENU",
+ "# STEP DYNAMICS / GROOVE",
+ "SEQ+FX: STEP VELOCITY/GATE",
+ "SEQ+ENV: STEP GROOVE EDIT",
+ "GROOVE K1 STEP K2 PARAM K3 VAL",
+ "MICRO 0-7/64 STEP (LATE)",
+ "RATCHET 1-4 PROB 100/75/50/25",
+ "IN GROOVE: SEQ+OP1 COPY STEP",
+ "IN GROOVE: SEQ+OP2 PASTE STEP",
+ "IN GROOVE: SEQ+OP3 FILL LANE",
+ "IN GROOVE: SEQ+OP4 CLEAR LANE",
+ "PRESET NOTE2: DRUM/---/STP",
+ "CH6 NOTE2 KEY: SECOND HIT",
+ "DYNAMICS K1 STEP K2 VEL/GATE",
+ "DYNAMICS K3 VALUE SEL RESET",
+ "GATE 0 LEGATO, 1-15 SHORT",
+ "BLOCK: K4 START, K1 END",
+ "BLOCK: K2 ACTION K3 AMOUNT",
+ "BLOCK: SEL APPLY",
+ "# INSTRUMENT / KEYBOARD",
+ "EDIT: EIGHT SYNTH PATCH SLOTS",
+ "INST 1-8: FIXED SYNTH PATCHES",
+ "TRACKER INST NUMBER = EDIT NUMBER",
+ "EDIT OPENS PATCH OF CURRENT NOTE",
+ "PATCH EDIT AFFECTS ALL ITS NOTES",
+ "DEFAULT 1 PULSE, 2 RETRO WAVE",
+ "DEFAULT 3 VA, 4 VA OSC2",
+ "DEFAULT 5 VA BASS, 6 VA PAD",
+ "DEFAULT 7 SID 6581, 8 NES PULSE",
+ "K1 ROW  K2 PAGE  K3 VALUE",
+ "OCT - / +: LIVE KEYBOARD",
+ "EDIT: BOTH OCT = MONO/POLY",
+ "EDIT: SEQ+EDIT LIBRARY",
+ "LIBRARY: 8 STORED PRESETS",
+ "LIB: K1 SLOT K2 ACTION",
+ "LIB: K3 ACTIVE INST 1-8",
+ "LIB: K4 COPY DEST SLOT",
+ "LIB: SEL STORE/LOAD/COPY/NAME",
+ "NAME: K1 POS K2 CHAR SEL SAVE",
+ "LIB: HOME EDIT SEQ TRACKER",
+ "UNDO: PATCH / LIBRARY CHANGES",
+ "UNDO: MASTER / MIXER CHANGES",
+ "OCT SHIFTS SAVED SELECTED NOTES",
+ "# PROJECTS",
+ "HOME: PROJECTS MENU",
+ "PROJECTS: K1 MENU  SEL ENTER",
+ "SETTINGS: SEL SWITCH USB MODE",
+ "SAVE: SAVE CURRENT PROJECT",
+ "SAVE AS: CHOOSE NAME / SLOT",
+ "LOAD: SELECT A SAVED SLOT",
+ "DISCARD OPENS PROJECT LIST",
+ "NEW: START EMPTY PROJECT",
+ "SEQ: RETURN TO TRACKER",
+ "# LIVE FX / RECORD",
+ "PLAY: START OR STOP",
+ "REC: ARM PUNCH-IN FX",
+ "FX: EDIT STEP EFFECTS (3 SLOTS)",
+ "FX1 FX2 FX3 WORK INDEPENDENTLY",
+ "FX MENU K1: CHOOSE FX ROW",
+ "FX MENU K2: CHOOSE EFFECT TYPE",
+ "FX MENU OCT-: DELETE FX SLOT",
+ "FX MENU K3: PARAMETER VALUE",
+ "CH6 FX: SELECT NOTE1/NOTE2",
+ "TRK FX: MUL IF 2 OR MORE FX",
+ "48 EXTRA FX PROJECT-WIDE",
+ "FULL: FX STORAGE FULL OVERLAY",
+ "HOLD FX KEY + K1: CHANGE FX",
+ "REPEAT/RING/FILTER/TAPE: K1 +/-1",
+ "RING MOD DEFAULT 20",
+ "STUTTER DEFAULT BPM X1",
+ "REC + PLAY: RECORD PUNCH FX",
+ "NEW FX TAKE REPLACES SAME FX LANE",
+ "SONG: PUNCH REC USES CH1 PAT",
+ "# SONG CHAINS",
+ "POS: SONG ROW NUMBER 01-64",
+ "CH1 CH2 CH3 CH4 CH5 DR REP",
+ "K1: ROW  K2: CHANNEL/REP",
+ "K3: PAT 01-48 OR -- SILENCE",
+ "REP: REPEAT EACH SONG ROW",
+ "OCT+: ADD POSITION-PAT ROW",
+ "POS02 -> DEFAULT ALL P02",
+ "OCT-: DELETE CURRENT ROW",
+ "OLD ROWS KEEP OWN PATTERNS",
+ "SEL: SONG ON/OFF",
+ "EACH CH PLAYS ITS OWN PATTERN",
+ "SHORT PATTERNS LOOP IN ROW",
+ "GLOBAL PUNCH SOURCE: CH1",
+ "REC SONG: WRITES ACTIVE CH1 PAT",
+ "FX NEW SONG ROW: NO GHOST CARRY",
+ "V18 SONGS AUTO-MIGRATE V19",
+ "# LIVE MIXER / SOLO",
+ "ARP: LIVE WHEN SONG ON",
+ "LIVE MIXER: BLACK 1-6 MUTE",
+ "WHITE KEYS BELOW: SOLO 1-6",
+ "SOLO KEY LED = SOLO ACTIVE",
+ "LIVE SOLO: [X] S / [Q S]",
+ "SONG OFF: LIVE MUTES/SOLOS BYPASS",
+ "OCT-: Q MUTE ON/OFF",
+ "OCT+: Q SOLO ON/OFF",
+ "Q ON: NEXT PAT; OFF: DIRECT",
+ "NORMAL MIXER Q DEFAULT OFF",
+ "MIXER VOLUME: 0-120%",
+ "UNDO: SONG ARRANGEMENT EDITS",
+ "# MIXER / PERFORMANCE",
+ "GLO: MIXER",
+ "MIXER SEL: QUANT MUTES ON/OFF",
+ "MIXER SEQ+SEL: PERFORMANCE",
+ "SNAPS: K1 SLOT  K2 SAVE",
+ "SNAPS: K3/SEL RECALL",
+ "SNAPS: FX MUTE GROUPS",
+ "GROUPS: K1 GROUP K2 MEMBER",
+ "GROUPS: SEL ADD/REMOVE LANE",
+ "GROUPS: K3 MUTE/UNMUTE ALL",
+ "GROUPS: HOME TO SNAPSHOTS",
+ "GROUPS FOLLOW QUANT MUTES",
+ "SNAPS: HOME MIXER SEQ TRACKER",
+ "SLOT COLORS: PINK MUTED WHITE ON",
+ "Q ON: PLAY MUTES AT NEXT BAR",
+ "Q OFF: MUTES APPLY DIRECTLY",
+ "Q1 PENDING MUTE / Q0 UNMUTE",
+ "SWITCH OFF: APPLY QUEUED NOW",
+ "STOP CANCELS PENDING MUTES",
+ "# MASTER FX",
+ "LFO: MASTER EQ / FX",
+ "MASTER SELECT: FX SCROLL",
+ "MASTER SEL: FX ON/OFF",
+ "MASTER K1-K4: PARAMETERS",
+ "SEQ+K4: REORDER MASTER FX",
+ "# GUIDE / NAVIGATION",
+ "HOLD HOME: SCALE GUIDE",
+ "HOME: OPEN PROJECTS MENU",
+ "SEQ: BACK TO TRACKER",
+ "# BLOCK INSTRUMENT / DELETE",
+ "HOLD SEL + K1: SELECT STEP RANGE",
+ "K2 INSTRUMENT COLUMN; K3 CHANGES ALL",
+ "SYNTH NOTES IN RANGE (EXCEPT ---/STP)",
+ "TAP SEL AGAIN: DELETE ENTIRE RANGE",
+ "ONE UNDO FOR EACH RANGE ACTION",
+ "# USB-C AUDIO",
+ "USB-C: 44.1 KHZ 16-BIT STEREO",
+ "PC: FM1 USB AUDIO INPUT",
+ "CONNECT WITH A DATA USB-C CABLE",
+ "USB AUDIO STARTS WHEN PC RECORDS",
+ "ANALOGUE OUT + USB MIDI REMAIN",
+ "PROJECTS > SETTINGS > USB MULTITRACK",
+ "OFF: STEREO MASTER / PAN / MASTER FX",
+ "ON: 6 MONO INPUTS CH1-CH6",
+ "CH1-5 SYNTH CH6 DRUMS / DRY STEMS",
+ "STEMS PRE MASTER FX AND PUNCH IN",
+ "MIX VOLUME/MUTE/SOLO APPLY",
+ "USB MODE SWITCH RECONNECTS DEVICE",
+ "RESELECT AUDIO INPUTS INSIDE DAW",
+ "USB MODE DEFAULTS OFF AT BOOT",
+ "USB CAPTURE: V1.2 CLOCK FIX",
+ };
+#define BEETLE_HELP_COUNT ((uint8_t)(sizeof(beetle_help_lines)/sizeof(beetle_help_lines[0])))
+/* Chapter indexing is derived from the existing source lines so adding or
+ * extending a topic never requires manually synchronizing an offset table.
+ * These helpers are UI-only and leave the V20 project, V19 migration supported. */
+static inline uint8_t beetle_help_chapter_count(void){
+ uint8_t count=0u;
+ for(uint8_t i=0u;i<BEETLE_HELP_COUNT;i++)if(beetle_help_lines[i][0]=='#')count++;
+ return count;
+}
+static inline uint8_t beetle_help_chapter_heading(uint8_t chapter){
+ uint8_t seen=0u;
+ for(uint8_t i=0u;i<BEETLE_HELP_COUNT;i++)if(beetle_help_lines[i][0]=='#'){
+  if(seen==chapter)return i;
+  seen++;
+ }
+ return 0u;
+}
+static inline uint8_t beetle_help_chapter_end(uint8_t chapter){
+ uint8_t start=beetle_help_chapter_heading(chapter);
+ for(uint16_t i=(uint16_t)start+1u;i<BEETLE_HELP_COUNT;i++)
+  if(beetle_help_lines[i][0]=='#')return (uint8_t)i;
+ return BEETLE_HELP_COUNT;
+}
+static inline uint8_t beetle_help_chapter_length(uint8_t chapter){
+ uint8_t first=beetle_help_chapter_heading(chapter);
+ uint8_t last=beetle_help_chapter_end(chapter);
+ return last>first?(uint8_t)(last-first-1u):0u;
+}
+static inline uint8_t beetle_help_chapter_maxscroll(uint8_t chapter){
+ uint8_t n=beetle_help_chapter_length(chapter);
+ return n>BEETLE_HELP_VISIBLE?(uint8_t)(n-BEETLE_HELP_VISIBLE):0u;
+}
+static inline uint8_t beetle_help_chapter_shift(uint8_t chapter,int32_t detents){
+ int32_t result=(int32_t)chapter+detents;
+ int32_t last=(int32_t)beetle_help_chapter_count()-1;
+ if(result<0)result=0;
+ if(result>last)result=last;
+ return (uint8_t)result;
+}
+static inline uint8_t beetle_help_chapter_scroll(uint8_t chapter,uint8_t current,int32_t detents){
+ int32_t result=(int32_t)current+detents;
+ int32_t last=beetle_help_chapter_maxscroll(chapter);
+ if(result<0)result=0;
+ if(result>last)result=last;
+ return (uint8_t)result;
+}
+#endif

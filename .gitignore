@@ -1,0 +1,9 @@
+# Generated build products and local test output
+build/
+tests/ota/generated/
+__pycache__/
+*.pyc
+*.o
+*.elf
+*.audit.json
+.DS_Store

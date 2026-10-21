@@ -1,0 +1,20 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const Bank=require('../web/beetle-global-bank.js');
+function wave(samples=500,seed=3){const n=44+samples*2;const a=new Uint8Array(n);const v=new DataView(a.buffer);
+ const name=(p,s)=>{for(let j=0;j<s.length;j++)a[p+j]=s.charCodeAt(j)};
+ name(0,'RIFF');v.setUint32(4,n-8,true);name(8,'WAVE');name(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,44100,true);v.setUint32(28,88200,true);v.setUint16(32,2,true);v.setUint16(34,16,true);name(36,'data');v.setUint32(40,n-44,true);
+ for(let i=0;i<samples;i++)v.setInt16(44+i*2,((i*seed)%65536)-32768,true);return a;}
+const original=Bank.empty();original[0]={name:'KICK',filename:'KICK.WAV',data:wave(1400)};original[7]={name:'LONG',filename:'LONG.WAV',data:wave(10000,47)};
+const encoded=Bank.encode(original),read=Bank.decode(encoded);
+assert.deepEqual(read,original);assert.equal(Bank.used(read),22888);
+let mutated=encoded.slice();mutated[mutated.length-50]^=32;assert.throws(()=>Bank.decode(mutated));
+mutated=encoded.slice();mutated[24+40+1]=0xff;assert.throws(()=>Bank.decode(mutated));
+const removed=Bank.decode(encoded);removed[0]={name:'',filename:'',data:new Uint8Array(0)};
+assert.equal(Bank.used(Bank.decode(Bank.encode(removed))),20044);
+removed[0]={name:'REPLACE',filename:'NEW.WAV',data:wave(100)};
+assert.equal(Bank.used(Bank.decode(Bank.encode(removed))),20288);
+assert.throws(()=>Bank.encode(Array.from({length:13},()=>({name:'bad',data:new Uint8Array([1])}))));
+const empty=Bank.decode(Bank.encode(Bank.empty()));assert.equal(Bank.used(empty),0);
+console.log('PASS: 13 global sample slots, WAV byte preservation, replacement, deletion/reclaimed bytes, length and CRC corruption rejection');

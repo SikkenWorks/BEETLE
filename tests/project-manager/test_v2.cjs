@@ -1,0 +1,23 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const path=require('node:path');const root=path.resolve(__dirname,'../../..');
+const source=fs.readFileSync(path.join(root,'simulator.html'),'utf8');
+const core=source.slice(source.indexOf('const TRACK_CORE=(()=>'),source.indexOf('const TRACK_AUDIO ='));
+const validate=source.slice(source.indexOf('function beetleVerifyProjectShape(p){'),source.indexOf('function beetleDownload(contents'));
+const env=vm.createContext({TextEncoder,TextDecoder,Uint8Array,Uint32Array,Blob,crypto:require('node:crypto').webcrypto,console});
+vm.runInContext(core,env);vm.runInContext('const {freshProject,emptyPattern,TYPES}=TRACK_CORE;',env);
+vm.runInContext(validate,env);
+vm.runInContext(fs.readFileSync(path.join(root,'source/tools/beetle_file_v2.js'),'utf8'),env);
+vm.runInContext(fs.readFileSync(path.join(root,'source/tools/beetle_native_codec.js'),'utf8'),env);
+(async()=>{
+ const bin=new Uint8Array(fs.readFileSync(path.join(__dirname,'native_fixture_v17.trk')));
+ const decode=vm.runInContext('BeetleNative.decode',env),encode=vm.runInContext('BeetleNative.encode',env);
+ const project=decode(bin);assert.equal(project.nativeSchema,17);assert.equal(project.typeBanks[0][9].attack,.92);
+ const converted=encode(project);assert.equal(decode(converted).typeBanks[0][9].attack,.92);
+ assert.equal(decode(encode(vm.runInContext('freshProject("SIM TEST")',env))).name,'SIM TEST');
+ const encrypt=vm.runInContext('BeetleFileV2.encrypt',env),decrypt=vm.runInContext('BeetleFileV2.decrypt',env);
+ const box=await encrypt(bin);assert.equal(box.size,bin.length+37);
+ assert.deepEqual([...await decrypt(box)],[...bin]);
+ const tampered=new Uint8Array(await box.arrayBuffer());tampered[30]^=1;
+ await assert.rejects(()=>decrypt(new Blob([tampered])),/integrity/);
+ console.log('PASS: native V17 fixture, simulator re-encode, AES-GCM portability, altered-data detection');
+})().catch(e=>{console.error(e);process.exitCode=1});

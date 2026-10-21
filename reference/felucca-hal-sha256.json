@@ -1,0 +1,21 @@
+{
+  "verified_critical_files": {
+    "hal/fm1_isr.S": "2aad84e24a51c79b187ef3faf9d1bae108b1389bf78659f6b02dbbd95d8a7d7b",
+    "hal/fm1_irq.h": "0b2191dd30b5b992782bc334ec542e1027947124be469e9270962f5ce9e857a8",
+    "hal/fm1_lcd_hw.h": "9e78a5f9b75fe881d3e90529f39876a322e311d2ae317d068c782bd528b96cff",
+    "hal/fm1_uart.h": "0df7266a58996c688a4279c6b7edbaa7921e18805c8a65f1ff156680b03fcff6",
+    "hal/fm1_vec.S": "8f9e787871332f522157d561dc3cfe8906ed0abf160139ed5819cfdeab66f01a",
+    "hal/fm1_guard.h": "6a5ddde30c97ff094ba7f843be53eeafc820caf451fe3270c06a17be178a4608",
+    "hal/fm1_time.h": "22116c4b6a365c8510ba1dab12f0e8a452343a82435abff7640648c630b740fa",
+    "hal/fm1_xip.h": "dcba6ddb9cd2403e1d97c4db49d836110ef2805d2369db7ed323e3fbe26c56ed",
+    "hal/fm1_usb.h": "12b9b31bde0dbb15fa15379a215eaec11e882bd33c18f4b250fa9e3a47c202f0",
+    "hal/fm1_gpio.h": "5e3937e32a3b4b9b9ae622c5b42c8819ec8a16f2d76dbddec91654703c77a216",
+    "hal/fm1_adc.h": "1917870bd802de9134d33335efbcf886b296705dff06688925fd7325589c0c1a",
+    "hal/fm1_cc.h": "46c533a0926ba9298ae36705f857ed609a61b95511ba7f0d1800857b4760dd73",
+    "hal/fm1_sys.h": "037bc64e65650fb2c8d3a23b218992fad347e9098352aae4938738622af2c224",
+    "hal/fm1_timer.h": "d5e89b90035018207264fd89ea2b0988d5d716506df07233c9dd2c39741b71e8",
+    "lcd.c": "bd2e7421d1e309ba3addd3e7071ef41694fc2083ccf23467cf1b6b99a19bb50b"
+  },
+  "methodology": "Exact-byte match against the supplied Felucca-main.zip; only verified matching files are included. Divergent HALs are deliberately excluded and must be audited separately.",
+  "source_zip_sha256": "834a3cc6f73954e5a8f10cc7f2780cad69b6eb40d14198a4f9803e30932fd30d"
+}

@@ -1,0 +1,1 @@
+This exact RC1.0.5 firmware container is retained ONLY as an immutable protected 16-KiB boot/OTA asset reference for RC1.0.6 HF2. It is not the new firmware, and must not be installed as RC1.0.6. The standard packer normalizes four bytes of the protected header, which is incompatible with RC1.0.4 OTA CHECK. SHA-256: 40fa76c5f24fbc3f13c262b59436e2d87ea462f382f2d85ad4bb375f90dab644

@@ -1,0 +1,13 @@
+BEETLE V1.4.4 PLAYHEAD FIX, experimental
+Build target: AC79 JieLi native firmware, compiled using jieli-linux-toolchains-20260730.1.
+- Read-only build: PASS, app bytes 444124 (see build audit)
+- Persistent project storage / OTA / 6-channel UAC experimental build: PASS, app bytes 484716 (see build audit)
+- Playhead dirty-band geometry / step cadence host unit test: PASS
+- V1.4.3 READ/WRITE input quarantine host regression: PASS
+- PCM matrix: PASS, df02ac8b (unchanged)
+- 120s 44.1kHz 12 oscillator types, five VA waveforms, up to 8 synth & 6 drum voices: PASS, 1183fe60
+- MOUNTAINKING 32 Song Mode position host simulation: PASS, no PCM clipping (not a physical FM1 test)
+- Installer firmware/CRC/SHA+JS simulated transfer: PASS
+- Firmware protected first 16 KiB and OTA-loader: byte-identical to V1.4.1 baseline
+- REAL FM1 LCD timing, DMA deadlines, recovery, and OTA flash operation: NOT VERIFIED
+The DMA deadline/root crackle in physical MOUNTAINKING at position 19 is not claimed fixed.

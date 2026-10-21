@@ -1,0 +1,25 @@
+{
+  "version": "V1.4.5 GHOST FIX",
+  "product": "FM-1_2123",
+  "firmware_file": "BEETLE-V1.4.5-PLAYHEAD-GHOST-FIX-UNVERIFIED.fwsc",
+  "fwsc_sha256": "bcdd03c45e0bbd176448726ee3cc1ffb8d503cb51f31daecadb8e5b20b1c2b67",
+  "fwsc_size": 610086,
+  "native_app_sha256": "fdc515bc61d91b48ce3a753255c584b22b022b24dd43a1d0e6171a8e380a69ec",
+  "protected_first_16K_unchanged": true,
+  "ota_loader_unchanged": true,
+  "hardware_verified": false,
+  "hardware_recovery_verified": false,
+  "sample_library_on_fm1": false,
+  "test_focus": "stale playhead ghost due to post-render ISR position read",
+  "related_fixture": "IMG_2437.mp4 (user video), MOUNTAINKING-SLOT-01.beetle",
+  "tests": [
+    "JieLi read-only and storage+OTA+UAC builds",
+    "240x240 playhead ghost simulation (64 loops + boundaries/jumps)",
+    "native source branch sync regression",
+    "V1.4.4 playhead geometry test",
+    "V1.4.3 input barrier",
+    "120sec PCM stress unchanged",
+    "FM1 FWSC/container CRC + protected loader",
+    "embedded WebInstaller exact SHA pin"
+  ]
+}
