@@ -176,7 +176,16 @@ async function query(cmd,args=[],expected,timeout=4500,retries=1){if(!portOut||!
 function log(msg,error=false){$('activity').className='activity'+(error?' error':'');$('activity').lastElementChild.textContent=msg;}
 function setProgress(label,fraction){$('progressPanel').hidden=false;$('progressText').textContent=label;let pct=Math.max(0,Math.min(100,Math.round(fraction*100)));$('progressCount').textContent=pct+'%';$('progressFill').style.width=pct+'%';}
 function hideProgress(){$('progressPanel').hidden=true;}
-function setBusy(value){busy=Boolean(value||migrationInProgress);value=busy;const bankTransfer=document.getElementById('bankTransfer');if(bankTransfer)bankTransfer.disabled=value||!connected||!deviceGlobalSamples;$('connect').disabled=value;const scan=$('checkStorageV2');if(scan)scan.disabled=value||!connected||deviceProtocol<5;const c=$('convertStorageV2');if(c)c.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='legacy';const r=$('restoreStorageV2');if(r)r.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='v2';$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('upgradeLegacy').disabled=value||!connected||legacySlots().length===0;$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('recover').disabled=value||!connected||deviceProtocol<3||!['bad','used'].includes(slots[selected].state);$('diagnoseMarker').disabled=value||!connected||deviceProtocol<4;$('repairMarker').disabled=value||!connected||deviceProtocol<4||markerStatus!==1;$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
+function setBusy(value){
+ busy=Boolean(value||migrationInProgress);
+ value=busy;
+ // V1.4.26: always restore the REAL (hidden) file inputs after migration.
+ // Previously migrationLock(true) disabled bankWav and bankFile permanently.
+ for(const id of ['bankOpen','bankSave','bankNew','bankFile','bankWav']){
+  const node=document.getElementById(id);
+  if(node)node.disabled=value;
+ }
+ const bankTransfer=document.getElementById('bankTransfer');if(bankTransfer)bankTransfer.disabled=value||!connected||!deviceGlobalSamples;$('connect').disabled=value;const scan=$('checkStorageV2');if(scan)scan.disabled=value||!connected||deviceProtocol<5;const c=$('convertStorageV2');if(c)c.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='legacy';const r=$('restoreStorageV2');if(r)r.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='v2';$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('upgradeLegacy').disabled=value||!connected||legacySlots().length===0;$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('recover').disabled=value||!connected||deviceProtocol<3||!['bad','used'].includes(slots[selected].state);$('diagnoseMarker').disabled=value||!connected||deviceProtocol<4;$('repairMarker').disabled=value||!connected||deviceProtocol<4||markerStatus!==1;$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
 function draw(){const root=$('slots');root.textContent='';let count=0;for(let k=0;k<12;k++){
  const s=slots[k];if(s.state==='used')count++;const b=document.createElement('button');b.type='button';b.className='slot '+(k===selected?'selected ':'')+(s.state==='empty'?'empty ':s.state==='bad'?'unavailable':'');b.setAttribute('aria-pressed',String(k===selected));
  const head=document.createElement('div');head.className='slot-head';const num=document.createElement('span');num.className='slot-number';num.textContent='SLOT '+String(k+1).padStart(2,'0');const status=document.createElement('span');status.className='slot-state';status.textContent=s.state==='used'?(Number.isInteger(s.version)&&s.version<deviceSchema?'↻ LEGACY':'● SAVED'):s.state==='empty'?'○ EMPTY':s.state==='bad'?'! ERROR':'— UNKNOWN';head.append(num,status);
@@ -347,7 +356,12 @@ function migrationLock(lock){
  migrationInProgress=lock;document.body.classList.toggle('migration-running',lock);
  document.querySelectorAll('#bankOpen,#bankSave,#bankNew,#bankFile,#bankWav,#bankTransfer,#restoreStorageV2,#refresh,#import,#export,#clear,#recover,#upgradeLegacy,#diagnoseMarker,#repairMarker,#convertStorageV2,#checkStorageV2')
   .forEach(el=>{if(lock)el.disabled=true;});
- if(!lock){draw();setMigrationLabel();window.dispatchEvent(new Event('beetle-connection-changed'));}
+ if(!lock){
+  // Restore the controls from the *current* application state, not from the
+  // disabled HTML attributes left behind by the migration lock.
+  setBusy(false);
+  draw();setMigrationLabel();window.dispatchEvent(new Event('beetle-connection-changed'));
+ }
 }
 async function convertStorageV2(){
  if(!connected)throw Error('Connect your FM1 first.');
@@ -1216,7 +1230,14 @@ const BeetleDeviceCodec=(()=>{
      if(e.data.length){const w=B.wavInfo(e.data);const meta=document.createElement('div');meta.style.cssText='font-size:10px;color:var(--muted);flex:1 1 100%';meta.textContent=w.durationSeconds.toFixed(2)+' s · '+(w.sampleRate/1000).toFixed(1)+' kHz · '+w.channels+' CH · '+w.format+' '+w.bitsPerSample+'-bit · ORIGINAL WAV';card.append(meta);}
      const name=document.createElement('input');name.className='field';name.style.cssText='max-width:125px';name.maxLength=12;name.placeholder='SAMPLE NAME';name.value=e.name;name.disabled=!e.data.length;
      name.onchange=()=>{const old=e.name;e.name=safeName(name.value);try{check();dirty=true;}catch(ex){e.name=old;log(ex.message,true);}name.value=e.name;};
-     const input=document.createElement('button');input.className='button quiet';input.textContent=e.data.length?'REPLACE WAV':'IMPORT WAV';input.onclick=()=>{target=i;q('bankWav').value='';q('bankWav').click();};
+     const input=document.createElement('button');input.className='button quiet';input.textContent=e.data.length?'REPLACE WAV':'IMPORT WAV';input.type='button';input.onclick=()=>{
+      if(busy||migrationInProgress)return;
+      target=i;
+      const chooser=q('bankWav');
+      chooser.disabled=false; // Defensive fix for controls left disabled by older migration UI.
+      chooser.value='';
+      chooser.click(); // Immediate user gesture: browsers require a synchronous click.
+     };
      const play=document.createElement('button');play.className='button quiet';play.textContent='PLAY';play.disabled=!e.data.length;
      play.onclick=()=>{stopPreview();
       previousUrl=URL.createObjectURL(new Blob([e.data],{type:'audio/wav'}));const a=new Audio(previousUrl);previousAudio=a;a.play().catch(err=>log('Browser preview unavailable: '+err.message,true));};
@@ -1237,7 +1258,10 @@ const BeetleDeviceCodec=(()=>{
    try{check();}catch(e){entries[target]=old;throw e;}dirty=true;draw();log('Imported WAV into shared library U'+(target+1)+'. Save the .beetlebank file.');
  });
  q('bankSave').onclick=()=>safe(async()=>{const raw=B.encode(entries),blob=new Blob([raw],{type:'application/octet-stream'});download(blob,'BEETLE-GLOBAL-LIBRARY.beetlebank');dirty=false;draw();log('Exported portable global bank ('+bytes(raw.length)+'). FM1 flash unchanged.');});
- q('bankOpen').onclick=()=>{q('bankFile').value='';q('bankFile').click();};
+ q('bankOpen').onclick=()=>{
+   if(busy||migrationInProgress)return;
+   const chooser=q('bankFile');chooser.disabled=false;chooser.value='';chooser.click();
+  };
  q('bankFile').onchange=()=>safe(async()=>{const file=q('bankFile').files?.[0];if(!file)return;
    const data=new Uint8Array(await file.arrayBuffer()),items=B.decode(data);
    if(dirty){const c=await modal('REPLACE UNSAVED LIBRARY','The current global bank has unsaved changes. Open another library and discard them?', [{label:'CANCEL',value:'cancel'},{label:'OPEN NEW FILE',value:'yes',kind:'danger'}]);if(c!=='yes')return;}
