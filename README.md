@@ -18,6 +18,7 @@
 
 <p align="center">
   <sub>Development release: <strong>V1.4.24</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <br>
   <b>The user sample feature is still experimental!</b>
 </p>
 
