@@ -17,8 +17,36 @@ void track_song_init(struct track_song_bank *b,const struct track_engine *e){
  }
  b->patterns[0]=e->active;
  b->chain[0].pattern=0u;b->chain[0].repeats=1u;
- for(uint8_t c=0;c<TRACK_CHANNELS;c++)b->chain[0].lane[c]=0u;
+ for(uint8_t c=0;c<TRACK_CHANNELS;c++)b->chain[0].lane[c]=TRACK_SONG_AUTO_BASE;
  b->count=1u;b->loop=1u;
+}
+static uint8_t track_song_auto_has_content(const struct track_song_bank *b,uint8_t source,uint8_t channel){
+ if(!b||source>=TRACK_PATTERNS||channel>=TRACK_CHANNELS)return 0u;
+ if(track_lane_has_data(&b->patterns[source],channel))return 1u;
+ if(channel==TRACK_DRUM_CHANNEL){
+  for(uint8_t step=0u;step<TRACK_STEPS;step++)
+   if(b->patterns[source].note2_fx[step].effect!=0u)return 1u;
+ }
+ for(uint8_t i=0u;i<b->extras.count;i++){
+  const struct track_extra_fx *f=&b->extras.data[i];
+  if(f->pattern!=source)continue;
+  uint8_t key=(uint8_t)(f->id&127u);
+  if((uint8_t)(key/TRACK_STEPS)==channel)return 1u;
+ }
+ return 0u;
+}
+uint8_t track_song_lane_visible(const struct track_song_bank *b,uint8_t encoded,uint8_t channel){
+ if(!track_song_valid_lane(encoded)||encoded==TRACK_SONG_SILENT)return 0u;
+ uint8_t src=track_song_source(encoded);
+ if(encoded<TRACK_PATTERNS)return 1u; /* explicitly selected EMPTY pattern sustains */
+ return track_song_auto_has_content(b,src,channel);
+}
+uint8_t track_song_stop_mask(const struct track_song_bank *b){
+ if(!b||!b->enabled||!b->composite_active||b->position>=b->count)return 0u;
+ uint8_t stop=0u;
+ for(uint8_t ch=0u;ch<TRACK_CHANNELS;ch++)
+  if(!track_song_lane_visible(b,b->chain[b->position].lane[ch],ch))stop|=(uint8_t)(1u<<ch);
+ return stop;
 }
 void track_song_capture(struct track_song_bank *b,const struct track_engine *e){
  if(!b||!e||b->composite_active||e->pattern_slot>=TRACK_PATTERNS)return;
@@ -42,15 +70,15 @@ static void track_song_compose(struct track_song_bank *b,struct track_engine *e)
  struct track_pattern *out=&e->active;
  uint8_t length=1u;
  for(uint8_t c=0u;c<TRACK_CHANNELS;c++){
-  uint8_t src=ent->lane[c];
-  if(src<TRACK_PATTERNS){
+  uint8_t src=track_song_source(ent->lane[c]);
+  if(src<TRACK_PATTERNS && track_song_lane_visible(b,ent->lane[c],c)){
    uint8_t plen=b->patterns[src].length;
    if(plen>length&&plen<=TRACK_STEPS)length=plen;
   }
  }
  for(uint8_t c=0u;c<TRACK_CHANNELS;c++){
-  uint8_t src=ent->lane[c];
-  const struct track_pattern *p=src<TRACK_PATTERNS?&b->patterns[src]:0;
+  uint8_t src=track_song_source(ent->lane[c]);
+  const struct track_pattern *p=track_song_lane_visible(b,ent->lane[c],c)?&b->patterns[src]:0;
   uint8_t plen=p&&p->length&&p->length<=TRACK_STEPS?p->length:TRACK_STEPS;
   if(p){
    /* Most patterns are 16 steps. One contiguous bounded copy replaces
@@ -86,7 +114,7 @@ void track_song_restore(struct track_song_bank *b,struct track_engine *e){
 }
 uint8_t track_song_punch_pattern(const struct track_song_bank *b,const struct track_engine *e){
  if(b&&b->enabled&&b->composite_active&&b->position<b->count){
-  uint8_t source=b->chain[b->position].lane[0];
+  uint8_t source=track_song_source(b->chain[b->position].lane[0]);
   return source<TRACK_PATTERNS?source:TRACK_PATTERNS;
  }
  return e?e->pattern_slot:TRACK_PATTERNS;
@@ -113,12 +141,10 @@ int track_song_on_wrap(struct track_song_bank *b,struct track_engine *e){
 int track_song_insert(struct track_song_bank *b,uint8_t after){
  if(!b||after>=b->count||b->count>=TRACK_SONG_ENTRIES)return -1;
  for(uint8_t i=b->count;i>after+1u;i--)b->chain[i]=b->chain[i-1u];
- /* New row defaults to the pattern numbered by its displayed position.
-  * Existing rows are moved intact (their manually edited chains stay intact). */
+ /* A new row is an exact copy of the previous row: lane references,
+  * automatic/manual binding state and repeats all survive insertion. */
  uint8_t row=(uint8_t)(after+1u);
- uint8_t pat=(uint8_t)(row<TRACK_PATTERNS?row:TRACK_PATTERNS-1u);
- b->chain[row].pattern=pat;b->chain[row].repeats=1u;
- for(uint8_t c=0u;c<TRACK_CHANNELS;c++)b->chain[row].lane[c]=pat;
+ b->chain[row]=b->chain[after];
  b->count++;b->edit_row=row;return 0;
 }
 int track_song_delete(struct track_song_bank *b,uint8_t at){
@@ -133,7 +159,7 @@ int track_song_change(struct track_song_bank *b,uint8_t row,uint8_t col,int32_t 
  struct track_song_entry *e=&b->chain[row];
  if(col<TRACK_CHANNELS){
   /* -1 (displayed --) is the silence sentinel; -1 detent from P01. */
-  int32_t current=e->lane[col]==TRACK_SONG_SILENT?-1:e->lane[col];
+  int32_t current=e->lane[col]==TRACK_SONG_SILENT?-1:track_song_source(e->lane[col]);
   int32_t next=bound(current+delta,-1,TRACK_PATTERNS-1);
   e->lane[col]=next<0?TRACK_SONG_SILENT:(uint8_t)next;
  }else e->repeats=(uint8_t)bound((int32_t)e->repeats+delta,1,16);

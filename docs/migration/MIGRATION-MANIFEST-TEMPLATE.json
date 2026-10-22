@@ -1,0 +1,54 @@
+{
+  "format": "BEETLE-MIGRATION-PREFLIGHT-1",
+  "projects": [
+    {
+      "slot": 1,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 2,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 3,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 4,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 5,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 6,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 7,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 8,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 9,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 10,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 11,
+      "status": "UNCONFIRMED"
+    },
+    {
+      "slot": 12,
+      "status": "UNCONFIRMED"
+    }
+  ],
+  "samples": []
+}

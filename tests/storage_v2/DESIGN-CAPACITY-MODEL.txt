@@ -1,0 +1,12 @@
+FM1 BEETLE project region: 294912 bytes = 72 sectors
+10 sec 22.05kHz DPCM4 planning: 113784 bytes, 28 sectors
+15 sec 22.05kHz DPCM4 planning: 170544 bytes, 42 sectors
+20 sec 22.05kHz DPCM4 planning: 227436 bytes, 56 sectors
+NOTE: Results omit per-sample metadata/padding/fragmentation; upper estimates only.
+NOTE: Free capacity alone never authorizes partition migration or NOR writes.
+{'scenario': '1 large + 11 small, current codec', 'project_AB_bytes': 57344, 'bookkeeping_reserved_bytes': 24576, 'sample_budget_bytes': 212992, 'capacity_seconds_whole': 18, '10sec_possible': True, '20sec_possible': False}
+{'scenario': '1 large + 11 small, desktop compression measurement', 'project_AB_bytes': 16896, 'bookkeeping_reserved_bytes': 24576, 'sample_budget_bytes': 249856, 'capacity_seconds_whole': 21, '10sec_possible': True, '20sec_possible': True}
+{'scenario': '12 mountain-sized, current codec', 'project_AB_bytes': 215040, 'bookkeeping_reserved_bytes': 24576, 'sample_budget_bytes': 53248, 'capacity_seconds_whole': 4, '10sec_possible': False, '20sec_possible': False}
+{'scenario': '12 mountain-sized, desktop compression measurement', 'project_AB_bytes': 67584, 'bookkeeping_reserved_bytes': 24576, 'sample_budget_bytes': 200704, 'capacity_seconds_whole': 17, '10sec_possible': True, '20sec_possible': False}
+{'scenario': '12 maximum-size incompressible projects', 'project_AB_bytes': 294912, 'bookkeeping_reserved_bytes': 24576, 'sample_budget_bytes': 0, 'capacity_seconds_whole': 0, '10sec_possible': False, '20sec_possible': False}
+PASS: capacity scenarios and fundamental worst-case refusal

@@ -18,10 +18,12 @@ static void init(void){
 }
 int main(void){
  struct track_engine e;track_init(&e);init();
- assert(p.song.chain[0].pattern==0u&&p.song.chain[0].lane[5]==0u);
+ assert(p.song.chain[0].pattern==0u&&p.song.chain[0].lane[5]==TRACK_SONG_AUTO_BASE);
  assert(track_song_insert(&p.song,0)==0);
- assert(p.song.chain[1].pattern==1u&&p.song.chain[1].repeats==1u);
- for(int c=0;c<6;c++)assert(p.song.chain[1].lane[c]==1u);
+ assert(p.song.chain[1].pattern==0u&&p.song.chain[1].repeats==1u);
+ for(int c=0;c<6;c++)assert(p.song.chain[1].lane[c]==TRACK_SONG_AUTO_BASE);
+ /* Old explicit lane-editing workflow remains supported after cloning. */
+ p.song.chain[1].lane[5]=1u;
  assert(track_song_change(&p.song,1,5,-1)==0);assert(p.song.chain[1].lane[5]==0u);
  assert(track_song_change(&p.song,1,0,-2)==0);assert(p.song.chain[1].lane[0]==TRACK_SONG_SILENT);
  assert(track_song_change(&p.song,1,6,3)==0&&p.song.chain[1].repeats==4u);
@@ -43,24 +45,44 @@ int main(void){
  track_song_restore(&p.song,&e);
  assert(e.active.ch[0][0].note==70u&&p.song.patterns[0].ch[0][0].note==70u);
  uint32_t n=0;assert(track_store_encode(&p,wire,sizeof wire,&n)==0);
- assert(wire[4]==19u&&track_store_decode(&q,wire,n)==0);
+ assert(wire[4]==TRACK_STORE_VERSION&&track_store_decode(&q,wire,n)==0);
  assert(q.song.chain[0].lane[0]==2u&&q.song.chain[0].lane[5]==3u);
  assert(q.song.chain[1].lane[0]==255u&&q.song.chain[1].repeats==4u);
  assert(q.song.patterns[3].note2_fx[0].value==73u);
- /* Construct a byte-accurate historical V18 image by dropping only V19 lane refs. */
- uint32_t head=24+12+1+3+2; /* title,slot,harmony,bpm,count/flags */
- assert(wire[head]==2u); /* song count */
- uint32_t songat=head+3;
- memcpy(old,wire,songat);
- for(unsigned r=0;r<p.song.count;r++)memcpy(old+songat+2*r,wire+songat+8*r,2);
- uint32_t oldend=songat+2*p.song.count;
- memcpy(old+oldend,wire+songat+8*p.song.count,n-(songat+8*p.song.count));
- uint32_t oldn=n-6*p.song.count;
- old[4]=18;old[8]=(uint8_t)oldn;old[9]=(uint8_t)(oldn>>8);old[10]=(uint8_t)(oldn>>16);old[11]=(uint8_t)(oldn>>24);
- uint32_t c=track_store_crc32(old+24,oldn-24);for(unsigned j=0;j<4;j++)old[12+j]=(uint8_t)(c>>(j*8));
- c=track_store_crc32(old,16);for(unsigned j=0;j<4;j++)old[16+j]=(uint8_t)(c>>(j*8));
+ /* V23 compatibility: its song lane layout has the same eight bytes per row,
+  * but cannot encode new automatic (128+) lane references. Convert those
+  * newly introduced references to their old explicit pattern numbers, then
+  * create a versioned CRC-valid V23 fixture and verify backward read support.
+  * Actual older V18 fixtures are covered by the older fixture suite. */
+ memcpy(old,wire,n);
+ uint32_t head=24+12+1+3+2;
+ assert(old[head]==2u);
+ uint32_t songat=head+3u;
+ for(unsigned row=0;row<p.song.count;row++)for(unsigned ch=0;ch<6;ch++){
+  uint32_t pos=songat+8u*row+2u+ch;
+  if(old[pos]>=TRACK_SONG_AUTO_BASE&&old[pos]<TRACK_SONG_AUTO_BASE+TRACK_PATTERNS)
+    old[pos]=(uint8_t)(old[pos]-TRACK_SONG_AUTO_BASE);
+ }
+ old[4]=23u;
+ /* V23 always appended a 13-entry legacy one-shot index and B1OS trailer. */
+ uint32_t oldn=n+BEETLE_ONESHOT_NOTES*10u+6u;
+ assert(oldn<=sizeof old);
+ memset(old+n,0,BEETLE_ONESHOT_NOTES*10u);
+ old[oldn-6u]=(uint8_t)n;
+ old[oldn-5u]=(uint8_t)(n>>8u);
+ memcpy(old+oldn-4u,"B1OS",4u);
+ for(unsigned j=0;j<4;j++)old[8+j]=(uint8_t)(oldn>>(j*8));
+ uint32_t c=track_store_crc32(old+24,oldn-24);
+ for(unsigned j=0;j<4;j++)old[12+j]=(uint8_t)(c>>(j*8));
+ c=track_store_crc32(old,16);
+ for(unsigned j=0;j<4;j++)old[16+j]=(uint8_t)(c>>(j*8));
  assert(track_store_decode(&q,old,oldn)==0);
- for(unsigned r=0;r<p.song.count;r++)for(int ch=0;ch<6;ch++)assert(q.song.chain[r].lane[ch]==q.song.chain[r].pattern);
- puts("PASS V19 song chains: row defaults, mixed lanes, --, NOTE2 FX, repeat, source isolation, V18 migration");
+ for(unsigned row=0;row<p.song.count;row++)for(unsigned ch=0;ch<6;ch++){
+  uint8_t lane=p.song.chain[row].lane[ch];
+  uint8_t legacy=(lane>=TRACK_SONG_AUTO_BASE&&lane<TRACK_SONG_AUTO_BASE+TRACK_PATTERNS)?
+                (uint8_t)(lane-TRACK_SONG_AUTO_BASE):lane;
+  assert(q.song.chain[row].lane[ch]==legacy);
+ }
+ puts("PASS V24 song chains: row clone, mixed lanes, --, NOTE2 FX, repeat, source isolation, V23 read");
  return 0;
 }

@@ -31,20 +31,28 @@ header{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;
 footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:10px;color:var(--dim)}footer strong{color:var(--pinklight);font-weight:normal}
 .modal-backdrop{display:none;position:fixed;inset:0;background:#000d;z-index:99;padding:20px;align-items:center;justify-content:center}.modal-backdrop.open{display:flex}.modal{width:min(450px,100%);background:#100c10;border:1px solid var(--pink);padding:22px;box-shadow:0 22px 100px #000}.modal h2{font-size:16px;color:var(--pink);margin:0 0 10px;letter-spacing:.6px}.modal p{white-space:pre-line;color:#d4bbcf;font-size:11px;line-height:1.75;margin:0 0 14px}.modal-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:16px}.confirm-row{display:flex;gap:9px;align-items:start;font-size:11px;color:var(--white);margin:12px 0}.confirm-row input{accent-color:var(--pink);margin-top:4px}
 [hidden]{display:none!important}
+body.migration-running .app button,body.migration-running .app input,body.migration-running .app select{pointer-events:none!important}
 @media(max-width:900px){.layout{grid-template-columns:1fr}.selection-panel{display:grid;grid-template-columns:1fr 1fr;gap:20px}.selection-panel>.box{margin:0}.box+.box{margin-top:0}}
 @media(max-width:650px){.app{padding:16px 13px}.wordmark{font-size:24px}.wordmark span{display:block;margin:9px 0 0}.hero{padding:23px 0}.hero-art{display:none}.connection{grid-template-columns:1fr}.slots{grid-template-columns:repeat(2,minmax(0,1fr))}.selection-panel{display:block}.selection-panel>.box+.box{margin-top:14px}.slot{min-height:105px}footer{flex-wrap:wrap}}
 </style>
 </head>
 <body>
 <main class="app">
-<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.4.2 · TOOL V1.9</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
-<section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites and true slot deletion. No firmware flashing from this page.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
+<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.4.24 · TOOL V2.1</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
+<section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites and true slot deletion. Storage V2 migration is available with compatible V1.4.24 firmware. Only the dedicated BEETLE project/sample partition is reformatted after an explicit backup.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
 <section class="box" aria-label="USB-MIDI connection">
 <div class="box-title">01 / DEVICE CONNECTION <small>USB · WEB MIDI SYSEX</small></div>
 <div class="connection"><div class="group"><label for="inPort">MIDI INPUT · FROM FM1</label><select id="inPort" class="field"><option value="">CONNECT TO SCAN</option></select></div><div class="group"><label for="outPort">MIDI OUTPUT · TO FM1</label><select id="outPort" class="field"><option value="">CONNECT TO SCAN</option></select></div><button class="button primary" id="connect">CONNECT FM1</button></div>
 <div class="help" id="deviceHelp">USB project management requires <strong>Project Transfer V4</strong> firmware for ownership-marker recovery (older versions still support ordinary transfers). Unmodified older firmware does not include this project protocol. Use Chrome/Edge over HTTPS or localhost, and grant MIDI SysEx access.</div>
 <div class="bar" style="margin:12px 0;gap:8px;flex-wrap:wrap"><span class="legend">STORAGE OWNERSHIP</span><button class="button quiet" id="diagnoseMarker" disabled>↻ DIAGNOSE STORAGE</button><button class="button danger" id="repairMarker" disabled>! REPAIR BEETLE MARKER</button></div>
-<div class="connection-diagnostics" role="status" aria-live="polite">
+<div class="connection-diagnostics" id="storageMigrationPanel" aria-label="Storage V2 migration">
+   <div class="diagnostic-top"><strong>STORAGE LAYOUT</strong><span id="volumeLayout">NOT CHECKED</span></div>
+   <div class="help" id="migrationInfo">Connect the FM1 to check whether it uses the original A/B project journal or shared Storage V2.</div>
+   <div class="bar" style="gap:8px"><button class="button primary" id="convertStorageV2" type="button" disabled>↻ CONVERT STORAGE TO V2</button><button class="button quiet" id="restoreStorageV2" type="button" disabled>↥ RESTORE V2 BACKUP ZIP</button></div>
+   <input type="file" id="migrationBackupFile" accept=".zip,application/zip" hidden>
+   <div class="tiny" style="margin-top:8px">Backs up all twelve slots, initializes only the BEETLE storage partition, restores every project and verifies each result. Requires V1.4.24 firmware.</div>
+ </div>
+ <div class="connection-diagnostics" role="status" aria-live="polite">
   <div class="diagnostic-top"><strong>CONNECTION DIAGNOSTICS</strong><button class="button quiet" type="button" id="copyDiagnostics">COPY REPORT</button></div>
   <div id="diagnosticResult">NOT CHECKED. Select the FM1 MIDI input and output, then press CONNECT FM1.</div>
   <div class="diagnostic-meta" id="diagnosticMeta">No data read or written.</div>
@@ -62,8 +70,8 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 <div class="selection-panel"><section class="box"><div class="box-title">03 / SELECTED SLOT <small>PROJECT ACTIONS</small></div>
 <div class="selection-title"><div class="selection-index" id="selectIndex">01</div><div class="selection-summary" id="selectState">NOT SCANNED</div></div>
 <div class="selection-name" id="selectName">NO DEVICE</div>
-<div class="button-stack"><button class="button primary" id="export" disabled>↓ EXPORT .BEETLE</button><button class="button" id="import" disabled>↑ IMPORT TO THIS SLOT</button><button class="button danger" id="clear" disabled>× DELETE PROJECT · EMPTY SLOT</button><button class="button danger" id="recover" disabled>! RECOVER [READ ERROR] SLOT</button></div>
-<div class="help">Export reads the full, CRC-verified project. Import assigns it to this slot. <strong>DELETE</strong> erases both A/B project banks of the selected slot so it becomes <strong>[ EMPTY ]</strong>. Requires Project Transfer V2 firmware. <strong>RECOVER</strong> with V3+ firmware can delete a damaged BEETLE-owned project that fails CRC verification. It cannot erase foreign/unrecognized flash. Recovery is destructive and may be impossible to back up.</div>
+<div class="button-stack"><button class="button primary" id="export" disabled>↓ EXPORT .BEETLE</button><button class="button" id="import" disabled>↑ IMPORT TO THIS SLOT</button><button class="button" id="upgradeLegacy" disabled>↻ CONVERT LEGACY PROJECTS</button><button class="button danger" id="clear" disabled>× DELETE PROJECT · EMPTY SLOT</button><button class="button danger" id="recover" disabled>! RECOVER [READ ERROR] SLOT</button></div>
+<div class="help">Export reads the full, CRC-verified project. Older project schemas are detected on the device and during import. Conversion is confirmed by you, saved by the FM1 with its current project schema, then read back and CRC-verified. A converted encrypted .beetle backup is offered. This does not reformat a legacy flash volume. Import assigns the project to this slot. <strong>DELETE</strong> erases both A/B project banks of the selected slot so it becomes <strong>[ EMPTY ]</strong>. Requires Project Transfer V2 firmware. <strong>RECOVER</strong> with V3+ firmware can delete a damaged BEETLE-owned project that fails CRC verification. It cannot erase foreign/unrecognized flash. Recovery is destructive and may be impossible to back up.</div>
 </section>
 <section class="box"><div class="box-title">04 / FILE FORMAT <small>AES-256-GCM · NO PASSWORD</small></div>
 <div class="label">AUTOMATIC .BEETLE ENCRYPTION</div>
@@ -72,11 +80,11 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 </section></div>
 </section>
 <section class="box" style="margin-top:18px" aria-label="Shared sample library">
-<div class="box-title">05 / GLOBAL SAMPLE LIBRARY <small>U01–U13 · PC LIBRARY / SAFE PROTOTYPE</small></div>
-<div class="note"><strong>STORAGE STATUS:</strong> This is a shared, portable PC-side sample library, independent of any .beetle project. It supports full WAV files, replacement and deletion. <strong>FM1 device-global flash transfer is NOT yet available:</strong> the protected/OTA flash map has not been qualified. Samples in this library are <strong>not automatically available on the FM1</strong>. Save a .beetlebank backup before closing this page.</div>
+<div class="box-title">05 / GLOBAL SAMPLE LIBRARY <small>U01–U13 · GLOBAL FM1 SAMPLE LIBRARY</small></div>
+<div class="note"><strong>STORAGE STATUS:</strong> This portable PC-side sample library is independent of any .beetle project and can be synchronized to migrated BEETLE Storage V2. It supports full WAV files, replacement and deletion. <strong>FM1 device-global transfer:</strong> requires a migrated Storage V2 volume and BEETLE V1.4.22 sample transfer firmware. Samples in this library remain separate from the device until explicitly synchronized. This tool validates PCM/float WAV structure, preserves the original bytes, and lets you export individual WAVs. WAV is converted to 22.05 kHz mono 4-bit BD4S for device transfer; the original WAV stays unchanged on your computer. U01–U13 are shared across all twelve projects once synchronized to a Storage V2-equipped FM1. On-device playback remains hardware-unverified. Save a .beetlebank backup before closing this page.</div>
 <div class="bar" style="margin-top:16px"><button type="button" class="button primary" id="bankOpen">OPEN .BEETLEBANK</button><button type="button" class="button" id="bankSave">↓ SAVE GLOBAL LIBRARY</button><button type="button" class="button quiet" id="bankNew">NEW EMPTY BANK</button><span class="legend" id="bankStats">0 / 13 SLOTS · 0 BYTES</span></div>
 <div id="bankRows" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin:14px 0"></div>
-<div class="bar"><button type="button" class="button" disabled title="Requires hardware-validated dedicated flash storage and transfer protocol">↑ TRANSFER GLOBAL BANK TO FM1 · NOT YET SUPPORTED</button><span class="legend">One library across projects on your computer, without duplicating WAVs.</span></div>
+<div class="bar"><button type="button" class="button primary" id="bankTransfer" disabled>↑ STORE U01–U13 ON FM1</button><span class="legend">Global bank for all twelve projects. FM1 storage works on migrated V2 volumes; native sample playback is enabled in V1.4.22, but hardware timing has not been validated.</span></div>
 <input id="bankFile" type="file" accept=".beetlebank,application/octet-stream" hidden>
 <input id="bankWav" type="file" accept=".wav,audio/wav,audio/x-wav" hidden>
 </section>
@@ -90,7 +98,7 @@ footer{border-top:1px solid var(--border);padding-top:16px;margin-top:30px;displ
 <input id="sampleFile" type="file" accept=".beetle" hidden>
 <input id="sampleWave" type="file" accept=".wav,audio/wav,audio/x-wav" hidden>
 </section>
-<footer><span>BEETLE · <strong>BORN OUT OF PASSION.</strong></span><span>BY SIKKENWORKS · LOCAL BROWSER TOOL · NEVER FORMATS PROJECT BANKS</span></footer>
+<footer><span>BEETLE · <strong>BORN OUT OF PASSION.</strong></span><span>BY SIKKENWORKS · LOCAL BROWSER TOOL · STORAGE MIGRATION REQUIRES CONFIRMATION</span></footer>
 </main>
 <input id="file" type="file" accept=".beetle,application/octet-stream" hidden>
 <div class="modal-backdrop" id="backdrop"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><h2 id="modalTitle"></h2><p id="modalText"></p><div id="modalExtra"></div><div id="modalActions" class="modal-actions"></div></div></div>
@@ -120,7 +128,10 @@ const BeetleFileV2=(()=>{
 })();
 
 const ERRORS={1:'Firmware has no writable BEETLE project storage.',2:'FM1 is busy. Stop playback and save unsaved edits first.',3:'Invalid project slot.',4:'This slot is empty.',5:'Invalid transfer length.',6:'Project checksum mismatch.',7:'Invalid or incompatible project file.',8:'The target slot is already occupied.',9:'FM1 flash read/write verification failed.',10:'Transfer state mismatch. Disconnect and retry.',11:'FM1 storage is not owned or verified by BEETLE.',12:'Project exceeds FM1 storage capacity.'};
+let deviceGlobalSamples=false;
 let midi=null,portIn=null,portOut=null, connected=false,deviceSchema=0,deviceProtocol=0,seq=0,pending=null,busy=false,selected=0,markerStatus=null;
+let storageMigrationMode='unknown',migrationInProgress=false;
+const legacySlots=()=>slots.map((v,i)=>v.state==='used'&&Number.isInteger(v.version)&&v.version>0&&v.version<deviceSchema?i:-1).filter(i=>i>=0);
 let identityWaiter=null,receivedMidi=0,validFrames=0,reportedState='NOT CHECKED';
 function reportDiagnostic(state,message){
  reportedState=state;
@@ -165,16 +176,26 @@ async function query(cmd,args=[],expected,timeout=4500,retries=1){if(!portOut||!
 function log(msg,error=false){$('activity').className='activity'+(error?' error':'');$('activity').lastElementChild.textContent=msg;}
 function setProgress(label,fraction){$('progressPanel').hidden=false;$('progressText').textContent=label;let pct=Math.max(0,Math.min(100,Math.round(fraction*100)));$('progressCount').textContent=pct+'%';$('progressFill').style.width=pct+'%';}
 function hideProgress(){$('progressPanel').hidden=true;}
-function setBusy(value){busy=value;$('connect').disabled=value;$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('recover').disabled=value||!connected||deviceProtocol<3||!['bad','used'].includes(slots[selected].state);$('diagnoseMarker').disabled=value||!connected||deviceProtocol<4;$('repairMarker').disabled=value||!connected||deviceProtocol<4||markerStatus!==1;$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
+function setBusy(value){busy=Boolean(value||migrationInProgress);value=busy;const bankTransfer=document.getElementById('bankTransfer');if(bankTransfer)bankTransfer.disabled=value||!connected||!deviceGlobalSamples;$('connect').disabled=value;const c=$('convertStorageV2');if(c)c.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='legacy';const r=$('restoreStorageV2');if(r)r.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='v2';$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('upgradeLegacy').disabled=value||!connected||legacySlots().length===0;$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('recover').disabled=value||!connected||deviceProtocol<3||!['bad','used'].includes(slots[selected].state);$('diagnoseMarker').disabled=value||!connected||deviceProtocol<4;$('repairMarker').disabled=value||!connected||deviceProtocol<4||markerStatus!==1;$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
 function draw(){const root=$('slots');root.textContent='';let count=0;for(let k=0;k<12;k++){
  const s=slots[k];if(s.state==='used')count++;const b=document.createElement('button');b.type='button';b.className='slot '+(k===selected?'selected ':'')+(s.state==='empty'?'empty ':s.state==='bad'?'unavailable':'');b.setAttribute('aria-pressed',String(k===selected));
- const head=document.createElement('div');head.className='slot-head';const num=document.createElement('span');num.className='slot-number';num.textContent='SLOT '+String(k+1).padStart(2,'0');const status=document.createElement('span');status.className='slot-state';status.textContent=s.state==='used'?'● SAVED':s.state==='empty'?'○ EMPTY':s.state==='bad'?'! ERROR':'— UNKNOWN';head.append(num,status);
+ const head=document.createElement('div');head.className='slot-head';const num=document.createElement('span');num.className='slot-number';num.textContent='SLOT '+String(k+1).padStart(2,'0');const status=document.createElement('span');status.className='slot-state';status.textContent=s.state==='used'?(Number.isInteger(s.version)&&s.version<deviceSchema?'↻ LEGACY':'● SAVED'):s.state==='empty'?'○ EMPTY':s.state==='bad'?'! ERROR':'— UNKNOWN';head.append(num,status);
  const name=document.createElement('div');name.className='slot-name';name.textContent=s.state==='used'?s.name||'UNTITLED':s.state==='empty'?'[ EMPTY ]':s.state==='bad'?'UNREADABLE':'NOT SCANNED';
- const meta=document.createElement('div');meta.className='slot-meta';meta.textContent=s.state==='used'?'BEETLE PROJECT':s.state==='empty'?'AVAILABLE FOR IMPORT':'DEVICE NOT READY';b.append(head,name,meta);b.onclick=()=>{selected=k;draw();};b.disabled=busy;root.appendChild(b);
+ const meta=document.createElement('div');meta.className='slot-meta';meta.textContent=s.state==='used'?(Number.isInteger(s.version)?'PROJECT SCHEMA V'+s.version+(s.version<deviceSchema?' · CONVERSION AVAILABLE':''):'BEETLE PROJECT · SCHEMA UNKNOWN'):s.state==='empty'?'AVAILABLE FOR IMPORT':'DEVICE NOT READY';b.append(head,name,meta);b.onclick=()=>{selected=k;draw();};b.disabled=busy;root.appendChild(b);
  }
- $('used').textContent=connected?String(count).padStart(2,'0'):'—';$('selectIndex').textContent=String(selected+1).padStart(2,'0');const s=slots[selected];$('selectName').textContent=s.state==='used'?s.name||'UNTITLED':s.state==='empty'?'EMPTY SLOT':s.state==='bad'?'UNREADABLE SLOT':'NO PROJECT INFORMATION';$('selectState').textContent=s.state==='used'?'PROJECT STORED':s.state==='empty'?'AVAILABLE':s.state==='bad'?'READ ERROR':'NOT SCANNED';setBusy(busy);
+ $('used').textContent=connected?String(count).padStart(2,'0'):'—';$('selectIndex').textContent=String(selected+1).padStart(2,'0');const s=slots[selected];$('selectName').textContent=s.state==='used'?s.name||'UNTITLED':s.state==='empty'?'EMPTY SLOT':s.state==='bad'?'UNREADABLE SLOT':'NO PROJECT INFORMATION';$('selectState').textContent=s.state==='used'?(Number.isInteger(s.version)&&s.version<deviceSchema?'LEGACY V'+s.version+' · CONVERT':'PROJECT STORED'): s.state==='empty'?'AVAILABLE':s.state==='bad'?'READ ERROR':'NOT SCANNED';setBusy(busy);
 }
-function setConnected(v){connected=v;$('led').classList.toggle('live',v);$('connectionState').textContent=v?'FM1 CONNECTED':'NOT CONNECTED';$('connect').textContent=v?'DISCONNECT':'CONNECT FM1';$('deviceHelp').textContent=v?'Connected via USB-MIDI SysEx · Project Transfer V'+deviceProtocol+' · firmware project schema V'+deviceSchema+'.':'Firmware without Project Transfer does not support USB project transfers. The separate Project Transfer firmware is required. Never flash an experimental build without a verified backup and independent recovery route.';draw();sampleRender();}
+function setConnected(v){connected=v;if(!v){storageMigrationMode='unknown';setMigrationLabel();}$('led').classList.toggle('live',v);$('connectionState').textContent=v?'FM1 CONNECTED':'NOT CONNECTED';$('connect').textContent=v?'DISCONNECT':'CONNECT FM1';$('deviceHelp').textContent=v?'Connected via USB-MIDI SysEx · Project Transfer V'+deviceProtocol+' · firmware project schema V'+deviceSchema+'.':'Firmware without Project Transfer does not support USB project transfers. The separate Project Transfer firmware is required. Never flash an experimental build without a verified backup and independent recovery route.';draw();sampleRender();window.dispatchEvent(new Event('beetle-connection-changed'));}
+function setMigrationLabel(){
+ const status=$('volumeLayout'),info=$('migrationInfo');if(!status||!info)return;
+ const names={unknown:'NOT CHECKED',legacy:'LEGACY A/B',v2:'STORAGE V2 READY',unsupported:'FIRMWARE UPDATE NEEDED'};
+ status.textContent=names[storageMigrationMode]||'NOT CHECKED';
+ info.textContent=storageMigrationMode==='v2'?'Storage V2 is active. Your twelve project slots and shared U01–U13 sample storage use independent namespaces. No conversion is necessary.':
+  storageMigrationMode==='legacy'?'Legacy A/B storage detected. Convert to Storage V2 to enable global sample uploads. All saved projects will be backed up first and restored afterwards.':
+  storageMigrationMode==='unsupported'?'This FM1 firmware has no USB Storage V2 migration command. Install the matching BEETLE V1.4.24 firmware before converting. The manager will not send an undocumented flash command.':
+  'Storage layout not yet verified.';
+ const btn=$('convertStorageV2');if(btn)btn.disabled=busy||!connected||deviceProtocol<5||storageMigrationMode!=='legacy';const restore=$('restoreStorageV2');if(restore)restore.disabled=busy||!connected||deviceProtocol<5||storageMigrationMode!=='v2';
+}
 function appendPorts(){const ins=[...midi.inputs.values()],outs=[...midi.outputs.values()];for(const [id,arr] of [['inPort',ins],['outPort',outs]]){const elem=$(id),old=elem.value;elem.textContent='';for(const x of arr){let opt=new Option(x.name||'Unnamed MIDI port',x.id);elem.add(opt);}if(arr.some(x=>x.id===old))elem.value=old;else{let idx=arr.findIndex(x=>/fm.?1|m-vave|beetle|jieli/i.test(x.name||''));if(idx>=0)elem.selectedIndex=idx;}}
 }
 async function disconnect(){
@@ -183,9 +204,9 @@ async function disconnect(){
  if(portIn)portIn.onmidimessage=null;
  if(portIn)try{await portIn.close();}catch{}
  if(portOut)try{await portOut.close();}catch{}
- for(const s of slots){s.state='unknown';s.name='';}
+ for(const s of slots){s.state='unknown';s.name='';s.version=null;}
  setConnected(false);sampleRender();log('Disconnected. No project data is retained in the page.');
- portIn=portOut=null;deviceProtocol=0;markerStatus=null;
+ portIn=portOut=null;deviceProtocol=0;deviceGlobalSamples=false;markerStatus=null;storageMigrationMode='unknown';setMigrationLabel();
 }
 async function connect(){
  if(connected){await disconnect();reportDiagnostic('DISCONNECTED','The FM1 connection was closed.');return;}
@@ -196,7 +217,7 @@ async function connect(){
  const inp=midi.inputs.get($('inPort').value),out=midi.outputs.get($('outPort').value);
  if(!inp||!out){reportDiagnostic('NO PORTS','No complete USB MIDI input/output pair found. Verify USB data cable and MIDI permissions.');throw Error('No FM1 MIDI input/output pair found.');}
  portIn=inp;portOut=out;receivedMidi=0;validFrames=0;
- reportDiagnostic('PROBING','Probing the selected ports for BEETLE Project Transfer V1–V4 (read-only)...');
+ reportDiagnostic('PROBING','Probing the selected ports for BEETLE Project Transfer V1–V5 (read-only)...');
  try{
   await portIn.open();await portOut.open();portIn.onmidimessage=onMidiMessage;
   let info;
@@ -213,9 +234,9 @@ async function connect(){
    const msg='No Project Transfer or firmware identity reply from the selected MIDI ports. Confirm FM1 is powered on, USB DATA cable is used, correct input AND output are selected, and no other MIDI application is holding the device. The installed firmware may also lack the protocol.';
    reportDiagnostic('NO USB REPLY',msg);throw Error(msg);
   }
-  if(info.length<4||(info[0]!==1&&info[0]!==2&&info[0]!==3&&info[0]!==4)||info[1]!==12){reportDiagnostic('UNSUPPORTED FIRMWARE','The device replied, but the Project Transfer version is incompatible.');throw Error('Unsupported Project Transfer protocol on this FM1.');}
+  if(info.length<4||(info[0]<1||info[0]>5)||info[1]!==12){reportDiagnostic('UNSUPPORTED FIRMWARE','The device replied, but the Project Transfer version is incompatible.');throw Error('Unsupported Project Transfer protocol on this FM1.');}
   if(!info[3]){reportDiagnostic('STORAGE DISABLED','The firmware replies to Project Transfer firmware but project flash storage is disabled.');throw Error('The connected firmware has Project Transfer but no available BEETLE project storage.');}
-  deviceProtocol=info[0];deviceSchema=info[2];
+  deviceProtocol=info[0];deviceSchema=info[2];deviceGlobalSamples=!!(info[3]&2);
   await query(0x58,[],0x64,2500,0);
   setConnected(true);
   reportDiagnostic('PROJECT TRANSFER READY','FM1 confirmed Project Transfer V'+deviceProtocol+'. Scanning its 12 project slots.');
@@ -232,7 +253,185 @@ async function connect(){
   }
   reportDiagnostic('CONNECTED · 12 SLOTS' ,'Project Transfer V'+deviceProtocol+' is active. The slot list was read successfully.'+(deviceProtocol<2?' Physical DELETE requires V2 firmware.':deviceProtocol<3?' Corrupted-slot recovery requires V3 firmware.':' Corrupted-slot recovery available (owned BEETLE data only).'));
   log('Connected. Select one of the 12 slots to export or import.');
+  if(legacySlots().length){try{await offerLegacyConversion();}catch(err){log('Legacy conversion stopped: '+(err.message||err),true);}}
+  else if(!deviceGlobalSamples)log('Project formats checked. This FM1 still uses the legacy flash layout; schema conversion alone does not enable global sample storage.');
  }catch(e){await disconnect();throw e;}
+}
+/* BEETLE V1.4.24 native USB storage migration.
+ * Host-side migration needs V5 preflight and explicit consent; never assume
+ * that converting TRK1 V22/V23 to V24 changed the physical volume. */
+async function readStorageMigrationPreflight(){
+ if(deviceProtocol<5)throw Error('Storage conversion requires BEETLE V1.4.24 (Project Transfer V5).');
+ const p=await query(0x5d,[],0x6d,90000,0);
+ if(p.length!==7||p[0]>1)throw Error('Unexpected Storage V2 migration preflight response. No flash writes attempted.');
+ return {layout:p[0],mask:u16(p,1),digest:u32(p,3)};
+}
+function fingerprintBackup(items){
+ let hash=2166136261>>>0;
+ for(let slot=0;slot<12;slot++){
+  const data=items.find(x=>x.slot===slot);
+  const len=data?data.raw.length:0,crc=data?crc32(data.raw):0;
+  const desc=Uint8Array.from([slot,data?1:0,len&255,(len>>>8)&255,...le32(crc)]);
+  for(const b of desc)hash=Math.imul(hash^b,16777619)>>>0;
+ }
+ return hash;
+}
+function migrationLock(lock){
+ migrationInProgress=lock;document.body.classList.toggle('migration-running',lock);
+ document.querySelectorAll('#bankOpen,#bankSave,#bankNew,#bankFile,#bankWav,#bankTransfer,#restoreStorageV2,#refresh,#import,#export,#clear,#recover,#upgradeLegacy,#diagnoseMarker,#repairMarker,#convertStorageV2')
+  .forEach(el=>{if(lock)el.disabled=true;});
+ if(!lock){draw();setMigrationLabel();window.dispatchEvent(new Event('beetle-connection-changed'));}
+}
+async function convertStorageV2(){
+ if(!connected)throw Error('Connect your FM1 first.');
+ if(deviceProtocol<5)throw Error('This firmware cannot initialize Storage V2. Update to BEETLE V1.4.24 first.');
+ if(storageMigrationMode==='v2')throw Error('Storage V2 is already active. No migration needed.');
+ if(storageMigrationMode!=='legacy')throw Error('Storage is not verified as legacy BEETLE storage. No changes permitted.');
+ const preflight=await readStorageMigrationPreflight();
+ if(preflight.layout!==0)throw Error('Device already uses Storage V2 or returned an unsupported state.');
+ if(slots.some(s=>!['used','empty'].includes(s.state)))throw Error('All 12 project slots must be readable or empty before migration. Refresh and resolve unreadable slots.');
+ const expectedMask=slots.reduce((mask,s,i)=>mask|(s.state==='used'?(1<<i):0),0);
+ if(preflight.mask!==expectedMask){await refresh();throw Error('FM1 project occupancy changed. No flash was modified. Refresh and retry.');}
+ const agree=await modal('CONVERT STORAGE TO V2 · STEP 1 / 3',
+  'This converts only the dedicated BEETLE project/sample flash volume. It does NOT flash firmware or overwrite OTA/bootloader data.\n\nThe old A/B partition is erased during conversion, so the Project Manager will first read ALL twelve slots and download an encrypted .beetle backup ZIP. You must confirm it is saved before any flash erase.\n\nDisconnecting or losing power during conversion may require restoring the backup using your established recovery route.',
+  [{label:'CANCEL',value:'cancel'},{label:'BACK UP ALL 12 SLOTS',kind:'primary',value:'backup'}]);
+ if(agree!=='backup')return;
+ setBusy(true);migrationLock(true);
+ let rawProjects=[],backupConfirmed=false,partitionConverted=false;
+ try{
+  // Snapshot only complete, CRC-verified originals. No native write yet.
+  for(let slot=0;slot<12;slot++){
+   const s=slots[slot];
+   if(s.state==='used'){
+    const item=await readProjectFromSlot(slot);
+    rawProjects.push({slot,...item});
+   }
+   setProgress('BACKING UP PROJECT SLOT '+String(slot+1).padStart(2,'0'),(slot+1)/12*.30);
+  }
+  const signature=fingerprintBackup(rawProjects);
+  if(signature!==preflight.digest||rawProjects.reduce((m,i)=>m|(1<<i.slot),0)!==preflight.mask)
+   throw Error('Project contents changed during backup. Device and local checksums disagree; no flash was modified.');
+  const files=[];
+  for(const project of rawProjects){
+   const encrypted=new Uint8Array(await (await encryptProject(project.raw)).arrayBuffer());
+   files.push({name:filename(project.info.name+'-BEFORE-V2',project.slot),bytes:encrypted});
+  }
+  const manifest={format:'BEETLE-V2-MIGRATION-BACKUP-1',created:new Date().toISOString(),project_schema:deviceSchema,
+   original_storage:'BEETLE LEGACY A/B',project_mask:preflight.mask,device_fingerprint:preflight.digest,
+   slots:Array.from({length:12},(_,slot)=>{const p=rawProjects.find(x=>x.slot===slot);return p?{slot:slot+1,name:p.info.name,project_version:p.info.version,length:p.raw.length,crc32:crc32(p.raw)}:{slot:slot+1,empty:true};}),
+   note:'Backups are encrypted .beetle files. Restore by importing each into its original slot after conversion.'};
+  files.push({name:'MIGRATION-MANIFEST.json',bytes:enc.encode(JSON.stringify(manifest,null,2)+'\n')});
+  const zip=new Blob([makeBackupZip(files)],{type:'application/zip'});
+  download(zip,'BEETLE-ALL-12-SLOTS-BEFORE-STORAGE-V2.zip');
+  hideProgress();
+  const confirmed=await modal('CONVERT STORAGE TO V2 · STEP 2 / 3',
+   'The encrypted backup ZIP was generated for all '+rawProjects.length+' occupied slots.\n\nCheck that the ZIP actually exists on your computer and that the MIGRATION-MANIFEST.json and individual .beetle files are inside it. Browser download initiation alone is NOT a verified backup.\n\nThe next operation erases the existing 288 KiB BEETLE project partition. All backed-up projects will then be restored, one by one, to the new V2 volume.',
+   [{label:'CANCEL',value:'cancel'},{label:'BACKUP VERIFIED · CONVERT',value:'yes',kind:'danger',confirm:true}],
+   'I verified the downloaded ZIP and know recovery may be needed if the transfer is interrupted.');
+  if(confirmed!=='yes')return;
+  backupConfirmed=true;
+  // Recheck device WITHOUT writes immediately before the irreversible command.
+  const finalCheck=await readStorageMigrationPreflight();
+  if(finalCheck.layout!==0||finalCheck.mask!==preflight.mask||finalCheck.digest!==signature)
+   throw Error('Storage layout or project content changed since backup. Conversion cancelled; no flash modified.');
+  setProgress('INITIALIZING STORAGE V2 · DO NOT DISCONNECT',.38);
+  const reply=await query(0x5e,[0x42,0x32,0x4d,0x47,preflight.mask&255,preflight.mask>>>8,...le32(signature)],0x6e,180000,0);
+  if(reply.length!==1||reply[0]!==1)throw Error('Storage conversion result not confirmed. Keep the backup and inspect the device before retrying.');
+  partitionConverted=true;
+  const after=await readStorageMigrationPreflight();
+  if(after.layout!==1)throw Error('The device did not verify Storage V2 after erase. Recovery from the saved ZIP may be necessary.');
+  deviceGlobalSamples=true;storageMigrationMode='v2';setMigrationLabel();
+  // Restore each project and verify the committed version/name/slot on-device.
+  for(let index=0;index<rawProjects.length;index++){
+   const p=rawProjects[index];
+   setProgress('RESTORING PROJECT '+String(p.slot+1).padStart(2,'0'),.42+index/Math.max(1,rawProjects.length)*.53);
+   await uploadProject(p.slot,p.raw,false,'RESTORE',false);
+   const verified=await readProjectFromSlot(p.slot);
+   if(verified.info.version!==deviceSchema||verified.info.slot!==p.slot||verified.info.name!==p.info.name)
+    throw Error('Restored SLOT '+(p.slot+1)+' failed current-schema/readback verification. Keep the original migration ZIP.');
+   // The new schema is re-encoded on FM1, so a raw-file CRC would naturally differ.
+  }
+  setProgress('VERIFYING ALL PROJECTS AND STORAGE V2',.97);
+  await refresh();
+  for(let i=0;i<12;i++){
+   const item=rawProjects.find(p=>p.slot===i),actual=slots[i];
+   if(item ? actual.state!=='used'||actual.name!==item.info.name||actual.version!==deviceSchema : actual.state!=='empty')
+    throw Error('Final slot audit failed at SLOT '+(i+1)+'. Keep the original backup ZIP.');
+  }
+  setProgress('STORAGE V2 READY · 12 SLOTS VERIFIED',1);
+  reportDiagnostic('STORAGE V2 CONVERSION COMPLETE','Storage V2 is active. All 12 project slots were checked after migration; '+rawProjects.length+' existing projects were restored with schema V'+deviceSchema+'. Global U01–U13 upload can now be used.');
+  log('Storage V2 activated and all '+rawProjects.length+' projects restored. You can now transfer the global sample library.');
+  await modal('STORAGE V2 READY','Storage V2 is active. All twelve slots were rechecked; '+rawProjects.length+' projects were successfully restored. Keep your migration backup ZIP for recovery.',[{label:'OK',value:'ok'}]);
+ }catch(err){
+  if(partitionConverted||backupConfirmed){
+   reportDiagnostic('STORAGE MIGRATION NEEDS ATTENTION','Migration/restore did not complete: '+(err.message||err)+'. Keep the original encrypted backup ZIP. Do not rerun FORMAT blindly. You can reconnect and restore the remaining slots or use your established recovery path.');
+  }
+  throw err;
+ }finally{hideProgress();migrationLock(false);setBusy(false);setMigrationLabel();}
+}
+/* Recovery from the manager's exact, uncompressed encrypted migration ZIP.
+ * Never initialize/erase Storage V2 while restoring a backup. */
+function parseV2MigrationBackup(bytes){
+ if(!(bytes instanceof Uint8Array)||bytes.length<22||bytes.length>4*1024*1024)throw Error('Invalid or oversized migration backup ZIP.');
+ const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),decoder=new TextDecoder();
+ const files=new Map();let i=0;
+ while(i+4<=bytes.length&&v.getUint32(i,true)===0x04034b50){
+  if(i+30>bytes.length)throw Error('Truncated backup ZIP header.');
+  const method=v.getUint16(i+8,true),size=v.getUint32(i+18,true),rawSize=v.getUint32(i+22,true),
+        fileCrc=v.getUint32(i+14,true),nameLength=v.getUint16(i+26,true),extra=v.getUint16(i+28,true);
+  const start=i+30+nameLength+extra,end=start+size;
+  if(method!==0||size!==rawSize||end>bytes.length||nameLength>180)throw Error('Unsupported, compressed or damaged migration ZIP.');
+  const name=decoder.decode(bytes.subarray(i+30,i+30+nameLength));
+  if(!name||name.includes('/')||name.includes('\\')||files.has(name)||crc32(bytes.subarray(start,end))!==fileCrc)
+   throw Error('Backup ZIP has a duplicate, unsafe name or CRC failure.');
+  files.set(name,bytes.slice(start,end));i=end;
+ }
+ if(!files.has('MIGRATION-MANIFEST.json'))throw Error('Not a BEETLE Storage V2 migration ZIP.');
+ let manifest;
+ try{manifest=JSON.parse(decoder.decode(files.get('MIGRATION-MANIFEST.json')));}catch{throw Error('Invalid migration manifest.');}
+ if(manifest.format!=='BEETLE-V2-MIGRATION-BACKUP-1'||!Array.isArray(manifest.slots)||manifest.slots.length!==12)
+  throw Error('Incompatible BEETLE migration manifest.');
+ return {files,manifest};
+}
+async function restoreV2FromZip(file){
+ if(!connected||deviceProtocol<5||storageMigrationMode!=='v2')throw Error('Connect a verified BEETLE Storage V2 volume first.');
+ const {files,manifest}=parseV2MigrationBackup(new Uint8Array(await file.arrayBuffer()));
+ const projects=[];
+ for(let slot=0;slot<12;slot++){
+  const meta=manifest.slots[slot];
+  if(meta.slot!==slot+1)throw Error('Backup manifest has wrong project slot order.');
+  if(meta.empty)continue;
+  const name=[...files.keys()].find(n=>n.endsWith('-SLOT-'+String(slot+1).padStart(2,'0')+'.beetle'));
+  if(!name)throw Error('Encrypted project for SLOT '+(slot+1)+' missing from ZIP.');
+  const bytes=files.get(name),raw=await BeetleFileV2.decrypt(new Blob([bytes])),info=validateProject(raw);
+  if(info.slot!==slot||info.name!==meta.name||crc32(raw)!==meta.crc32||raw.length!==meta.length)
+   throw Error('Backup project failed authenticated slot/name/CRC validation for SLOT '+(slot+1));
+  projects.push({slot,raw,info});
+ }
+ if(projects.length!==manifest.slots.filter(s=>!s.empty).length||
+    fingerprintBackup(projects)!==manifest.device_fingerprint)
+  throw Error('Migration ZIP contents do not match the original project fingerprint.');
+ const confirmation=await modal('RESTORE STORAGE V2 PROJECTS',
+  'This ZIP contains '+projects.length+' authenticated original projects. Restore them to their original slots in the already-active Storage V2 volume?\n\nExisting projects in those destination slots will be replaced. Other sample slots and unrelated data are not intentionally modified.',
+  [{label:'CANCEL',value:'cancel'},{label:'RESTORE PROJECTS',kind:'danger',value:'yes',confirm:true}],
+  'I understand that this replaces the matching destination project slots.');
+ if(confirmation!=='yes')return;
+ setBusy(true);migrationLock(true);
+ try{
+  for(let k=0;k<projects.length;k++){
+   const p=projects[k];setProgress('RESTORING SLOT '+String(p.slot+1).padStart(2,'0'),k/projects.length*.90);
+   await uploadProject(p.slot,p.raw,true,'RESTORE',false);
+   const checked=await readProjectFromSlot(p.slot);
+   if(checked.info.version!==deviceSchema||checked.info.slot!==p.slot||checked.info.name!==p.info.name)
+    throw Error('Restored project SLOT '+(p.slot+1)+' did not verify as V'+deviceSchema+'.');
+  }
+  await refresh();
+  for(const p of projects)if(slots[p.slot].state!=='used'||slots[p.slot].name!==p.info.name||slots[p.slot].version!==deviceSchema)
+   throw Error('Final restoration verification failed for SLOT '+(p.slot+1));
+  setProgress('V2 BACKUP RESTORED',1);
+  log('Restored and verified '+projects.length+' projects from the original backup ZIP.');
+  await modal('V2 BACKUP RESTORED','The restored projects were read back and verified. Keep the original ZIP.',[{label:'OK',value:'ok'}]);
+ }finally{hideProgress();migrationLock(false);setBusy(false);}
 }
 const MARKER_REPORT={
  0:'The BEETLE storage owner marker is intact. No repair is required.',
@@ -279,7 +478,27 @@ async function repairStorageMarker(){
  await refresh();
  reportDiagnostic('MARKER REPAIRED · PROJECTS AVAILABLE','BEETLE owner marker restored and verified, project slots rescanned. Project-bank data was not intentionally erased.');
 }
-async function refresh(){if(!connected)return;setBusy(true);try{for(let k=0;k<12;k++){setProgress('SCANNING SLOT '+String(k+1).padStart(2,'0'),k/12);const info=await query(0x51,[k],0x61,7000,1);if(info.length<14||info[0]!==k)throw Error('Invalid slot response');slots[k]={state:info[1]===1?'used':info[1]===0?'empty':'bad',name:ascii(info.slice(2,14))};draw();}setProgress('SLOTS SCANNED',1);}finally{hideProgress();setBusy(false);draw();}}
+async function refresh(){if(!connected)return;setBusy(true);try{for(let k=0;k<12;k++){
+ setProgress('SCANNING SLOT '+String(k+1).padStart(2,'0'),k/12);
+ const info=await query(0x51,[k],0x61,7000,1);
+ if(info.length<14||info[0]!==k)throw Error('Invalid slot response');
+ const state=info[1]===1?'used':info[1]===0?'empty':'bad';
+ const entry={state,name:ascii(info.slice(2,14)),version:null};
+ if(state==='used'){
+  // READ_BEGIN performs the native full-project validation and exposes the real stored TRK1 schema.
+  // Abort the read immediately: metadata alone is enough; NO flash writes or project modification.
+  try{
+   const meta=await query(0x52,[k],0x62,12000,0);
+   if(meta.length<20||meta[0]!==k||meta[7]<1||meta[7]>deviceSchema)throw Error('Invalid project schema metadata');
+   entry.version=meta[7];
+  }catch(err){entry.scanError=String(err.message||err);}
+  finally{await tryAbort();}
+ }
+ slots[k]=entry;draw();
+ }
+ setProgress('SLOTS SCANNED',1);
+ }finally{hideProgress();setBusy(false);draw();}}
+
 function validateProject(bytes){if(bytes.length<42||bytes.length>MAX_PROJECT||ascii(bytes.slice(0,4))!=='TRK1')throw Error('Not a valid BEETLE project.');const version=u16(bytes,4),slot=u16(bytes,6),size=u32(bytes,8);if(version>deviceSchema)throw Error('Project schema V'+version+' requires newer BEETLE firmware. Connected FM1 supports V'+deviceSchema+'. No data written.');if(!version||version>deviceSchema||slot>=12||bytes[36]!==slot||size!==bytes.length||u32(bytes,16)!==crc32(bytes.slice(0,16))||u32(bytes,12)!==crc32(bytes.slice(24)))throw Error('Unsupported, incomplete or corrupted project data.');return {version,slot,name:ascii(bytes.slice(24,36))||'UNTITLED'};}
 async function makeKey(password,salt,usage){const material=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,[usage]);}
 async function encryptProject(data){return BeetleFileV2.encrypt(data);}
@@ -314,8 +533,36 @@ async function decryptProject(file){
 function download(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),45000);}
 function filename(name,slot){return (name||'UNTITLED').replace(/[^a-z0-9_-]/gi,'_').slice(0,32)+'-SLOT-'+String(slot+1).padStart(2,'0')+'.beetle';}
 async function tryAbort(){try{await query(0x58,[],0x64,2000,0);}catch{}}
-async function exportSlot(slot){if(!connected||slots[slot].state!=='used')throw Error('Choose a filled project slot.');setBusy(true);let opened=false;try{setProgress('READING PROJECT FROM FM1',0);const meta=await query(0x52,[slot],0x62,10000,1);if(meta.length<20||meta[0]!==slot)throw Error('FM1 returned an invalid project header.');opened=true;const length=u16(meta,1),expected=u32(meta,3);if(length<42||length>MAX_PROJECT)throw Error('Device project length exceeds safe limit.');const raw=new Uint8Array(length);for(let at=0;at<length;at+=CHUNK){const len=Math.min(CHUNK,length-at);const v=await query(0x53,[at&255,at>>>8,len],0x63,5500,2);if(v.length!==3+len||u16(v,0)!==at||v[2]!==len)throw Error('Out-of-order FM1 transfer response.');raw.set(v.slice(3),at);setProgress('READING PROJECT FROM FM1',(at+len)/length*.8);}if(crc32(raw)!==expected)throw Error('Export CRC failed; no backup file was created.');const info=validateProject(raw);setProgress('ENCRYPTING PROJECT',.89);const blob=await encryptProject(raw);setProgress('DOWNLOADING ENCRYPTED .BEETLE',1);download(blob,filename(info.name,slot));log('Encrypted backup download started for '+info.name+'. Verify that your browser saved the file.');return {info,blob};}finally{if(opened)await tryAbort();hideProgress();setBusy(false);}}
-async function uploadProject(slot,raw,overwrite,operation='IMPORT'){setBusy(true);let initiated=false;let committed=false;try{const fingerprint=crc32(raw);const args=[slot,raw.length&255,raw.length>>>8,...le32(fingerprint),overwrite?1:0,0x42];await query(0x55,args,0x64,14000,0);initiated=true;for(let at=0;at<raw.length;at+=CHUNK){const n=Math.min(CHUNK,raw.length-at);const v=await query(0x56,[at&255,at>>>8,n,...raw.slice(at,at+n)],0x64,5500,2);if(v.length<2||u16(v,0)!==at+n)throw Error('FM1 did not acknowledge the correct upload position.');setProgress((operation==='CLEAR'?'CLEARING PROJECT CONTENT IN SLOT ':'TRANSFERRING PROJECT TO SLOT ')+(slot+1),(at+n)/raw.length*.92);}setProgress('VERIFYING & COMMITTING JOURNAL',.96);const done=await query(0x57,[],0x65,60000,0);if(done[0]!==slot)throw Error('Unexpected slot in FM1 commit response.');committed=true;setProgress(operation==='CLEAR'?'PROJECT CONTENT CLEARED':'PROJECT IMPORTED',1);log(operation==='CLEAR'?'Project CONTENT cleared in slot '+String(slot+1).padStart(2,'0')+'. This slot remains occupied; original A/B history may still exist.':'Project imported to slot '+String(slot+1).padStart(2,'0')+'. FM1 journal commit acknowledged.');}catch(e){if(initiated&&!committed)log((operation==='CLEAR'?'Clear stopped: ':'Import stopped: ')+e.message+' If the commit timed out, refresh the device slots to check the result.',true);throw e;}finally{if(!committed)await tryAbort();hideProgress();setBusy(false);if(committed)await refresh();}}
+async function readProjectFromSlot(slot){
+ if(!connected||slots[slot].state!=='used')throw Error('Choose a filled project slot.');
+ let opened=false;
+ try{
+  setProgress('READING PROJECT FROM FM1',0);
+  const meta=await query(0x52,[slot],0x62,10000,1);
+  if(meta.length<20||meta[0]!==slot)throw Error('FM1 returned an invalid project header.');
+  opened=true;
+  const length=u16(meta,1),expected=u32(meta,3);
+  if(length<42||length>MAX_PROJECT)throw Error('Device project length exceeds safe limit.');
+  const raw=new Uint8Array(length);
+  for(let at=0;at<length;at+=CHUNK){
+   const len=Math.min(CHUNK,length-at),v=await query(0x53,[at&255,at>>>8,len],0x63,5500,2);
+   if(v.length!==3+len||u16(v,0)!==at||v[2]!==len)throw Error('Out-of-order FM1 transfer response.');
+   raw.set(v.slice(3),at);setProgress('READING PROJECT FROM FM1',(at+len)/length*.85);
+  }
+  if(crc32(raw)!==expected)throw Error('FM1 project transfer failed CRC verification.');
+  const info=validateProject(raw);if(info.slot!==slot)throw Error('FM1 returned a project from the wrong slot.');
+  return {raw,info};
+ }finally{if(opened)await tryAbort();hideProgress();}
+}
+async function exportSlot(slot){setBusy(true);try{
+ const {raw,info}=await readProjectFromSlot(slot);
+ setProgress('ENCRYPTING PROJECT',.9);const blob=await encryptProject(raw);
+ setProgress('DOWNLOADING ENCRYPTED .BEETLE',1);download(blob,filename(info.name,slot));
+ log('Encrypted backup download started for '+info.name+'. Verify that your browser saved the file.');
+ return {info,blob};
+}finally{hideProgress();setBusy(false);}}
+
+async function uploadProject(slot,raw,overwrite,operation='IMPORT',refreshAfter=true){setBusy(true);let initiated=false;let committed=false;try{const fingerprint=crc32(raw);const args=[slot,raw.length&255,raw.length>>>8,...le32(fingerprint),overwrite?1:0,0x42];await query(0x55,args,0x64,14000,0);initiated=true;for(let at=0;at<raw.length;at+=CHUNK){const n=Math.min(CHUNK,raw.length-at);const v=await query(0x56,[at&255,at>>>8,n,...raw.slice(at,at+n)],0x64,5500,2);if(v.length<2||u16(v,0)!==at+n)throw Error('FM1 did not acknowledge the correct upload position.');setProgress((operation==='CLEAR'?'CLEARING PROJECT CONTENT IN SLOT ':'TRANSFERRING PROJECT TO SLOT ')+(slot+1),(at+n)/raw.length*.92);}setProgress('VERIFYING & COMMITTING JOURNAL',.96);const done=await query(0x57,[],0x65,60000,0);if(done[0]!==slot)throw Error('Unexpected slot in FM1 commit response.');committed=true;setProgress(operation==='CLEAR'?'PROJECT CONTENT CLEARED':'PROJECT IMPORTED',1);log(operation==='CLEAR'?'Project CONTENT cleared in slot '+String(slot+1).padStart(2,'0')+'. This slot remains occupied; original A/B history may still exist.':'Project imported to slot '+String(slot+1).padStart(2,'0')+'. FM1 journal commit acknowledged.');}catch(e){if(initiated&&!committed)log((operation==='CLEAR'?'Clear stopped: ':'Import stopped: ')+e.message+' If the commit timed out, refresh the device slots to check the result.',true);throw e;}finally{if(!committed)await tryAbort();hideProgress();setBusy(false);if(committed){if(refreshAfter)await refresh();else{slots[slot].state='used';slots[slot].name=ascii(raw.slice(24,36));slots[slot].version=null;draw();}}}}
 async function verifyClearTarget(slot,expectedName){
  const reply=await query(0x51,[slot],0x61,7000,1);
  if(reply.length<14||reply[0]!==slot)throw Error('FM1 slot preflight failed. Nothing was deleted.');
@@ -421,22 +668,144 @@ function closeModal(){if(document.activeElement&&document.activeElement.blur)doc
 function modal(title,message,buttons,checkboxText){return new Promise(resolve=>{$('modalTitle').textContent=title;$('modalText').textContent=message;$('modalActions').textContent='';$('modalExtra').textContent='';let check=null;if(checkboxText){const lbl=document.createElement('label');lbl.className='confirm-row';check=document.createElement('input');check.type='checkbox';const txt=document.createElement('span');txt.textContent=checkboxText;lbl.append(check,txt);$('modalExtra').append(lbl);}
 for(const b of buttons){const btn=document.createElement('button');btn.className='button '+(b.kind||'quiet');btn.textContent=b.label;btn.disabled=Boolean(check&&b.confirm);btn.onclick=()=>{closeModal();resolve(b.value);};$('modalActions').append(btn);if(check&&b.confirm)check.addEventListener('change',()=>btn.disabled=!check.checked);}
 $('backdrop').classList.add('open');});}
-async function safe(task){try{await task();}catch(e){hideProgress();setBusy(false);log(e.message||String(e),true);await modal('OPERATION STOPPED',e.message||String(e),[{label:'OK',value:'ok'}]);}}
-async function importWithPrompt(file){if(!/\.beetle$/i.test(file.name))throw Error('Select an encrypted .beetle project file.');setProgress('DECRYPTING FILE',.35);const raw=await decryptProject(file);hideProgress();const info=validateProject(raw),target=selected;const s=slots[target];if(s.state==='bad'||s.state==='unknown')throw Error('Refresh slots. Cannot import into unverified storage.');
-if(s.state==='empty'){const action=await modal('IMPORT PROJECT','Import "'+info.name+'" (file schema V'+info.version+') into empty slot '+(target+1)+'? The complete project will be verified on the FM1 before saving.',[{label:'CANCEL',value:'cancel'},{label:'IMPORT TO SLOT',kind:'primary',value:'go'}]);if(action==='go')await uploadProject(target,raw,false);return;}
-const action=await modal('SLOT ALREADY OCCUPIED','Slot '+(target+1)+' contains "'+s.name+'". Importing "'+info.name+'" will replace that stored project. The other 11 slots will not be changed.\n\nChoose whether to back up the existing project first.',[{label:'CANCEL',value:'cancel'},{label:'EXPORT FIRST',value:'backup'},{label:'OVERWRITE',kind:'danger',value:'overwrite'}]);
-if(action==='cancel')return;
-if(action==='backup'){
- await exportSlot(target);
- const approved=await modal('VERIFY YOUR BACKUP','The encrypted backup download has started. Check that the .beetle file actually exists on your computer before replacing the project.',[{label:'CANCEL',value:'cancel'},{label:'BACKUP SAVED · OVERWRITE',kind:'danger',value:'go',confirm:true}], 'I have verified that the backup file is saved.');
- if(approved==='go')await uploadProject(target,raw,true);
-}else{
- const approved=await modal('CONFIRM OVERWRITE','Final confirmation: overwrite slot '+(target+1)+' ("'+s.name+'") with "'+info.name+'"? The former saved version in this slot may no longer be recoverable.',[{label:'CANCEL',value:'cancel'},{label:'YES · REPLACE SLOT',kind:'danger',value:'go',confirm:true}],'I understand this will replace the existing project in this slot.');
- if(approved==='go')await uploadProject(target,raw,true);
+function storageErrorMessage(message){
+ const m=String(message||'');
+ if(/Library exceeds the 32 MiB PC-file limit/i.test(m))
+  return 'The PC library file has reached its 32 MiB software limit. Remove or replace samples to make room. This limit is NOT the FM1 sample capacity. Nothing was overwritten.';
+ if(/Project exceeds FM1 storage capacity|no free sectors|not enough (safe )?(flash )?(storage|space)|flash (storage )?full|storage capacity/i.test(m))
+  return 'The requested project does not fit the verified FM1 storage allowance. The save was refused; existing project data was not intentionally changed. Free space or select a smaller project.';
+ return null;
+}
+async function safe(task){try{await task();}catch(e){
+ hideProgress();setBusy(false);
+ const msg=e.message||String(e),full=storageErrorMessage(msg);
+ log(msg,true);
+ await modal(full?'STORAGE FULL':'OPERATION STOPPED',full||msg,[{label:'OK',value:'ok'}]);
 }}
+async function verifiedConvertedBackup(slot,sourceInfo,downloadFile=true){
+ setBusy(true);
+ try{
+  const {raw,info}=await readProjectFromSlot(slot);
+  if(info.version!==deviceSchema || info.name!==sourceInfo.name || info.slot!==slot)
+   throw Error('Project was written but its V'+deviceSchema+' migration could NOT be verified. Check this slot before using it; the original backup remains untouched.');
+  if(downloadFile){const converted=await encryptProject(raw);
+   download(converted,filename(info.name+'-V'+deviceSchema,slot));}
+  slots[slot].version=info.version;draw();
+  return info;
+ }finally{setBusy(false);}
+}
+async function importWithPrompt(file){
+ if(!/\.beetle$/i.test(file.name))throw Error('Select an encrypted .beetle project file.');
+ if(!connected)throw Error('Connect the FM1 before importing a project.');
+ setProgress('DECRYPTING FILE',.35);
+ const raw=await decryptProject(file);hideProgress();
+ const info=validateProject(raw),target=selected,s=slots[target];
+ if(s.state==='bad'||s.state==='unknown')throw Error('Refresh slots. Cannot import into unverified storage.');
+ const containerVersion=BeetleFileV2.signature(new Uint8Array(await file.slice(0,9).arrayBuffer()));
+ const isLegacy=info.version<deviceSchema||containerVersion===1;
+ if(isLegacy){
+  const action=await modal('LEGACY PROJECT DETECTED · V'+info.version,
+   '"'+info.name+'" uses project schema V'+info.version+' (current FM1: V'+deviceSchema+').'+
+   (containerVersion===1?' The encrypted backup also uses the older password-protected file format.':'')+
+   '\n\nBEETLE will decode the project, write it with its current schema, read the committed result back for verification, and provide an updated encrypted .beetle backup. The original file remains unchanged. This upgrades the project FORMAT, not the underlying legacy flash partition.',
+   [{label:'CANCEL',value:'cancel'},{label:'CONVERT & IMPORT',kind:'primary',value:'go'}]);
+  if(action!=='go')return;
+ }
+ let confirmed=false,overwrite=s.state==='used';
+ if(!overwrite){
+  confirmed=(await modal('IMPORT PROJECT','Import "'+info.name+'" to empty slot '+(target+1)+'?'+(isLegacy?' Its project schema will be converted to V'+deviceSchema+'.':''),[{label:'CANCEL',value:'cancel'},{label:'IMPORT TO SLOT',kind:'primary',value:'go'}]))==='go';
+ }else{
+  const action=await modal('SLOT ALREADY OCCUPIED','Slot '+(target+1)+' contains "'+s.name+'". Importing "'+info.name+'" will replace that stored project. The other eleven slots remain unchanged. Back up the original first?',
+   [{label:'CANCEL',value:'cancel'},{label:'EXPORT FIRST',value:'backup'},{label:'OVERWRITE',kind:'danger',value:'overwrite'}]);
+  if(action==='backup'){
+   await exportSlot(target);
+   confirmed=(await modal('VERIFY YOUR BACKUP','Check that the .beetle backup exists before replacing slot '+(target+1)+'.',
+    [{label:'CANCEL',value:'cancel'},{label:'BACKUP SAVED · OVERWRITE',kind:'danger',value:'go',confirm:true}],
+    'I have verified that the backup file was downloaded.'))==='go';
+  }else if(action==='overwrite'){
+   confirmed=(await modal('CONFIRM OVERWRITE','Replace "'+s.name+'" in slot '+(target+1)+' with "'+info.name+'"?',
+    [{label:'CANCEL',value:'cancel'},{label:'YES · REPLACE SLOT',kind:'danger',value:'go',confirm:true}],
+    'I understand that this replaces the current slot.'))==='go';
+  }
+ }
+ if(!confirmed)return;
+ await uploadProject(target,raw,overwrite);
+ if(isLegacy){
+  const converted=await verifiedConvertedBackup(target,info);
+  await modal('PROJECT CONVERTED · V'+converted.version,
+   'The FM1 saved and verified "'+converted.name+'" as project V'+converted.version+'. An updated password-free .beetle backup was generated. The original legacy file remains unchanged. Global sample storage still requires a migrated Storage V2 volume.',
+   [{label:'OK',value:'ok'}]);
+  log('Converted legacy project V'+info.version+' to V'+converted.version+' in slot '+(target+1)+' and generated a new .beetle backup.');
+ }
+}
+// Stored older projects can be upgraded without changing the device flash partition layout.
+// All originals are backed up BEFORE any write; a failed commit leaves previously saved copies recoverable.
+async function offerLegacyConversion(){
+ const old=legacySlots();if(!old.length)return;
+ const lines=old.map(i=>'SLOT '+String(i+1).padStart(2,'0')+' · '+slots[i].name+' · V'+slots[i].version).join('\n');
+ const action=await modal('LEGACY PROJECTS FOUND',
+  'BEETLE found '+old.length+' project(s) older than V'+deviceSchema+':\n'+lines+
+  '\n\nConvert them to the current project format? First, the Project Manager will download an encrypted ZIP backup containing ALL selected original projects. No writing begins until you confirm that backup exists. This does not change the legacy/V2 flash partition layout.',
+  [{label:'LATER',value:'later'},{label:'BACK UP & CONVERT',kind:'primary',value:'go'}]);
+ if(action!=='go')return;
+ await convertStoredLegacyProjects(old);
+}
+async function convertStoredLegacyProjects(indices){
+ setBusy(true);const originals=[];
+ try{
+  for(const slot of indices){const item=await readProjectFromSlot(slot);
+   if(item.info.version>=deviceSchema)continue;
+   originals.push({slot,...item});
+  }
+  if(!originals.length)return;
+  const files=[];
+  for(const item of originals){const encrypted=await encryptProject(item.raw);
+   files.push({name:filename(item.info.name+'-ORIGINAL-V'+item.info.version,item.slot),bytes:new Uint8Array(await encrypted.arrayBuffer())});
+  }
+  const backup=makeBackupZip(files);download(new Blob([backup],{type:'application/zip'}),'BEETLE-LEGACY-BACKUP-BEFORE-CONVERSION.zip');
+ }finally{hideProgress();setBusy(false);}
+ if(!originals.length)return;
+ const approved=await modal('VERIFY LEGACY BACKUP BEFORE CONVERSION',
+  'An encrypted ZIP containing '+originals.length+' original .beetle projects has been generated. Check that it exists and can be opened. The next step rewrites only the selected existing project slots as schema V'+deviceSchema+'.',
+  [{label:'CANCEL',value:'cancel'},{label:'BACKUP SAVED · CONVERT',value:'yes',kind:'danger',confirm:true}],
+  'I verified the ZIP backup is safely stored.');
+ if(approved!=='yes')return;
+ let converted=0;
+ try{
+  for(const item of originals){
+   await uploadProject(item.slot,item.raw,true,'CONVERT',false);
+   await verifiedConvertedBackup(item.slot,item.info,false);
+   converted++;
+  }
+  await refresh();
+  log('Converted '+converted+' legacy project(s) to V'+deviceSchema+'. Original backups remain in the downloaded ZIP.');
+  await modal('LEGACY PROJECTS CONVERTED','Successfully re-read and verified '+converted+' project(s) in schema V'+deviceSchema+'. No other project slots were intentionally changed.',[{label:'OK',value:'ok'}]);
+ }catch(e){
+  await refresh().catch(()=>{});
+  throw Error('Converted and verified '+converted+' of '+originals.length+' selected projects before stopping: '+e.message+' The original encrypted backup ZIP was created before any write.');
+ }
+}
+// Store-only ZIP writer: immutable encrypted backups, no external libraries or compression losses.
+function makeBackupZip(files){
+ const blocks=[],centers=[];let at=0;const nameEnc=new TextEncoder();
+ const short=n=>[n&255,(n>>>8)&255],long=n=>[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];
+ for(const entry of files){
+  const name=nameEnc.encode(entry.name),data=entry.bytes,sum=crc32(data),start=at;
+  const h=Uint8Array.from([...long(0x04034b50),...short(20),...short(0x800),...short(0),...short(0),...short(0),...long(sum),...long(data.length),...long(data.length),...short(name.length),...short(0),...name]);
+  blocks.push(h,data);at+=h.length+data.length;
+  centers.push(Uint8Array.from([...long(0x02014b50),...short(20),...short(20),...short(0x800),...short(0),...short(0),...short(0),...long(sum),...long(data.length),...long(data.length),...short(name.length),...short(0),...short(0),...short(0),...short(0),...long(0),...long(start),...name]));
+ }
+ const centralAt=at;for(const c of centers){blocks.push(c);at+=c.length;}
+ blocks.push(Uint8Array.from([...long(0x06054b50),...short(0),...short(0),...short(files.length),...short(files.length),...long(at-centralAt),...long(centralAt),...short(0)]));
+ const result=new Uint8Array(at+22);let pos=0;for(const b of blocks){result.set(b,pos);pos+=b.length;}return result;
+}
 $('connect').onclick=()=>safe(async()=>{setBusy(true);try{await connect();}finally{setBusy(false);}});
+$('upgradeLegacy').onclick=()=>safe(offerLegacyConversion);
+$('convertStorageV2').onclick=()=>safe(convertStorageV2);
+$('restoreStorageV2').onclick=()=>{if(!busy){$('migrationBackupFile').value='';$('migrationBackupFile').click();}};
+$('migrationBackupFile').onchange=()=>{const f=$('migrationBackupFile').files?.[0];if(f)safe(()=>restoreV2FromZip(f));};
 $('copyDiagnostics').onclick=async()=>{
- const report='BEETLE V1.3.4 PROJECT MANAGER · V1.7\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
+ const report='BEETLE V1.4.24 PROJECT MANAGER · STORAGE MIGRATION\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
  try{await navigator.clipboard.writeText(report);log('Connection report copied.');}
  catch{log('Could not copy automatically. Select an HTTPS/localhost page and try again.',true);}
 };
@@ -459,14 +828,14 @@ function samplePut16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;}
 function samplePut32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255;}
 function sampleRawCheck(raw){
  if(raw.length<42||raw.length>MAX_PROJECT||ascii(raw.subarray(0,4))!=='TRK1')throw Error('Not a BEETLE raw project.');
- const v=u16(raw,4);if(v!==22&&v!==23)throw Error('One-shot editor supports V22 and V23 projects; got V'+v+'.');
+ const v=u16(raw,4);if(v!==22&&v!==23&&v!==24)throw Error('One-shot editor supports V22, V23 and V24 projects; got V'+v+'.');
  if(u32(raw,8)!==raw.length||u32(raw,16)!==crc32(raw.subarray(0,16))||u32(raw,12)!==crc32(raw.subarray(24)))throw Error('Project CRC or size mismatch.');
  return v;
 }
 function sampleLoadRaw(raw){
  const version=sampleRawCheck(raw);let base=raw.length;
  const entries=Array.from({length:SAMPLE_SLOTS},()=>({name:'',bytes:new Uint8Array(0)}));
- if(version===23){
+ if(version===23 || (version===24&&raw.length>=SAMPLE_META+6&&ascii(raw.subarray(raw.length-4))==='B1OS')){
   if(raw.length<SAMPLE_META+6||ascii(raw.subarray(raw.length-4))!=='B1OS')throw Error('Invalid V23 sample bank trailer.');
   base=sampleLE16(raw,raw.length-6);
   if(base<42||base+SAMPLE_META+6>raw.length)throw Error('Invalid V23 bank offset.');
@@ -485,7 +854,7 @@ function sampleBytes(){return sampleEntries.reduce((n,e)=>n+e.bytes.length,0);}
 function sampleBuild(){
  if(!sampleBase)throw Error('Open a .beetle project first.');
  const total=sampleBytes(),length=sampleBase.length+SAMPLE_META+total+6;
- if(total===0){const raw=sampleBase.slice();samplePut16(raw,4,22);samplePut32(raw,8,raw.length);samplePut32(raw,12,crc32(raw.subarray(24)));samplePut32(raw,16,crc32(raw.subarray(0,16)));sampleRawCheck(raw);return raw;}
+ if(total===0){const raw=sampleBase.slice();samplePut16(raw,4,u16(sampleBase,4)>=24?24:22);samplePut32(raw,8,raw.length);samplePut32(raw,12,crc32(raw.subarray(24)));samplePut32(raw,16,crc32(raw.subarray(0,16)));sampleRawCheck(raw);return raw;}
  if(total>SAMPLE_CAP)throw Error('Samples exceed 6144 bytes. Remove or shorten one-shots.');
  if(length>MAX_PROJECT)throw Error('This project is too large for the FM1 A/B bank. Project: '+sampleBase.length+' bytes; samples+metadata: '+(SAMPLE_META+total+6)+' bytes; budget: '+MAX_PROJECT+'.');
  const raw=new Uint8Array(length);raw.set(sampleBase,0);let p=sampleBase.length,d=p+SAMPLE_META;
@@ -496,7 +865,7 @@ function sampleBuild(){
   raw.set(entry.bytes,d);d+=entry.bytes.length;
  }
  samplePut16(raw,d,sampleBase.length);raw.set([66,49,79,83],d+2);
- samplePut16(raw,4,23);samplePut32(raw,8,raw.length);
+ samplePut16(raw,4,u16(sampleBase,4)>=24?24:23);samplePut32(raw,8,raw.length);
  samplePut32(raw,12,crc32(raw.subarray(24)));samplePut32(raw,16,crc32(raw.subarray(0,16)));samplePut32(raw,20,0);
  sampleRawCheck(raw);return raw;
 }
@@ -565,7 +934,11 @@ draw();
  const MAGIC=Uint8Array.from([66,69,69,84,66,65,78,75]); // BEETBANK
  const textEnc=typeof TextEncoder!=='undefined'?new TextEncoder():null;
  const textDec=typeof TextDecoder!=='undefined'?new TextDecoder():null;
- function crc32(data){let v=0xFFFFFFFF;for(const c of data){v^=c;for(let j=0;j<8;j++)v=(v>>>1)^((v&1)?0xEDB88320:0);}return (v^0xFFFFFFFF)>>>0;}
+ // Table-based CRC is bit-for-bit compatible with the original format, but
+ // avoids eight bit-iterations per byte for multi-megabyte WAV banks.
+ const CRC_TABLE=new Uint32Array(256);
+ for(let i=0;i<256;i++){let v=i;for(let bit=0;bit<8;bit++)v=(v>>>1)^((v&1)?0xEDB88320:0);CRC_TABLE[i]=v>>>0;}
+ function crc32(data){let v=0xFFFFFFFF;for(let i=0;i<data.length;i++)v=CRC_TABLE[(v^data[i])&255]^(v>>>8);return (v^0xFFFFFFFF)>>>0;}
  function empty(){return Array.from({length:SLOTS},()=>({name:'',filename:'',data:new Uint8Array(0)}));}
  function u16(a,o){return a[o]|a[o+1]<<8;}
  function u32(a,o){return (a[o]|a[o+1]<<8|a[o+2]<<16|a[o+3]<<24)>>>0;}
@@ -579,8 +952,51 @@ draw();
    if(!data.length&&(name.length||filename.length))throw Error('Empty sample has stray metadata');
    size+=data.length;if(size>MAX_FILE)throw Error('Library exceeds the 32 MiB PC-file limit');
    return {data,name,filename};});}
- function wavValid(a){if(a.length<44)return false;
-  return a[0]===82&&a[1]===73&&a[2]===70&&a[3]===70&&a[8]===87&&a[9]===65&&a[10]===86&&a[11]===69&&u32(a,4)+8<=a.length;}
+ function match(a,p,str){if(p<0||p+str.length>a.length)return false;for(let i=0;i<str.length;i++)if(a[p+i]!==str.charCodeAt(i))return false;return true;}
+ /* Read-only strict WAV inspection. The bytes are NEVER transcoded or
+  * resampled when stored in .beetlebank. Parsing validates RIFF chunk bounds,
+  * audio frames and supported PCM/float formats (including WAVE Extensible).
+  */
+ function wavInfo(raw){
+  const a=raw instanceof Uint8Array?raw:new Uint8Array(raw);
+  if(a.length<44||!match(a,0,'RIFF')||!match(a,8,'WAVE'))throw Error('Expected RIFF/WAVE');
+  const end=u32(a,4)+8;
+  if(end<44||end>a.length)throw Error('Truncated or invalid RIFF length');
+  let fmt=null,dataBytes=0,dataSeen=false,pos=12;
+  while(pos<end){
+   if(pos+8>end)throw Error('Truncated WAV chunk header');
+   const len=u32(a,pos+4),payload=pos+8,after=payload+len;
+   if(after>end||after+((len&1)>>>0)>end)throw Error('Truncated WAV chunk');
+   if(match(a,pos,'fmt ')){
+    if(fmt||len<16)throw Error('Duplicate or malformed WAV fmt chunk');
+    const tag=u16(a,payload),channels=u16(a,payload+2),sampleRate=u32(a,payload+4);
+    const bytesPerSec=u32(a,payload+8),align=u16(a,payload+12),bits=u16(a,payload+14);
+    let formatTag=tag;
+    if(tag===65534){
+     if(len<40||u16(a,payload+16)<22||u16(a,payload+18)>bits)throw Error('Invalid WAV Extensible fmt');
+     const guid=payload+24;
+     // PCM and IEEE float canonical KSDATAFORMAT_SUBTYPE GUIDs.
+     if(a[guid+2]!==0||a[guid+3]!==0||a[guid+4]!==0||a[guid+5]!==0||a[guid+6]!==16||a[guid+7]!==0||
+       ![128,0,0,170,0,56,155,113].every((b,j)=>a[guid+8+j]===b))throw Error('Unsupported WAV Extensible subformat');
+     formatTag=u16(a,guid);
+    }
+    if(formatTag!==1&&formatTag!==3)throw Error('Only PCM/IEEE-float WAV is supported');
+    if(!channels||channels>32||sampleRate<1000||sampleRate>384000||
+       !(formatTag===1?[8,16,24,32].includes(bits):[32,64].includes(bits))||
+       align!==channels*(bits>>>3)||bytesPerSec!==sampleRate*align)throw Error('Invalid WAV channel/rate/bit-depth or block alignment');
+    fmt={channels,sampleRate,bitsPerSample:bits,format:formatTag===1?'PCM':'FLOAT',blockAlign:align};
+   }else if(match(a,pos,'data')){
+    if(dataSeen)throw Error('Multiple WAV data chunks unsupported');
+    dataSeen=true;dataBytes=len;
+   }
+   pos=after+(len&1);
+  }
+  if(!fmt||!dataSeen||!dataBytes||dataBytes%fmt.blockAlign!==0)throw Error('Missing WAV audio or incomplete audio frame');
+  const frames=dataBytes/fmt.blockAlign;
+  return Object.freeze({channels:fmt.channels,sampleRate:fmt.sampleRate,bitsPerSample:fmt.bitsPerSample,
+   format:fmt.format,dataBytes,frames,durationSeconds:frames/fmt.sampleRate});
+ }
+ function wavValid(a){try{wavInfo(a);return true;}catch{return false;}}
  function encode(entries){const items=clean(entries),size=HEADER+ENTRY*SLOTS+items.reduce((s,i)=>s+i.data.length,0);const out=new Uint8Array(size);out.set(MAGIC);
   p16(out,8,1);p16(out,10,SLOTS);p32(out,12,size);let at=HEADER+SLOTS*ENTRY;
   items.forEach((e,i)=>{const o=HEADER+i*ENTRY;p32(out,o,at);p32(out,o+4,e.data.length);p32(out,o+8,crc32(e.data));out[o+12]=e.name.length;out[o+13]=e.filename.length;
@@ -600,39 +1016,153 @@ draw();
   if(pos!==a.length)throw Error('Trailing or unassigned bytes in bank file');
   return entries;}
  function used(entries){return entries.reduce((n,e)=>n+e.data.length,0);}
- return Object.freeze({SLOTS,MAX_FILE,empty,encode,decode,used,crc32,wavValid});
+ return Object.freeze({SLOTS,MAX_FILE,empty,encode,decode,used,crc32,wavValid,wavInfo});
 });
 
 
+
+/* BEETLE original BD4S 4-bit codec, ported from tools/dpcm4/beetle_dpcm4.py.
+ * Conversion affects only FM1 copy; PC .beetlebank WAV stays intact. */
+const BeetleDeviceCodec=(()=>{
+ const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+ function pcmFromWav(bytes){
+  const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const word=i=>data.getUint16(i,true),long=i=>data.getUint32(i,true);
+  if(bytes.length<44||long(0)!==0x46464952||long(8)!==0x45564157)throw Error('Expected RIFF/WAVE');
+  let at=12,channels=0,rate=0,bits=0,tag=0,start=-1,size=0;
+  while(at+8<=bytes.length){const len=long(at+4),off=at+8;
+   if(len>bytes.length-off)throw Error('Truncated WAV file');
+   if(long(at)===0x20746d66){tag=word(off);channels=word(off+2);rate=long(off+4);bits=word(off+14);}
+   if(long(at)===0x61746164){start=off;size=len;}
+   at=off+len+(len&1);
+  }
+  if(tag!==1||![1,2].includes(channels)||bits!==16||![22050,44100].includes(rate)||
+     start<0||!size||size%(channels*2))throw Error('FM1 import requires 16-bit PCM WAV, mono/stereo, 22.05 or 44.1 kHz. Original WAV is kept in the PC bank.');
+  let n=size/(channels*2),pcm=new Int16Array(n);
+  for(let i=0;i<n;i++){
+   let a=data.getInt16(start+i*channels*2,true);
+   let b=channels===2?data.getInt16(start+i*channels*2+2,true):a;
+   pcm[i]=Math.floor((a+b)/2);
+  }
+  if(rate===44100){const low=new Int16Array(Math.ceil(n/2));
+   for(let i=0,j=0;i<n;i+=2,j++){
+    const x=k=>pcm[clamp(k,0,n-1)];
+    low[j]=clamp(Math.floor((x(i-2)+4*x(i-1)+6*x(i)+4*x(i+1)+x(i+2))/16),-32768,32767);
+   }pcm=low;
+  }
+  if(!pcm.length||pcm.length>441000)throw Error('Each user sample must be 20 seconds or shorter at 22.05 kHz.');
+  return pcm;
+ }
+ function encode(wav){const pcm=pcmFromWav(wav),payload=[];
+  for(let base=0;base<pcm.length;base+=256){
+   const n=Math.min(256,pcm.length-base);let total=0,delta=0;
+   for(let i=1;i<Math.min(n,65);i++){total+=Math.abs(pcm[base+i]-pcm[base+i-1]);delta++;}
+   let step=clamp(Math.max(8,Math.floor(Math.floor(total/Math.max(1,delta))/2)),8,8192);
+   let pred=pcm[base],lo=-1;
+   payload.push(pred&255,(pred>>8)&255,step&255,(step>>8)&255,n&255,(n>>8)&255);
+   for(let i=1;i<n;i++){
+    const target=pcm[base+i];let q=0,best=Infinity,mag=Infinity;
+    for(let j=-8;j<=7;j++){const diff=Math.abs(target-clamp(pred+j*step,-32768,32767)),abs=Math.abs(j);
+     if(diff<best||(diff===best&&abs<mag)){best=diff;mag=abs;q=j;}}
+    pred=clamp(pred+q*step,-32768,32767);
+    if(Math.abs(q)<=1)step-=Math.floor(step/16);
+    else if(Math.abs(q)>=5)step+=Math.floor(step*(Math.abs(q)-4)/4);
+    step=clamp(step,8,8192);
+    if(lo<0)lo=q&15;else{payload.push(lo|((q&15)<<4));lo=-1;}
+   }
+   if(lo>=0)payload.push(lo);
+  }
+  const b=Uint8Array.from(payload),o=new Uint8Array(16+b.length),v=new DataView(o.buffer);
+  o.set([66,68,52,83,1,1],0);v.setUint16(6,22050,true);
+  v.setUint32(8,pcm.length,true);v.setUint32(12,crc32(b),true);o.set(b,16);
+  return o;
+ }
+ return Object.freeze({encode});
+})();
 (function(){
  'use strict';
  const B=BeetleGlobalBank;
  const q=id=>document.getElementById(id);
- let entries=B.empty(),target=0,dirty=false,previousUrl=null;
+ let entries=B.empty(),target=0,dirty=false,previousUrl=null,previousAudio=null;
  const bytes=n=>n>=1048576?(n/1048576).toFixed(2)+' MiB':(n/1024).toFixed(1)+' KiB';
  const safeName=s=>String(s||'').replace(/[^a-zA-Z0-9 _-]/g,'').slice(0,12);
  function check(){B.encode(entries);}
+ function stopPreview(){if(previousAudio){previousAudio.pause();previousAudio.removeAttribute('src');previousAudio.load();previousAudio=null;}if(previousUrl){URL.revokeObjectURL(previousUrl);previousUrl=null;}}
+ async function info(slot){
+   const r=await query(0x70,[slot],0x78,12000,0);
+   if(r.length!==14||r[0]!==slot)throw Error('Invalid global sample slot response');
+   return {present:!!r[1],bytes:u32(r,2),crc:u32(r,6),generation:u32(r,10)};
+ }
+ async function upload(slot,blob){
+   const check=B.crc32(blob),old=await info(slot);
+   if(old.present&&old.bytes===blob.length&&old.crc===check)return;
+   let begun=false;
+   try{
+    const started=await query(0x71,[slot,...le32(blob.length),...le32(check),0x42],0x79,30000,0);
+    if(started[0]!==slot)throw Error('Wrong upload slot acknowledgement');
+    begun=true;
+    for(let at=0;at<blob.length;at+=24){const part=blob.subarray(at,at+24);
+     const ack=await query(0x72,[...le32(at),part.length,...part],0x7a,12000,0);
+     if(ack.length!==4||u32(ack,0)!==at+part.length)throw Error('Sample upload went out of sequence');
+     setProgress('WRITING + VERIFYING · U'+String(slot+1).padStart(2,'0'),(at+part.length)/blob.length*.94);
+    }
+    const reply=await query(0x73,[],0x7b,90000,0);
+    begun=false;
+    if(reply[0]!==slot)throw Error('FM1 committed an unexpected sample slot');
+    const checked=await info(slot);
+    if(!checked.present||checked.bytes!==blob.length||checked.crc!==check)throw Error('FM1 sample commit could not be verified');
+   }finally{if(begun){try{await query(0x74,[],0x7c,6000,0);}catch{}}}
+ }
+ async function sync(){
+  if(!connected||!deviceGlobalSamples)throw Error('Connect BEETLE with an already migrated Storage V2 volume. The FM1 must be stopped with no unsaved project edits.');
+  const ok=await modal('STORE GLOBAL SAMPLE BANK ON FM1',
+   'Write the 13 global U-slots into the V2 flash library? Empty PC slots delete their device counterparts. This is shared across all 12 projects. V1.4.22 routes these samples to the native CH6 drum mixer. Playback on physical FM1 hardware is experimental and must be verified. Originals remain in the .beetlebank file. Stop playback and save your edits first.',
+   [{label:'CANCEL',value:'no'},{label:'STORE U01–U13',kind:'primary',value:'yes',confirm:true}],
+   'I have saved my PC sample bank and understand that sample assignments on the FM1 may change.');
+  if(ok!=='yes')return;
+  setBusy(true);
+  try{
+   const encoded=entries.map(e=>e.data.length?BeetleDeviceCodec.encode(e.data):null);
+   const total=encoded.reduce((n,b)=>n+(b?b.length:0),0);
+   if(total>250000)throw Error('STORAGE FULL: the 13 user samples exceed the 250 KB upper transfer limit. Shorten them.');
+   for(let k=0;k<13;k++){
+    if(encoded[k])await upload(k,encoded[k]);
+    else {const current=await info(k);if(current.present){
+      const res=await query(0x75,[k,0xD3,0x7E],0x7d,50000,0);
+      if(res[0]!==k||(await info(k)).present)throw Error('FM1 sample delete was not verified');
+    }}
+   }
+   setProgress('GLOBAL SAMPLE BANK VERIFIED',1);
+   log('FM1 DPCM4 storage bank synchronized and all 13 slots checked; native CH6 playback enabled in V1.4.22 for the migrated V2 volume (hardware-unverified). Original PC WAVs unchanged.');
+  }finally{hideProgress();setBusy(false);draw();}
+ }
  function draw(){
    const list=q('bankRows');list.replaceChildren();let occupied=0;
    entries.forEach((e,i)=>{
      if(e.data.length)occupied++;
      const card=document.createElement('div');card.style.cssText='border:1px solid var(--border);padding:12px;background:#0a0a0a;display:flex;gap:6px;align-items:center;flex-wrap:wrap';
      const title=document.createElement('strong');title.style.cssText='flex:1 1 100%;color:var(--pinklight)';title.textContent='U'+String(i+1).padStart(2,'0')+' · KEY '+(14+i)+' · '+(e.data.length?bytes(e.data.length):'EMPTY');
+     if(e.data.length){const w=B.wavInfo(e.data);const meta=document.createElement('div');meta.style.cssText='font-size:10px;color:var(--muted);flex:1 1 100%';meta.textContent=w.durationSeconds.toFixed(2)+' s · '+(w.sampleRate/1000).toFixed(1)+' kHz · '+w.channels+' CH · '+w.format+' '+w.bitsPerSample+'-bit · ORIGINAL WAV';card.append(meta);}
      const name=document.createElement('input');name.className='field';name.style.cssText='max-width:125px';name.maxLength=12;name.placeholder='SAMPLE NAME';name.value=e.name;name.disabled=!e.data.length;
      name.onchange=()=>{const old=e.name;e.name=safeName(name.value);try{check();dirty=true;}catch(ex){e.name=old;log(ex.message,true);}name.value=e.name;};
      const input=document.createElement('button');input.className='button quiet';input.textContent=e.data.length?'REPLACE WAV':'IMPORT WAV';input.onclick=()=>{target=i;q('bankWav').value='';q('bankWav').click();};
      const play=document.createElement('button');play.className='button quiet';play.textContent='PLAY';play.disabled=!e.data.length;
-     play.onclick=()=>{if(previousUrl)URL.revokeObjectURL(previousUrl);previousUrl=URL.createObjectURL(new Blob([e.data],{type:'audio/wav'}));const a=new Audio(previousUrl);a.play().catch(err=>log(err.message,true));};
+     play.onclick=()=>{stopPreview();
+      previousUrl=URL.createObjectURL(new Blob([e.data],{type:'audio/wav'}));const a=new Audio(previousUrl);previousAudio=a;a.play().catch(err=>log('Browser preview unavailable: '+err.message,true));};
      const del=document.createElement('button');del.className='button danger';del.textContent='DELETE';del.disabled=!e.data.length;
-     del.onclick=async()=>{const choice=await modal('REMOVE ONE-SHOT','Delete '+(e.name||'U'+(i+1))+' from the global PC library? The data will be removed from the next saved .beetlebank file, freeing its space. No FM1 flash will be written.',[{label:'CANCEL',value:'no'},{label:'DELETE SAMPLE',kind:'danger',value:'yes'}]);if(choice!=='yes')return;entries[i]={name:'',filename:'',data:new Uint8Array(0)};dirty=true;draw();log('Removed sample U'+(i+1)+' from PC library. Save the updated bank to persist this change.');};
-     card.append(title,name,input,play,del);list.append(card);
+     del.onclick=async()=>{const choice=await modal('REMOVE ONE-SHOT','Delete '+(e.name||'U'+(i+1))+' from the global PC library? The data will be removed from the next saved .beetlebank file, freeing its space. No FM1 flash will be written.',[{label:'CANCEL',value:'no'},{label:'DELETE SAMPLE',kind:'danger',value:'yes'}]);if(choice!=='yes')return;stopPreview();entries[i]={name:'',filename:'',data:new Uint8Array(0)};dirty=true;draw();log('Removed sample U'+(i+1)+' from PC library. Save the updated bank to persist this change.');};
+     const exportWav=document.createElement('button');exportWav.className='button quiet';exportWav.textContent='EXPORT WAV';exportWav.disabled=!e.data.length;
+     exportWav.onclick=()=>download(new Blob([e.data],{type:'audio/wav'}),(e.filename||('BEETLE-U'+String(i+1).padStart(2,'0')+'.wav')));
+     card.append(title,name,input,play,exportWav,del);list.append(card);
    });
-   q('bankStats').textContent=occupied+' / 13 SLOTS · '+bytes(B.used(entries))+' AUDIO'+(dirty?' · UNSAVED CHANGES':'');
+   q('bankTransfer').disabled=busy||!connected||!deviceGlobalSamples;
+   q('bankStats').textContent=occupied+' / 13 SLOTS · '+bytes(B.used(entries))+' WAV · '+bytes(B.MAX_FILE-(24+40*13)-B.used(entries))+' REMAINING IN PC FILE'+(dirty?' · UNSAVED CHANGES':'');
  }
+ q('bankTransfer').onclick=()=>safe(sync);
  q('bankWav').onchange=()=>safe(async()=>{const file=q('bankWav').files?.[0];if(!file)return;
-   if(!/\.wav$/i.test(file.name)||file.size>16*1024*1024)throw Error('Choose a WAV file up to 16 MiB.');
-   const data=new Uint8Array(await file.arrayBuffer());if(!B.wavValid(data))throw Error('Invalid RIFF/WAVE file.');
-   const old=entries[target];entries[target]={name:safeName(file.name.replace(/\.wav$/i,'')),filename:safeName(file.name),data};
+   if(!/\.wav$/i.test(file.name)||file.size>16*1024*1024)throw Error('Choose a WAV file up to 16 MiB (PC library limit, not FM1 flash).');
+   const data=new Uint8Array(await file.arrayBuffer());try{B.wavInfo(data);}catch(e){throw Error('Invalid WAV: '+e.message);}
+   stopPreview();const old=entries[target];entries[target]={name:safeName(file.name.replace(/\.wav$/i,'')),filename:safeName(file.name),data};
    try{check();}catch(e){entries[target]=old;throw e;}dirty=true;draw();log('Imported WAV into shared library U'+(target+1)+'. Save the .beetlebank file.');
  });
  q('bankSave').onclick=()=>safe(async()=>{const raw=B.encode(entries),blob=new Blob([raw],{type:'application/octet-stream'});download(blob,'BEETLE-GLOBAL-LIBRARY.beetlebank');dirty=false;draw();log('Exported portable global bank ('+bytes(raw.length)+'). FM1 flash unchanged.');});
@@ -640,14 +1170,16 @@ draw();
  q('bankFile').onchange=()=>safe(async()=>{const file=q('bankFile').files?.[0];if(!file)return;
    const data=new Uint8Array(await file.arrayBuffer()),items=B.decode(data);
    if(dirty){const c=await modal('REPLACE UNSAVED LIBRARY','The current global bank has unsaved changes. Open another library and discard them?', [{label:'CANCEL',value:'cancel'},{label:'OPEN NEW FILE',value:'yes',kind:'danger'}]);if(c!=='yes')return;}
-   entries=items;dirty=false;draw();log('Opened '+file.name+'. This library is independent of all .beetle projects.');
+   stopPreview();entries=items;dirty=false;draw();log('Opened '+file.name+'. This library is independent of all .beetle projects.');
  });
  q('bankNew').onclick=()=>safe(async()=>{if(dirty||B.used(entries)){
    const c=await modal('START EMPTY LIBRARY','Clear the current PC-side global bank? Save it first if you need a backup.',[{label:'CANCEL',value:'no'},{label:'NEW BANK',value:'yes',kind:'danger'}]);if(c!=='yes')return;}
-   entries=B.empty();dirty=false;draw();log('Started new empty PC-side global library.');
+   stopPreview();entries=B.empty();dirty=false;draw();log('Started new empty PC-side global library.');
  });
  window.addEventListener('beforeunload',evt=>{if(dirty){evt.preventDefault();evt.returnValue='';}});
+ window.addEventListener('pagehide',stopPreview);
  draw();
+ window.addEventListener('beetle-connection-changed',draw);
 })();
 
 </script>

@@ -28,6 +28,41 @@ static int beetle_hal_probe_ownership(void){
  beetle_storage_last_audit=rc;
  return rc;
 }
+/* BEETLE V1.4.20: V2 migration uses an explicitly versioned marker.
+ * Verify the EXACT marker and entire protected marker sector. A V2 marker
+ * is NOT equivalent to the legacy journal marker: their writers must NEVER
+ * operate on each other's storage layout. */
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+#include "beetle_storage_v2_reader.h"
+static int beetle_hal_v2_marker_prefix(void){
+ static const uint8_t magic[8]={'B','T','L','S','T','V','2',1u};
+ uint8_t hdr[8];
+ if(beetle_hal_abs_read(0,BEETLE_FLASH_MARKER,hdr,sizeof(hdr)))return -1;
+ return memcmp(hdr,magic,sizeof(magic))==0?1:0;
+}
+static int beetle_hal_probe_v2_ownership(void){
+ uint8_t marker[32],expected[32];
+ if(beetle_hal_abs_read(0,BEETLE_FLASH_MARKER,marker,sizeof(marker)))return BEETLE_CLAIM_IO;
+ beetle_v2_make_marker(expected);
+ if(memcmp(marker,expected,sizeof(expected)))return BEETLE_CLAIM_FOREIGN;
+ uint8_t block[256];
+ for(uint32_t at=BEETLE_FLASH_MARKER+32u;at<BEETLE_FLASH_MARKER_END;){
+  uint32_t n=BEETLE_FLASH_MARKER_END-at;if(n>sizeof(block))n=sizeof(block);
+  if(beetle_hal_abs_read(0,at,block,n))return BEETLE_CLAIM_IO;
+  for(uint32_t i=0;i<n;i++)if(block[i]!=0xffu)return BEETLE_CLAIM_FOREIGN;
+  at+=n;
+ }
+ return BEETLE_CLAIM_EXISTING;
+}
+static int beetle_hal_probe_ownership_ui(void){
+ int is_v2=beetle_hal_v2_marker_prefix();
+ int rc=is_v2<0?BEETLE_CLAIM_IO:is_v2?beetle_hal_probe_v2_ownership():beetle_hal_probe_ownership();
+ beetle_storage_last_audit=rc;
+ return rc;
+}
+#else
+static int beetle_hal_probe_ownership_ui(void){return beetle_hal_probe_ownership();}
+#endif
 static int beetle_hal_journal_read(void *ctx,uint8_t slot,uint8_t bank,
  uint32_t offset,uint8_t *dst,uint32_t n){
  uint32_t addr;(void)ctx;
@@ -102,6 +137,9 @@ static int beetle_hal_restore_marker(void){
  * to foreign/unknown data; only this whole-volume reinitialization can
  * erase it. Any flash read error or unknown runtime mode is rejected. */
 static int beetle_hal_wipe_projects(void (*progress)(uint8_t,uint8_t)){
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+ if(beetle_hal_v2_marker_prefix()!=0)return -1;
+#endif
  if(!beetle_write_permit||!beetle_full_wipe_confirmed||native_safe||native_tripped||native_updating)return -1;
  int owner=beetle_hal_probe_ownership();
  if(owner==BEETLE_CLAIM_IO||owner==BEETLE_CLAIM_INVALID)return -1;
@@ -142,6 +180,9 @@ static int beetle_hal_wipe_projects(void (*progress)(uint8_t,uint8_t)){
  * This standalone partition DESTROYS any prior ETCH/Felucca user data in it.
  */
 static int beetle_hal_init_exclusive(void (*progress)(uint8_t,uint8_t)){
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+ if(beetle_hal_v2_marker_prefix()!=0)return -1;
+#endif
  if(native_safe||native_tripped||native_updating)return -1;
  int prev=beetle_hal_probe_ownership();
  if(prev==BEETLE_CLAIM_EXISTING)return 0; /* never erase saved BEETLE files */
@@ -167,3 +208,32 @@ static int beetle_hal_init_exclusive(void (*progress)(uint8_t,uint8_t)){
  fm1_wdt_feed();if(rc)return -5;
  return beetle_hal_probe_ownership()==BEETLE_CLAIM_EXISTING?0:-6;
 }
+
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+/* Storage V2 absolute-address SPI NOR adapter. Project operations are in
+ * main context with transport PAUSED. No flash reads or writes in DMA ISR.
+ * Storage ownership: EXACT 0x97000..0xDEFFF, with legacy marker preserved.
+ * The B2SB volume must already have been migrated by a verified recovery
+ * image; unknown/legacy bytes are never auto-reformatted here. */
+static int beetle_v2_hal_read(void *ctx,uint32_t address,uint8_t *data,uint32_t n){
+ (void)ctx;return beetle_hal_abs_read(0,address,data,n);
+}
+static int beetle_v2_hal_program(void *ctx,uint32_t address,const uint8_t *data,uint32_t n){
+ (void)ctx;
+ if(!data||!n||!beetle_write_permit||native_safe||native_tripped||native_updating||
+    address<BEETLE_FLASH_BASE||address>BEETLE_FLASH_END||
+    n>BEETLE_FLASH_END-address||((address&255u)+n)>256u)return -1;
+ uint32_t took=0;
+ fm1_irq_off();int rc=FL_FAR(fl_prog_ram)(address,data,n,&took);fm1_irq_enable_all();
+ fm1_wdt_feed();return rc;
+}
+static int beetle_v2_hal_erase(void *ctx,uint32_t address){
+ (void)ctx;
+ if(!beetle_write_permit||native_safe||native_tripped||native_updating||
+    (address&4095u)||address<BEETLE_FLASH_BASE||
+    address>BEETLE_FLASH_END-4096u)return -1;
+ uint32_t took=0;
+ fm1_irq_off();int rc=FL_FAR(fl_erase4k_ram)(address,&took);fm1_irq_enable_all();
+ fm1_wdt_feed();return rc;
+}
+#endif

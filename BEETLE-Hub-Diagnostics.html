@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BEETLE · Firmware Hub Diagnostics</title><style>
+:root{color-scheme:dark;font:12px/1.6 ui-monospace,Consolas,monospace;background:#080808;color:#f5f0f4}
+*{box-sizing:border-box}body{max-width:820px;margin:auto;padding:32px 20px}h1{font-size:24px;letter-spacing:1px}h1 span{color:#ff00d6;font-size:13px}
+section{border:1px solid #513449;padding:18px;margin:16px 0}p{color:#b7a6b1}label{display:block;margin:8px 0;color:#dfa5d0}
+select,button{font:inherit;max-width:100%;background:#151015;color:#fff;border:1px solid #9f4d8b;padding:9px 11px;cursor:pointer}
+button{margin:5px 8px 5px 0}button:disabled{opacity:.45;cursor:default}select{width:100%}pre{padding:15px;max-height:350px;overflow:auto;background:#0b090b;border:1px solid #352a33;white-space:pre-wrap;overflow-wrap:anywhere}
+strong{color:#fff}small{color:#b9a8b5}a{color:#ff7add}
+</style></head><body>
+<header><h1>BEETLE <span>HUB DIAGNOSTICS</span></h1><p>Read-only FM1 firmware identity and BEETLE application check. Nothing is uploaded, erased, written, installed or flashed.</p></header>
+<section><p>Use Chrome or Edge on desktop and connect the FM1 via USB-C. Close other MIDI applications. Keep BEETLE running normally; do not enter update mode.</p>
+<button id="connect">1 · CONNECT MIDI</button>
+<label>FM1 MIDI Input<select id="input"><option value="">Select input</option></select></label>
+<label>FM1 MIDI Output<select id="output"><option value="">Select output</option></select></label>
+<button id="probe" disabled>2 · READ-ONLY CHECK</button><button id="copy" disabled>COPY REPORT</button>
+<p id="state" role="status">Not connected.</p></section>
+<section><strong>Diagnostic report</strong><pre id="report">No queries sent.</pre></section>
+<section><strong>What the result means</strong><p>If the device replies to BEETLE's read-only <code>0x50 HELLO</code> with <code>0x60</code>, the BEETLE application is running. If the Hub simultaneously calls it another firmware's update-loader, that points to Hub-side classification or port identification, not proof that the loader is actually running. If the application handshake is absent, we cannot tell from identity alone whether another loader is active or USB traffic was interrupted.</p>
+<p>Before changing firmware, back up all projects and verify a recovery path. See the <a href="https://thefirmwarehub.com/kb/" target="_blank" rel="noopener noreferrer">Firmware Hub knowledge base</a>. Do not share private full-flash dumps.</p>
+<small>BEETLE V1.4.13 · Package identity FM-1_2123 · diagnostic transport only</small></section>
+<script>
+(()=>{'use strict';
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('selectstart',e=>e.preventDefault());
+const $=s=>document.getElementById(s);let access=null,inputs=[],outputs=[],report='';
+const pack7=p=>{const o=[];let a=0,b=0;for(const v of p){a|=v<<b;b+=8;while(b>=7){o.push(a&127);a>>>=7;b-=7;}}if(b)o.push(a&127);return o;};
+const unpack7=p=>{const o=[];let a=0,b=0;for(const v of p){if(v>127)throw Error('Bad 7-bit data');a|=v<<b;b+=7;if(b>=8){o.push(a&255);a>>>=8;b-=8;}}return o;};
+function frame(cmd,body){const h=[0,0x59,cmd,body.length&255,(body.length>>>8)&255,(body.length>>>16)&255,...body];let sum=0;for(const x of body)sum=(sum+x)&255;return [0xf0,...pack7([...h,(~sum)&255]),0xf7];}
+function parse(dat){if(dat[0]!==0xf0||dat[dat.length-1]!==0xf7)return null;let p=unpack7(dat.slice(1,-1));if(p.length<7||p[0]!==0||p[1]!==0x59||p.length!==7+(p[3]|(p[4]<<8)|(p[5]<<16)))return null;const body=p.slice(6,-1);let sum=0;for(const x of body)sum=(sum+x)&255;if(((~sum)&255)!==p[p.length-1])return null;return{cmd:p[2],body};}
+const ports=(list,select)=>{select.replaceChildren(new Option('Select MIDI port',''));list.forEach((p,i)=>select.add(new Option(`${p.name||'Unnamed'} (${p.manufacturer||'unknown'})`,String(i))));select.value=list.length===1?'0':'';};
+$('connect').onclick=async()=>{try{if(!navigator.requestMIDIAccess)throw Error('Web MIDI is not available in this browser.');access=await navigator.requestMIDIAccess({sysex:true});inputs=[...access.inputs.values()];outputs=[...access.outputs.values()];ports(inputs,$('input'));ports(outputs,$('output'));$('probe').disabled=!(inputs.length&&outputs.length);$('state').textContent=`Detected ${inputs.length} inputs / ${outputs.length} outputs. Select both FM1 ports.`;}catch(e){$('state').textContent='Connection error: '+e.message;}};
+function request(input,output,cmd,body,accept,timeout=3500){return new Promise(resolve=>{let done=false;const finish=v=>{if(done)return;done=true;clearTimeout(t);input.removeEventListener('midimessage',listener);resolve(v);};const listener=e=>{let p;try{p=parse([...e.data]);}catch{return;}if(p&&accept(p))finish(p);};const t=setTimeout(()=>finish(null),timeout);input.addEventListener('midimessage',listener);try{output.send(frame(cmd,body));}catch(e){finish({error:e.message});}});}
+$('probe').onclick=async()=>{const i=$('input').value===''?null:inputs[Number($('input').value)],o=$('output').value===''?null:outputs[Number($('output').value)];if(!i||!o){$('state').textContent='Choose the correct MIDI input and output.';return;}
+$('probe').disabled=true;$('copy').disabled=true;$('state').textContent='Sending two read-only identity and application queries…';
+try{await i.open();await o.open();const ident=await request(i,o,0x11,[],p=>p.cmd===0x11,4000);const cap=await request(i,o,0x50,[37],p=>p.cmd===0x60&&p.body[0]===37||p.cmd===0x6f&&p.body[0]===37,4000);
+const id=ident&&ident.body?String.fromCharCode(...ident.body).replace(/\0/g,'').trim():'(no valid identity reply)';const app=Boolean(cap&&cap.cmd===0x60&&cap.body&&cap.body.length>=5);
+const lines=[`BEETLE HUB PREFLIGHT · ${new Date().toISOString()}`,`MIDI input:  ${i.name||'Unnamed'}`,`MIDI output: ${o.name||'Unnamed'}`,`Firmware identity: ${id}`,`Identity check: ${ident&&ident.body?'VALID':'NO REPLY'}`,`BEETLE app HELLO (read-only): ${app?'CONFIRMED (0x60)':'NOT CONFIRMED'}`,`BEETLE capabilities: ${app?cap.body.slice(1).join(', '):'(none)'}`,`Result: ${app?'NORMAL BEETLE APPLICATION RESPONDED; Hub loader warning would need Hub-side investigation.':'NO VERIFIED APP HANDSHAKE; do not infer running application, recovery or updater state.'}`,`Flash writes: NONE`];report=lines.join('\n');$('report').textContent=report;$('state').textContent='Read-only check finished.';$('copy').disabled=false;
+}catch(e){$('state').textContent='Probe failed: '+e.message;}finally{$('probe').disabled=false;}};
+$('copy').onclick=()=>{if(report)navigator.clipboard.writeText(report).then(()=>$('state').textContent='Report copied.').catch(()=>$('state').textContent='Clipboard unavailable.');};
+})();
+</script></body></html>

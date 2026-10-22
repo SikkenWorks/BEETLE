@@ -374,14 +374,57 @@ static int ota_host_app_compatible(uint32_t fl_off, uint8_t *b, uint8_t *scratch
     return 0;
 }
 
-/* BEETLE firmware updates: pin the exact legacy community loader bytes.
- * A separate exact-image-checked official V15 restore route follows below. */
+/* BEETLE V1.4.14: the old ETCH loader SHA is NOT a universal community
+ * loader identity. Several valid Felucca-family firmwares build their own
+ * application-only loader, so a byte-for-byte pin blocks cross-firmware OTA.
+ *
+ * Recognize the bounded Felucca-family loader container by its versioned
+ * crt0 tag and entry point, then verify all loader bytes with the package's
+ * CRC16 before touching staging flash. The fully validated FM1 app payload
+ * is checked separately below. This is a FORMAT/INTEGRITY check, NOT an
+ * authenticity proof: anyone can imitate the tag. Use an independently
+ * trusted package source (the Hub pins its offered package SHA256). Other
+ * loader families remain refused until their destructive footprint is
+ * independently reviewed; official V15 remains exact-image-pinned.
+ */
 #define ETCH_OTA_BODY_LEN 6898u
 #define ETCH_OTA_OWNER (OTA_RES+0x80u)
 static const uint8_t etch_ota_digest[32]={0xd0,0xb1,0xa0,0x5c,0x63,0x03,0x0b,0x58,0xe5,0xbe,0x06,0xb9,0x37,0x51,0xe6,0xcc,0x37,0x5d,0x3d,0x34,0xee,0xc5,0x84,0x10,0x9f,0x97,0xfd,0x31,0xf0,0xa4,0x2a,0x78};
 static const uint8_t etch_ota_owner[16]="BEETLE-OTA-STAGE";
 static const uint8_t etch_ota_old_owner[16]="ETCH-OTA-STAGE-1";
 static uint8_t ota_touched;
+/* The tag is at an offset inside the loader's first LZ4-literal segment.
+ * The entry point must stay in the verified loader RAM window. No writes. */
+static int beetle_compatible_felucca_loader(const uint8_t *header512, uint32_t body_len)
+{
+    static const uint8_t tag[16] = "FELUCCA-LOADER-1";
+    uint32_t at;
+    if (body_len < 1024u || body_len > OTA_AREA_LEN - 0x200u)
+        return 0;
+    if (ota_rd32(header512 + 0x20u + 4u) > 0x14000u ||
+        ota_rd32(header512 + 0x20u + 4u) < 0x1000u)
+        return 0;
+    for (at = 0x48u; at + 16u <= 0x48u + 64u; ++at)
+        if (ota_memeq(header512 + at, tag, sizeof tag))
+            return 1;
+    return 0;
+}
+/* Entire proposed loader is downloaded/CRC checked BEFORE erase. CRC is
+ * accidental-corruption detection; host package authenticity is separate. */
+static int beetle_validate_incoming_loader_crc(uint32_t body_off, uint32_t body_len,
+                                                 uint16_t expected, uint8_t *scratch)
+{
+    uint32_t pos = 0, n, seen = 0;
+    while (pos < body_len) {
+        n = body_len - pos;
+        if (n > 512u) n = 512u;
+        if (ota_read(body_off + pos, scratch, n)) return -9;
+        seen = ota_crc16(scratch, n, seen);
+        pos += n;
+        ota_idle();
+    }
+    return seen == expected ? 0 : -11;
+}
 static int etch_ota_hash(uint32_t off,uint8_t *b,uint8_t from_host){
  struct etch_sha256 h;uint8_t digest[32];etch_sha256_init(&h);
  for(uint32_t i=0;i<ETCH_OTA_BODY_LEN;){uint32_t n=ETCH_OTA_BODY_LEN-i;if(n>512)n=512;
@@ -418,7 +461,9 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
     static uint8_t mine[512] __attribute__((section(".pool")));
     uint32_t i, n, ota_off, ota_len, fl_off, fl_len, c, len;
     int rc;
-    uint8_t official_stock_restore=0u;
+    uint8_t official_stock_restore=0u, verified_original_loader=0u;
+    uint8_t compatible_community_loader=0u;
+    uint16_t proposed_loader_crc;
     /* 1. UFW header + entry list */
     ota_show(1, 0);
     if ((rc = ota_ufw(hdr, &fl_off, &fl_len, &ota_off, &ota_len)) != 0)
@@ -431,6 +476,7 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
     if (ota_read(ota_off, b, 512))
         return -6;
     len = ota_rd32(b + 8);
+    proposed_loader_crc=(uint16_t)ota_rd16(b+2u);
     if (ota_crc16(b + 2, 30, 0) != ota_rd16(b) || ota_rd32(b + 4) != 0x20u || b[12] != 0x41u ||
         ota_len != len + 0x20u || len > OTA_AREA_LEN - 0x200u || ota_crc16(b + 0x22, 30, 0) != ota_rd16(b + 0x20) ||
         ota_rd32(b + 0x20 + 8) != 0x01C0A800u)
@@ -442,12 +488,21 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
      * Note: CRC16 does NOT cryptographically authenticate the OTA loader.
      * A trusted full official .fwsc and physical recovery proof are required.
      */
-    if(len==ETCH_OTA_BODY_LEN){
-        if(!etch_ota_hash(ota_off+32,b,1))return -16;
-    }else if(len==OTA_LDR_LEN && ota_rd16(b)==OTA_LDR_HCRC &&
-             ota_rd16(b+2)==OTA_LDR_DCRC && etch_ota_stock(fl_off,b)){
+    if(len==OTA_LDR_LEN && ota_rd16(b)==OTA_LDR_HCRC &&
+       ota_rd16(b+2)==OTA_LDR_DCRC && etch_ota_stock(fl_off,b)) {
         official_stock_restore=1u;
-    }else return -16;
+    } else {
+        compatible_community_loader=(uint8_t)beetle_compatible_felucca_loader(b,len);
+        /* Keep recognizing the original known loader even if its label
+         * layout is atypical; neither case licenses arbitrary loaders. */
+        if(len==ETCH_OTA_BODY_LEN)
+            verified_original_loader=(uint8_t)etch_ota_hash(ota_off+32,b,1);
+        if(!compatible_community_loader && !verified_original_loader) return -16;
+        /* Check the entire incoming loader while all device flash is intact. */
+        rc=beetle_validate_incoming_loader_crc(ota_off+32u,len,
+                                                proposed_loader_crc,mine);
+        if(rc) return rc;
+    }
     ota_show(2,0);
     if(!official_stock_restore){
         /* Native app-only writer preserves installed boot ROM/bootloader.
@@ -487,7 +542,10 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
         if (crc != c)
             return -11;
     }
-    if(!official_stock_restore && !etch_ota_hash(OTA_AREA+32,b,0))return -16;
+    /* For the byte-pinned original, also retain the stronger digest check.
+     * Foreign tagged community loaders passed their full CRC and readback. */
+    if(!official_stock_restore && verified_original_loader &&
+       !etch_ota_hash(OTA_AREA+32,b,0))return -16;
     if (ota_stage_head(len))
         return -12;
     /* 6. the host confirms: nothing is committed without it */

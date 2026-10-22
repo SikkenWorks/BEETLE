@@ -17,7 +17,8 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.4.5</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.4.24</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <b>The user sample feature is still experimental!</b>
 </p>
 
 ---

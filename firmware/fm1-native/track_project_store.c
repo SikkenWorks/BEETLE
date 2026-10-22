@@ -48,7 +48,7 @@ static uint8_t track_store_preflight(const struct track_store_project *p){
   if(p->song.chain[k].pattern>=TRACK_PATTERNS ||
      p->song.chain[k].repeats<1u || p->song.chain[k].repeats>16u)return 0u;
  for(uint8_t k=0u;k<p->song.count;k++)for(uint8_t c=0u;c<TRACK_CHANNELS;c++)
-  if(p->song.chain[k].lane[c]>=TRACK_PATTERNS && p->song.chain[k].lane[c]!=TRACK_SONG_SILENT)return 0u;
+  if(!track_song_valid_lane(p->song.chain[k].lane[c]))return 0u;
  for(uint8_t k=0u;k<TRACK_CHANNELS;k++){
   const struct track_mixer_channel *m=&p->mixer.ch[k];
   if(m->volume>120u || m->pan< -100 || m->pan>100 || m->mute>1u ||
@@ -284,18 +284,19 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
   out[i++]='B';out[i++]='1';out[i++]='O';out[i++]='S';
   }
  }
- wr32(out,TRACK_STORE_MAGIC);wr16(out+4,beetle_oneshot_used(&p->oneshots)?TRACK_STORE_VERSION:22u);
+ wr32(out,TRACK_STORE_MAGIC);wr16(out+4,TRACK_STORE_VERSION);
  wr16(out+6,(uint16_t)p->slot);wr32(out+8,i);wr32(out+12,track_store_crc32(out+24u,i-24u));
  wr32(out+16,track_store_crc32(out,16u));wr32(out+20,0u);
  *used=i;return 0;
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=21u&&rd16(data+4u)!=22u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=21u&&rd16(data+4u)!=22u&&rd16(data+4u)!=23u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  /* Fail closed on a structurally invalid V23 suffix before touching the
   * live staging bank or the RAM samples still referenced by the drum ISR. */
- if(rd16(data+4u)==23u){
+ if(rd16(data+4u)==23u || (rd16(data+4u)==24u && n>=6u &&
+     data[n-4u]=='B' && data[n-3u]=='1' && data[n-2u]=='O' && data[n-1u]=='S')){
   if(n<BEETLE_ONESHOT_NOTES*10u+6u)return -3;
   uint32_t start=rd16(data+n-6u),pos=start,total=0u;
   if(start<42u||start+BEETLE_ONESHOT_NOTES*10u+6u>n||
@@ -328,7 +329,8 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   for(uint8_t lane=0u;lane<TRACK_CHANNELS;lane++){
    if(rd16(data+4u)>=19u){GET1(p->song.chain[c].lane[lane]);}
    else p->song.chain[c].lane[lane]=p->song.chain[c].pattern;
-   if(p->song.chain[c].lane[lane]>=TRACK_PATTERNS&&p->song.chain[c].lane[lane]!=TRACK_SONG_SILENT)return -3;
+   if(!track_song_valid_lane(p->song.chain[c].lane[lane]) ||
+      (rd16(data+4u)<24u&&p->song.chain[c].lane[lane]>=TRACK_SONG_AUTO_BASE&&p->song.chain[c].lane[lane]!=TRACK_SONG_SILENT))return -3;
   }
  }
  for(c=0;c<TRACK_CHANNELS;c++){p->mixer.ch[c].volume=c==TRACK_DRUM_CHANNEL?80u:50u;p->mixer.ch[c].pan=0u;}
@@ -571,7 +573,7 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
    p->type_valid[c]=(uint16_t)(1u<<t);p->type_presets[c][t]=p->instruments[c];
   }
  }
- if(rd16(data+4u)>=23u){
+ if(rd16(data+4u)>=23u && i<n){
   uint32_t used=0u;
   if(i+BEETLE_ONESHOT_NOTES*10u+6u>n)return -2;
   uint32_t start=i;

@@ -37,6 +37,8 @@ int track_drum_trigger_pair_tuned(struct track_drum_engine *d,uint8_t first,uint
 /* Update an already-triggered voice after per-NOTE pitch FX (ISR-safe). */
 void track_drum_retune_voice(struct track_drum_engine *d,struct track_drum_voice *v);
 void track_drum_stop(struct track_drum_engine *d);
+/* Fast, bounded 48-frame fade for -- Song Chain transitions. */
+void track_drum_choke_all(struct track_drum_engine *d);
 void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix,int16_t *stereo,uint32_t frames);
 const char *track_drum_name(uint8_t index);
 #endif

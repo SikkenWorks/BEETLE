@@ -1,0 +1,183 @@
+{
+  "description": "Files omitted from V1.4.16 source distribution as redundant/generated/private, original V1.4.15 archive retained separately",
+  "files_removed": [
+    {
+      "path": "build",
+      "size_bytes": 6275806
+    },
+    {
+      "path": "tools/__pycache__",
+      "size_bytes": 72097
+    },
+    {
+      "path": "tools/dpcm4/__pycache__",
+      "size_bytes": 11819
+    },
+    {
+      "path": "tools/storage_v2/__pycache__",
+      "size_bytes": 53472
+    },
+    {
+      "path": "tests/private-fixtures",
+      "size_bytes": 8992
+    },
+    {
+      "path": "BEETLE-Project-Manager-Sample-Bank-Stage2.html",
+      "size_bytes": 78379
+    },
+    {
+      "path": "BEETLE-V1.4.2-Project-Manager.html",
+      "size_bytes": 78379
+    },
+    {
+      "path": "BEETLE-V1.4.4-PLAYHEAD-LCD-FIX-UNVERIFIED.fwsc",
+      "size_bytes": 610086
+    },
+    {
+      "path": "BEETLE-V1.4.2-DMA-PATCH2-UNVERIFIED.fwsc",
+      "size_bytes": 610086
+    },
+    {
+      "path": "BEETLE-V1.4.10-MONO-SONG-FIX-UNVERIFIED.fwsc",
+      "size_bytes": 610086
+    },
+    {
+      "path": "BEETLE-V1.4.3-STABILITY-LAB-UNVERIFIED.fwsc",
+      "size_bytes": 610086
+    },
+    {
+      "path": "BEETLE-V1.3.1-USB-AUDIO-EXPERIMENTAL.fwsc",
+      "size_bytes": 610086
+    },
+    {
+      "path": "BEETLE-V1.4.3-DMA-SONG-IO-LAB-UNVERIFIED.fwsc",
+      "size_bytes": 610086
+    },
+    {
+      "path": "BEETLE-V1.4.11-SONG-STP-DRUM-OPT-UNVERIFIED.fwsc",
+      "size_bytes": 610086
+    },
+    {
+      "path": "BEETLE-V1.4.12-SONG-REC-LED-UNVERIFIED.fwsc",
+      "size_bytes": 610086
+    },
+    {
+      "path": "PROJECT-INVENTORY-V145.json",
+      "size_bytes": 133530
+    },
+    {
+      "path": "PROJECT-INVENTORY-V143.json",
+      "size_bytes": 130575
+    },
+    {
+      "path": "HOST-V143-REGRESSION.log",
+      "size_bytes": 205
+    },
+    {
+      "path": "V148-PROJECT-INVENTORY.json",
+      "size_bytes": 246
+    },
+    {
+      "path": "FWSC-V143-BUILD.log",
+      "size_bytes": 1073
+    },
+    {
+      "path": "PROJECT-INVENTORY-V144.json",
+      "size_bytes": 132179
+    },
+    {
+      "path": "MOUNTAIN-SONG-32POS-PROFILE.log",
+      "size_bytes": 3343
+    },
+    {
+      "path": "JIELI-V143-OTA-UAC.log",
+      "size_bytes": 585
+    },
+    {
+      "path": "SHA256SUMS.txt",
+      "size_bytes": 90565
+    },
+    {
+      "path": "HOST-TEST-RESULTS.txt",
+      "size_bytes": 1490
+    },
+    {
+      "path": "JIELI-READONLY-BUILD-LOG.txt",
+      "size_bytes": 777
+    },
+    {
+      "path": "FWSC-VALIDATION-LOG.txt",
+      "size_bytes": 1073
+    },
+    {
+      "path": "FULL-REPOSITORY-INVENTORY.json",
+      "size_bytes": 18321
+    },
+    {
+      "path": "HOST-V143-AUDIO-LOG.txt",
+      "size_bytes": 205
+    },
+    {
+      "path": "JIELI-STORAGE-USB-OTA-BUILD-LOG.txt",
+      "size_bytes": 667
+    },
+    {
+      "path": "PROJECT-FILES-SHA256.txt",
+      "size_bytes": 90565
+    },
+    {
+      "path": "JIELI-V143-READONLY.log",
+      "size_bytes": 669
+    },
+    {
+      "path": "V149-PACKAGE-INTEGRITY.json",
+      "size_bytes": 1070
+    },
+    {
+      "path": "V1415-OFFLINE-MANIFEST.json",
+      "size_bytes": 1153
+    },
+    {
+      "path": "V1414-RELEASE-MANIFEST.json",
+      "size_bytes": 901
+    },
+    {
+      "path": "BEETLE-V1.4.4-PLAYHEAD-FIX-MANIFEST.json",
+      "size_bytes": 830
+    },
+    {
+      "path": "GLOBAL-SAMPLES-STAGE2-MANIFEST.json",
+      "size_bytes": 894
+    },
+    {
+      "path": "DMA-PATCH2-MANIFEST.json",
+      "size_bytes": 3745
+    },
+    {
+      "path": "BEETLE-V1.4.5-GHOST-FIX-MANIFEST.json",
+      "size_bytes": 1038
+    },
+    {
+      "path": "FIRMWARE-MANIFEST-V1.3.3-LEGACY.json",
+      "size_bytes": 1191
+    },
+    {
+      "path": "STORAGE-V2-RELEASE-MANIFEST.json",
+      "size_bytes": 1204
+    },
+    {
+      "path": "V1410-VALIDATION-MANIFEST.json",
+      "size_bytes": 704
+    },
+    {
+      "path": "BEETLE-V1.4.3-STABILITY-LAB-MANIFEST.json",
+      "size_bytes": 889
+    },
+    {
+      "path": "BEETLE-V1.4.8-MANIFEST.json",
+      "size_bytes": 1360
+    }
+  ],
+  "total_removed": 44,
+  "bytes_removed": 12080679
+}

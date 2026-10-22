@@ -15,6 +15,18 @@ struct track_song_clip {
 /* V19: legacy base pattern/repeats plus six independent lane references.
  * 255 means silence for a particular lane. */
 #define TRACK_SONG_SILENT 255u
+/* 128..175: automatically bound to pattern 0..47, visible only with content.
+ * 0..47: explicitly selected pattern, even when empty (allows sustain).
+ * 255: explicit STOP; never resumes on later pattern edits. */
+#define TRACK_SONG_AUTO_BASE 128u
+static inline uint8_t track_song_source(uint8_t lane){
+ return (lane>=TRACK_SONG_AUTO_BASE && lane<TRACK_SONG_AUTO_BASE+TRACK_PATTERNS)?
+        (uint8_t)(lane-TRACK_SONG_AUTO_BASE):lane;
+}
+static inline uint8_t track_song_valid_lane(uint8_t lane){
+ return (uint8_t)(lane<TRACK_PATTERNS || lane==TRACK_SONG_SILENT ||
+         (lane>=TRACK_SONG_AUTO_BASE&&lane<TRACK_SONG_AUTO_BASE+TRACK_PATTERNS));
+}
 struct track_song_entry {uint8_t pattern,repeats,lane[TRACK_CHANNELS];};
 struct track_song_bank {
  struct track_pattern patterns[TRACK_PATTERNS];
@@ -85,6 +97,10 @@ int track_song_on_wrap(struct track_song_bank *bank,struct track_engine *engine)
 int track_song_insert(struct track_song_bank *bank,uint8_t after);
 int track_song_delete(struct track_song_bank *bank,uint8_t at);
 int track_song_change(struct track_song_bank *bank,uint8_t row,uint8_t col,int32_t delta);
+/* Show auto-referenced lanes only once a source pattern contains actual events.
+ * A deliberate 255 SILENT assignment stays silent, including after edits. */
+uint8_t track_song_lane_visible(const struct track_song_bank *bank,uint8_t source,uint8_t channel);
+uint8_t track_song_stop_mask(const struct track_song_bank *bank);
 int track_song_record(struct track_song_bank *bank,uint8_t pattern,uint8_t step,uint8_t fx,uint8_t pressed);
 int track_song_record_value(struct track_song_bank *bank,uint8_t pattern,uint8_t step,uint8_t fx,uint8_t kind,uint8_t value);
 uint8_t track_song_effect_parameter(const struct track_song_bank *bank,uint8_t pat,uint8_t step,uint8_t fx,uint8_t fallback);

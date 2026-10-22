@@ -12,7 +12,11 @@
  const MAGIC=Uint8Array.from([66,69,69,84,66,65,78,75]); // BEETBANK
  const textEnc=typeof TextEncoder!=='undefined'?new TextEncoder():null;
  const textDec=typeof TextDecoder!=='undefined'?new TextDecoder():null;
- function crc32(data){let v=0xFFFFFFFF;for(const c of data){v^=c;for(let j=0;j<8;j++)v=(v>>>1)^((v&1)?0xEDB88320:0);}return (v^0xFFFFFFFF)>>>0;}
+ // Table-based CRC is bit-for-bit compatible with the original format, but
+ // avoids eight bit-iterations per byte for multi-megabyte WAV banks.
+ const CRC_TABLE=new Uint32Array(256);
+ for(let i=0;i<256;i++){let v=i;for(let bit=0;bit<8;bit++)v=(v>>>1)^((v&1)?0xEDB88320:0);CRC_TABLE[i]=v>>>0;}
+ function crc32(data){let v=0xFFFFFFFF;for(let i=0;i<data.length;i++)v=CRC_TABLE[(v^data[i])&255]^(v>>>8);return (v^0xFFFFFFFF)>>>0;}
  function empty(){return Array.from({length:SLOTS},()=>({name:'',filename:'',data:new Uint8Array(0)}));}
  function u16(a,o){return a[o]|a[o+1]<<8;}
  function u32(a,o){return (a[o]|a[o+1]<<8|a[o+2]<<16|a[o+3]<<24)>>>0;}
@@ -26,8 +30,51 @@
    if(!data.length&&(name.length||filename.length))throw Error('Empty sample has stray metadata');
    size+=data.length;if(size>MAX_FILE)throw Error('Library exceeds the 32 MiB PC-file limit');
    return {data,name,filename};});}
- function wavValid(a){if(a.length<44)return false;
-  return a[0]===82&&a[1]===73&&a[2]===70&&a[3]===70&&a[8]===87&&a[9]===65&&a[10]===86&&a[11]===69&&u32(a,4)+8<=a.length;}
+ function match(a,p,str){if(p<0||p+str.length>a.length)return false;for(let i=0;i<str.length;i++)if(a[p+i]!==str.charCodeAt(i))return false;return true;}
+ /* Read-only strict WAV inspection. The bytes are NEVER transcoded or
+  * resampled when stored in .beetlebank. Parsing validates RIFF chunk bounds,
+  * audio frames and supported PCM/float formats (including WAVE Extensible).
+  */
+ function wavInfo(raw){
+  const a=raw instanceof Uint8Array?raw:new Uint8Array(raw);
+  if(a.length<44||!match(a,0,'RIFF')||!match(a,8,'WAVE'))throw Error('Expected RIFF/WAVE');
+  const end=u32(a,4)+8;
+  if(end<44||end>a.length)throw Error('Truncated or invalid RIFF length');
+  let fmt=null,dataBytes=0,dataSeen=false,pos=12;
+  while(pos<end){
+   if(pos+8>end)throw Error('Truncated WAV chunk header');
+   const len=u32(a,pos+4),payload=pos+8,after=payload+len;
+   if(after>end||after+((len&1)>>>0)>end)throw Error('Truncated WAV chunk');
+   if(match(a,pos,'fmt ')){
+    if(fmt||len<16)throw Error('Duplicate or malformed WAV fmt chunk');
+    const tag=u16(a,payload),channels=u16(a,payload+2),sampleRate=u32(a,payload+4);
+    const bytesPerSec=u32(a,payload+8),align=u16(a,payload+12),bits=u16(a,payload+14);
+    let formatTag=tag;
+    if(tag===65534){
+     if(len<40||u16(a,payload+16)<22||u16(a,payload+18)>bits)throw Error('Invalid WAV Extensible fmt');
+     const guid=payload+24;
+     // PCM and IEEE float canonical KSDATAFORMAT_SUBTYPE GUIDs.
+     if(a[guid+2]!==0||a[guid+3]!==0||a[guid+4]!==0||a[guid+5]!==0||a[guid+6]!==16||a[guid+7]!==0||
+       ![128,0,0,170,0,56,155,113].every((b,j)=>a[guid+8+j]===b))throw Error('Unsupported WAV Extensible subformat');
+     formatTag=u16(a,guid);
+    }
+    if(formatTag!==1&&formatTag!==3)throw Error('Only PCM/IEEE-float WAV is supported');
+    if(!channels||channels>32||sampleRate<1000||sampleRate>384000||
+       !(formatTag===1?[8,16,24,32].includes(bits):[32,64].includes(bits))||
+       align!==channels*(bits>>>3)||bytesPerSec!==sampleRate*align)throw Error('Invalid WAV channel/rate/bit-depth or block alignment');
+    fmt={channels,sampleRate,bitsPerSample:bits,format:formatTag===1?'PCM':'FLOAT',blockAlign:align};
+   }else if(match(a,pos,'data')){
+    if(dataSeen)throw Error('Multiple WAV data chunks unsupported');
+    dataSeen=true;dataBytes=len;
+   }
+   pos=after+(len&1);
+  }
+  if(!fmt||!dataSeen||!dataBytes||dataBytes%fmt.blockAlign!==0)throw Error('Missing WAV audio or incomplete audio frame');
+  const frames=dataBytes/fmt.blockAlign;
+  return Object.freeze({channels:fmt.channels,sampleRate:fmt.sampleRate,bitsPerSample:fmt.bitsPerSample,
+   format:fmt.format,dataBytes,frames,durationSeconds:frames/fmt.sampleRate});
+ }
+ function wavValid(a){try{wavInfo(a);return true;}catch{return false;}}
  function encode(entries){const items=clean(entries),size=HEADER+ENTRY*SLOTS+items.reduce((s,i)=>s+i.data.length,0);const out=new Uint8Array(size);out.set(MAGIC);
   p16(out,8,1);p16(out,10,SLOTS);p32(out,12,size);let at=HEADER+SLOTS*ENTRY;
   items.forEach((e,i)=>{const o=HEADER+i*ENTRY;p32(out,o,at);p32(out,o+4,e.data.length);p32(out,o+8,crc32(e.data));out[o+12]=e.name.length;out[o+13]=e.filename.length;
@@ -47,5 +94,5 @@
   if(pos!==a.length)throw Error('Trailing or unassigned bytes in bank file');
   return entries;}
  function used(entries){return entries.reduce((n,e)=>n+e.data.length,0);}
- return Object.freeze({SLOTS,MAX_FILE,empty,encode,decode,used,crc32,wavValid});
+ return Object.freeze({SLOTS,MAX_FILE,empty,encode,decode,used,crc32,wavValid,wavInfo});
 });

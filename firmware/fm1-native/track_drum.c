@@ -9,6 +9,9 @@
 #include "track_core.h"
 #include "beetle_stereo_pan.h"
 #include "beetle_drum_rom.h"
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+#include "beetle_bd4_live.h"
+#endif
 #include <string.h>
 static const char *const names[TRACK_DRUM_COUNT]={"KIK","SNR","HHC","HHO","TM1","TM2","TM3","CRS","RDE","CLP","PC1","PC2","PC3","RIM"};
 /* Physical synthesis variations. Snare and hi-hat alternate without repeating. */
@@ -89,8 +92,13 @@ static void update_length(struct track_drum_voice *v,const struct track_drum_tim
 int track_drum_trigger(struct track_drum_engine *d,uint8_t index){
  if(!d||index>=TRACK_DRUM_NOTE_COUNT)return 0;
  const uint8_t user=(uint8_t)(index>=TRACK_DRUM_COUNT);
- if(user && (!d->oneshots||!d->oneshots->length[index-BEETLE_ONESHOT_FIRST]))return 0;
- const uint8_t id=user?(uint8_t)(16u+index-BEETLE_ONESHOT_FIRST):choose(d,physical[index]);
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+ const uint8_t global=user && beetle_bd4_live_available((uint8_t)(index-TRACK_DRUM_COUNT));
+#else
+ const uint8_t global=0u;
+#endif
+ if(user && !global && (!d->oneshots||!d->oneshots->length[index-BEETLE_ONESHOT_FIRST]))return 0;
+ const uint8_t id=global?(uint8_t)(32u+index-TRACK_DRUM_COUNT):user?(uint8_t)(16u+index-BEETLE_ONESHOT_FIRST):choose(d,physical[index]);
  if(hat(id))for(uint8_t i=0;i<TRACK_DRUM_POLY;i++){
   struct track_drum_voice *old=&d->voices[i];
   if(old->active&&hat(old->id)&&(!old->release_frames||old->release_frames>48u))old->release_frames=48u;
@@ -104,9 +112,12 @@ int track_drum_trigger(struct track_drum_engine *d,uint8_t index){
   }
  }
  struct track_drum_voice *v=&d->voices[target];
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+ beetle_bd4_live_stop((uint8_t)target);
+#endif
  *v=(struct track_drum_voice){0};
  v->sequence=++d->trigger_serial;v->id=id;v->component=index;
- if(user){uint32_t start=0u;for(uint8_t s=0u;s<index-BEETLE_ONESHOT_FIRST;s++)start+=d->oneshots->length[s];
+ if(user&&!global){uint32_t start=0u;for(uint8_t s=0u;s<index-BEETLE_ONESHOT_FIRST;s++)start+=d->oneshots->length[s];
   if(start+d->oneshots->length[index-BEETLE_ONESHOT_FIRST]>BEETLE_ONESHOT_MAX_BYTES){v->active=0u;return 0;}
   v->oneshot_offset=(uint16_t)start;
  }
@@ -115,7 +126,14 @@ int track_drum_trigger(struct track_drum_engine *d,uint8_t index){
  v->gain_q8=(uint16_t)(256u*p->gain/100u);
  v->env_q24=16777215u;v->noise_state=rnd(&d->rng);
  v->phase_step=rate_step(p->pitch);v->pitch_semitones=p->pitch;v->active=1u;
- update_length(v,p,d->oneshots);return 1;
+ if(global){
+  v->length=900000u; /* max 20 s @ 44.1 kHz, source determines actual end */
+  v->env_loss_q16=1u;
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+  beetle_bd4_live_request((uint8_t)target,(uint8_t)(index-TRACK_DRUM_COUNT),v->sequence);
+#endif
+ }else update_length(v,p,d->oneshots);
+ return 1;
 }
 int track_drum_trigger_pair(struct track_drum_engine *d,uint8_t first,uint8_t second){
  const uint8_t a=first<TRACK_DRUM_NOTE_COUNT,b=second<TRACK_DRUM_COUNT;
@@ -144,6 +162,9 @@ int track_drum_trigger_pair_tuned(struct track_drum_engine *d,uint8_t a,uint8_t 
    int32_t combined=(int32_t)v->pitch_semitones+semitones;
    if(combined<-36)combined=-36;if(combined>36)combined=36;
    v->pitch_semitones=(int8_t)combined;v->phase_step=rate_step(v->pitch_semitones);
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+   if(v->id>=32u)continue; /* DPCM4 stream owns its decoded frame count. */
+#endif
    static const struct track_drum_timbre user_default={0u,50u,0u,50u,50u,50u,50u,100u,0};
  update_length(v,v->component<TRACK_DRUM_COUNT?&d->components[v->component]:&user_default,d->oneshots);
   }
@@ -152,10 +173,23 @@ int track_drum_trigger_pair_tuned(struct track_drum_engine *d,uint8_t a,uint8_t 
 void track_drum_retune_voice(struct track_drum_engine *d,struct track_drum_voice *v){
  if(!d||!v||!v->active)return;
  v->phase_step=rate_step(v->pitch_semitones);
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+ if(v->id>=32u)return; /* Do not derive ROM length for streamed data. */
+#endif
  static const struct track_drum_timbre user_default={0u,50u,0u,50u,50u,50u,50u,100u,0};
  update_length(v,v->component<TRACK_DRUM_COUNT?&d->components[v->component]:&user_default,d->oneshots);
 }
-void track_drum_stop(struct track_drum_engine *d){if(d)for(unsigned i=0;i<TRACK_DRUM_POLY;i++)d->voices[i].active=0u;}
+void track_drum_choke_all(struct track_drum_engine *d){
+ if(!d)return;
+ for(uint8_t i=0u;i<TRACK_DRUM_POLY;i++)if(d->voices[i].active &&
+     (!d->voices[i].release_frames||d->voices[i].release_frames>48u))d->voices[i].release_frames=48u;
+}
+void track_drum_stop(struct track_drum_engine *d){
+ if(d)for(unsigned i=0;i<TRACK_DRUM_POLY;i++)d->voices[i].active=0u;
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+ beetle_bd4_live_choke_all();
+#endif
+}
 static int16_t clamp16(int32_t x){return (int16_t)(x>32767?32767:x<-32768?-32768:x);}
 static int32_t get_pcm(uint8_t id,uint32_t sample,const struct beetle_oneshot_bank *bank,uint16_t start){
  if(id>=16u){
@@ -200,7 +234,7 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
   const struct track_drum_timbre *ctrl=v->component<TRACK_DRUM_COUNT?&d->components[v->component]:&user_default;
   voice_ctrl[i]=ctrl;
   if(v->active){
-   voice_frames[i]=sample_frames(v->id,d->oneshots);
+   voice_frames[i]=v->id>=32u?0xFFFFFFFFu:sample_frames(v->id,d->oneshots);
    voice_floor[i]=(uint32_t)ctrl->sustain*16777215u/100u;
    voice_attack[i]=(uint32_t)ctrl->attack*25u;
   }else voice_frames[i]=voice_floor[i]=voice_attack[i]=0u;
@@ -212,9 +246,26 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
    const struct track_drum_timbre *ctrl=voice_ctrl[i];
    const uint32_t idx=v->phase>>16u;
    if(idx>=voice_frames[i]||v->age>=v->length){v->active=0u;continue;}
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+   int16_t streamed=0;
+   if(v->id>=32u){
+    int state=beetle_bd4_live_next(i,v->sequence,&streamed);
+    if(state<0){v->active=0u;continue;}
+   }
+#endif
    const uint32_t frac=v->phase&65535u;
-   const int32_t one=get_pcm(v->id,idx,d->oneshots,v->oneshot_offset),two=get_pcm(v->id,idx+1u,d->oneshots,v->oneshot_offset);
-   const int32_t wave=one+(int32_t)(((int64_t)(two-one)*frac)>>16u);
+   /* Factory-ROM pointers resolved once per chunk. No repeated mapping,
+    * offset lookup or two function-level branch ladders per active voice/sample.
+    * The second fetch past the final ROM frame must still decode to ZERO. */
+   const uint8_t *rom=v->id<16u?beetle_drum_rom+beetle_drum_offsets[rom_index[v->id]]:0;
+   const int32_t one=v->id>=32u?0:rom?beetle_ulaw_decode[rom[idx]]:
+          get_pcm(v->id,idx,d->oneshots,v->oneshot_offset);
+   const int32_t two=v->id>=32u?0:rom?(idx+1u<voice_frames[i]?beetle_ulaw_decode[rom[idx+1u]]:0):
+          get_pcm(v->id,idx+1u,d->oneshots,v->oneshot_offset);
+   int32_t wave=one+(int32_t)(((int64_t)(two-one)*frac)>>16u);
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+   if(v->id>=32u)wave=streamed;
+#endif
    /* Real 3-band sample EQ (low/mid/high); all voice state is independent. */
    v->noise_lp+= (wave-v->noise_lp)>>5u; /* approx 220 Hz */
    v->noise_lp2+=(wave-v->noise_lp2)>>2u;/* approx 2 kHz */

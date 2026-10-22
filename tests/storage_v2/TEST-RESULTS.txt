@@ -1,0 +1,20 @@
+BEETLE Storage V2 OFFLINE testing; source fixtures 4
+lossless BEETLE-V19-real-legacy-project.trk 1637 -> 487
+lossless BEETLE-V21-multi-fx-migration.trk 1295 -> 230
+lossless MOUNTAINKING-SLOT-01.trk 8779 -> 3754
+lossless NUGGIE-SLOT-07.trk 1724 -> 572
+PASS 120 randomized roundtrip/corruption/RAW fallback cases
+PASS initial persistence and read-back
+PASS exhaustive project power cuts at 20 NOR mutation boundaries
+PASS exhaustive sample power cuts at 50 NOR mutation boundaries
+PASS sample deletion and rollback
+PASS 12 slots, bit corruption, old-generation fallback
+PASS 10-sec-sized encoded payload, 12 projects, reboot {'total_bytes': 294912, 'live_sectors': 31, 'erased_sectors': 39, 'unreferenced_dirty_sectors': 0, 'guard_erased_sectors': 4}
+PASS 20-sec-sized payload in 1-large/11-small case, safety reserve intact
+PASS 12 incompressible maximum project slots preserved, 20-sec upload refused
+PASS delete/replace + checkpoint reclaim without touching live projects
+PASS independent 13 user slots across 12 projects
+PASS truncated metadata commit marker rejected (torn write)
+PASS oversized sample refused without any NOR mutation
+PASS corrupt newest superblock falls back to verified prior metadata
+PASS unreadable flash fails closed; NO physical device modifications

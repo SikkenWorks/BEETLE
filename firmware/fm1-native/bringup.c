@@ -433,6 +433,11 @@ static union {
 } beetle_project_workspace __attribute__((section(".pool"),aligned(4)));
 #define native_project_cfg beetle_project_workspace.etch
 #define beetle_staged beetle_project_workspace.beetle.project
+/* Stable live 6-KiB user-oneshot metadata. V2 transactions reuse the
+ * staging project as scratch; an ISR must NEVER point inside that scratch.
+ * The sample PCM arrays remain in their original dedicated RAM regions. */
+static struct beetle_oneshot_bank beetle_live_oneshots
+    __attribute__((section(".beetle_edit_scratch"),aligned(4)));
 #define beetle_codec_buffer beetle_project_workspace.beetle.scratch
 #else
 static struct etch_project_settings native_project_cfg __attribute__((section(".pool")));
@@ -472,6 +477,9 @@ static uint8_t native_updating;
 /* BEETLE USB project transfer: called only from the non-ISR OTA event dispatcher. */
 #if defined(TRACK_FIRMWARE)
 static int beetle_transfer_handle(uint32_t decoded_len);
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+static void beetle_sample_transfer_maintenance(void);
+#endif
 #endif
 #include "ota.c"
 #include "ota_target.c"
@@ -2312,6 +2320,22 @@ void fm1_cstart(void){
     fm1_irq_off();native_controls.gain=next_gain;fm1_irq_enable_all();
    }
   }
+#ifdef TRACK_FIRMWARE
+  /* Read battery ADC only every four seconds in foreground. Never read ADC,
+   * draw pixels or touch flash from the realtime audio callback. Threshold
+   * is provisional until verified from real FM1 readings. */
+  static uint32_t beetle_last_battery_sample_ms=0u;
+  if(!safe && !native_updating && (uint32_t)(etch_ms-beetle_last_battery_sample_ms)>=4000u){
+   beetle_last_battery_sample_ms=etch_ms;
+   int32_t raw_battery=fm1_adc_read(FM1_ADC_BATT);
+   if(raw_battery>=0){
+    track_battery_adc_filtered=beetle_battery_filter(track_battery_adc_filtered,(uint16_t)raw_battery,track_battery_valid);
+    track_battery_valid=1u;
+    uint8_t low=beetle_battery_low20(track_battery_adc_filtered,track_battery_low20);
+    if(low!=track_battery_low20){track_battery_low20=low;track_battery_ui_dirty=1u;}
+   }
+  }
+#endif
   uint8_t gone=!usb.config||usb.suspended;
   if(gone&&!disconnected){fm1_irq_off();midi_in_overflow=1;fm1_irq_enable_all();}
   /* Explicit local recovery from an audio deadline stop. Press HOME+PLAY
