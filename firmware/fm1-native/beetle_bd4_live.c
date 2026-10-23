@@ -19,6 +19,7 @@ struct live_runtime {
  struct live_chunk chunks[BEETLE_BD4_STREAM_VOICES];
  struct live_note notes[BEETLE_BD4_STREAM_VOICES];
  struct beetle_v2_sample slots[BEETLE_BD4_STREAM_SLOTS];
+ char labels[BEETLE_BD4_STREAM_SLOTS][4];
  struct beetle_v2_device device;
  uint8_t index[4096];
  uint8_t chunk_scratch[4068];
@@ -45,6 +46,9 @@ void beetle_bd4_live_init(void){
  if(live_rt)beetle_bd4_live_bind(live_rt,sizeof(*live_rt));
 }
 void beetle_bd4_live_invalidate(void){if(live_rt){live_refresh=1u;live_valid=0u;}}
+const char *beetle_bd4_live_label(uint8_t slot){
+ return live_rt&&slot<BEETLE_BD4_STREAM_SLOTS&&live_valid&&live_rt->labels[slot][0]?live_rt->labels[slot]:0;
+}
 int beetle_bd4_live_available(uint8_t slot){
  return live_rt&&slot<BEETLE_BD4_STREAM_SLOTS && live_valid && live_slots[slot].generation!=0u;
 }
@@ -127,13 +131,24 @@ void beetle_bd4_live_poll(beetle_v2_read read,void *ctx,void (*lock)(void),void 
  if(!read||!live_rt||!lock||!unlock)return;
  if(live_refresh){
   /* Installation/migration required: refuses the legacy layout. */
-  live_valid=0u;memset(live_slots,0,sizeof(live_slots));
+  live_valid=0u;memset(live_slots,0,sizeof(live_slots));memset(live_rt->labels,0,sizeof(live_rt->labels));
   if(beetle_v2_open(&live_device,read,ctx,live_index)==0){
    live_valid=1u;
    for(uint8_t i=0;i<13u;i++){
     struct beetle_v2_sample info;
-    if(beetle_v2_sample_info(&live_device,i,&info,live_index)==1)
+    if(beetle_v2_sample_info(&live_device,i,&info,live_index)==1){
      live_slots[i]=info;
+     if(info.byte_length>=30u){
+      uint8_t footer[8];
+      if(beetle_v2_sample_read(&live_device,i,info.byte_length-8u,footer,8u,live_index)==0 &&
+         footer[0]=='B'&&footer[1]=='N'&&footer[2]=='M'&&footer[3]=='1'&&
+         (uint8_t)(footer[4]^footer[5]^footer[6]^0xA5u)==footer[7]){
+       uint8_t good=1u;
+       for(unsigned j=0;j<3u;j++)if(footer[4u+j]<32u||footer[4u+j]>126u)good=0u;
+       if(good){for(unsigned j=0;j<3u;j++)live_rt->labels[i][j]=(char)footer[4u+j];live_rt->labels[i][3]=0;}
+      }
+     }
+    }
    }
   }
   live_refresh=0u;

@@ -164,7 +164,8 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
    const struct track_song_event *e=&clip->data[x];
    if(e->step>=TRACK_STEPS||e->fx>=TRACK_PUNCH_COUNT||e->down>2u||
       (e->param>100u&&(e->param!=255u||e->down==2u)))return -1;
-   PUT1((uint8_t)(e->step|(e->fx<<4u)|((e->down==0u?0u:1u)<<7u)));
+   PUT1((uint8_t)(e->step|(e->fx<<4u)));
+   PUT1(e->down);
    /* 127 encodes unspecified value for legacy callers (255 in RAM).
     * Bit 7 marks an ALGORITHM change without changing the ON/OFF mask. */
    PUT1(e->down==2u?(uint8_t)(e->param|0x80u):(e->param==255u?127u:e->param));
@@ -201,7 +202,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
  PUT1(p->master.reverb_wet);PUT1(p->master.reverb_feedback);PUT1(p->master.reverb_tone);
  for(c=0u;c<3u;c++)PUT1(p->master.enabled[c]);
  for(c=0u;c<3u;c++)PUT1(p->master.order[c]);
- for(c=0u;c<5u;c++){if(p->punch_param[c]>100u)return -1;PUT1(p->punch_param[c]);}
+ for(c=0u;c<13u;c++){if(p->punch_param[c]>100u)return -1;PUT1(p->punch_param[c]);}
  if(p->master.comp_attack>100u||p->master.reverb_spread>100u)return -1;
  PUT1(p->master.comp_attack);PUT1(p->master.reverb_spread);
  if(p->mixer.quantize_mutes>1u)return -1;PUT1(p->mixer.quantize_mutes);
@@ -291,11 +292,11 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=21u&&rd16(data+4u)!=22u&&rd16(data+4u)!=23u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=21u&&rd16(data+4u)!=22u&&rd16(data+4u)!=23u&&rd16(data+4u)!=24u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  /* Fail closed on a structurally invalid V23 suffix before touching the
   * live staging bank or the RAM samples still referenced by the drum ISR. */
- if(rd16(data+4u)==23u || (rd16(data+4u)==24u && n>=6u &&
+ if(rd16(data+4u)==23u || (rd16(data+4u)>=24u && n>=6u &&
      data[n-4u]=='B' && data[n-3u]=='1' && data[n-2u]=='O' && data[n-1u]=='S')){
   if(n<BEETLE_ONESHOT_NOTES*10u+6u)return -3;
   uint32_t start=rd16(data+n-6u),pos=start,total=0u;
@@ -413,7 +414,8 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   if(clip->count>TRACK_SONG_FX_EVENTS)return -3;
   for(uint8_t x=0;x<clip->count;x++){
    if(rd16(data+4u)>=4u){uint8_t ev;GET1(ev);
-    clip->data[x].step=ev&15u;clip->data[x].fx=(ev>>4u)&7u;clip->data[x].down=ev>>7u;
+    clip->data[x].step=ev&15u;clip->data[x].fx=(ev>>4u)&(rd16(data+4u)>=25u?15u:7u);
+    if(rd16(data+4u)>=25u){GET1(clip->data[x].down);}else clip->data[x].down=ev>>7u;
     clip->data[x].param=255u;
     if(rd16(data+4u)>=9u){uint8_t aux;GET1(aux);
      if(aux&0x80u){clip->data[x].down=2u;clip->data[x].param=(uint8_t)(aux&0x7Fu);}
@@ -489,10 +491,12 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
   for(c=0u;c<3u;c++){p->master.enabled[c]=1u;p->master.order[c]=c;}
  }
  if(rd16(data+4u)>=8u){
-  for(c=0u;c<5u;c++){GET1(p->punch_param[c]);if(p->punch_param[c]>100u)return -3;}
+  for(c=0u;c<(rd16(data+4u)>=25u?13u:5u);c++){GET1(p->punch_param[c]);if(p->punch_param[c]>100u)return -3;}
+  for(c=5u;c<13u;c++)if(rd16(data+4u)<25u)p->punch_param[c]=50u;
  }else{
   for(c=0u;c<5u;c++)p->punch_param[c]=50u;
   p->punch_param[1]=20u;p->punch_param[2]=0u;p->punch_param[4]=50u;
+  for(c=5u;c<13u;c++)p->punch_param[c]=50u;
  }
  if(rd16(data+4u)>=10u){
   GET1(p->master.comp_attack);GET1(p->master.reverb_spread);

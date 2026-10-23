@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * BEETLE original, transaction-bound BD4S transfer protocol. Main loop only.
  * 0x70 INFO, 0x71 BEGIN, 0x72 DATA, 0x73 COMMIT, 0x74 ABORT,
- * 0x75 DELETE. Replies 0x78-0x7D, errors 0x6F.
+ * 0x75 DELETE, 0x76 STORAGE CAPACITY (read-only). Replies 0x78-0x7E, errors 0x6F.
  * This protocol is intentionally distinct from OTA and never chooses an
  * arbitrary flash address. The destination is one verified V2 sample slot.
  */
@@ -36,7 +36,7 @@ static int beetle_sx_open(void){
 }
 #endif
 static int beetle_sample_transfer_handle(uint8_t cmd,const uint8_t *arg,uint32_t n){
- if(cmd<0x70u||cmd>0x75u)return 0;
+ if(cmd<0x70u||cmd>0x76u)return 0;
  if(n<1u)return 1;
  uint8_t seq=arg[0],out[16]={seq};
 #if !defined(BEETLE_NATIVE_V2) || !BEETLE_NATIVE_V2
@@ -65,6 +65,30 @@ static int beetle_sample_transfer_handle(uint8_t cmd,const uint8_t *arg,uint32_t
   beetle_xfer_wr32(out+7u,r==1?info.crc:0u);
   beetle_xfer_wr32(out+11u,r==1?info.generation:0u);
   beetle_xfer_reply(0x78u,out,15u);return 1;
+ }
+ if(cmd==0x76u){
+  /* Read-only truthful flash budget. Use exactly the same union-of-two-indexes
+   * ownership model as the sample writer. No writes or erases. */
+  if(n!=1u){beetle_xfer_error(seq,cmd,BERR_FORMAT);return 1;}
+  if(beetle_sample_xfer_active||beetle_transfer_active()||!beetle_xfer_ready()){
+   beetle_xfer_error(seq,cmd,BERR_BUSY);return 1;}
+  if(beetle_v2_mode()!=1){beetle_xfer_error(seq,cmd,BERR_OWNER);return 1;}
+  native_pause();beetle_bd4_live_invalidate();
+  int r=beetle_sx_open();
+  struct beetle_v2_sample_capacity cap;
+  if(!r)r=beetle_v2_get_sample_capacity(beetle_sx_writer(),
+     beetle_sx_index(),beetle_sx_page(),&cap);
+  beetle_bd4_live_bind(beetle_v2_workspace(),sizeof(beetle_staged));native_start();
+  if(r){beetle_xfer_error(seq,cmd,BERR_IO);return 1;}
+  out[1]=1u;/* capacity protocol */
+  beetle_xfer_wr32(out+2u,cap.current_sample_bytes);
+  beetle_xfer_wr32(out+6u,cap.estimated_additional_bytes);
+  out[10]=(uint8_t)cap.erased_free_sectors;
+  out[11]=BEETLE_V2_PROJECT_RESERVE_SECTORS;
+  out[12]=BEETLE_V2_GUARD_SECTORS;
+  out[13]=(uint8_t)cap.sample_blank_pages;
+  out[14]=(uint8_t)(cap.sample_blank_pages>>8);
+  beetle_xfer_reply(0x7Eu,out,15u);return 1;
  }
  if(cmd==0x71u){
   /* seq,slot,len32,CRC32,0x42. Reject before any NOR write. */

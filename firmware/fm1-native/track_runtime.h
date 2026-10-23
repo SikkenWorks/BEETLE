@@ -73,7 +73,7 @@ static struct track_punch_events track_rec_events;
 /* TRACK 0.8: place 48-pattern RAM song bank in large POOL to keep the
  * 96 KiB low-RAM section within the FM1 linker memory map. */
 static struct track_song_bank track_song __attribute__((section(".beetle_song"),aligned(64)));
-static uint8_t track_live_punch_mask,track_replay_punch_mask;
+static uint16_t track_live_punch_mask,track_replay_punch_mask;
 /* REC is a TRACKER note-write switch, ON by default; Punch recording has
  * its own page-scoped switch. Both controls live outside the audio ISR. */
 static uint8_t track_punch_rec_armed;
@@ -89,15 +89,18 @@ static uint8_t track_battery_valid;
 
 /* REC only saves fresh physical down edges after PLAY. Orphan OFF events are ignored.
  * Preserve the source clip even when Song Chains advances during a hold. */
-static uint8_t track_recorded_punch_mask;
-static uint8_t track_recorded_punch_source[8];
-static uint8_t track_recorded_punch_edited[TRACK_PATTERNS] __attribute__((section(".pool")));
+static uint16_t track_recorded_punch_mask;
+static uint8_t track_recorded_punch_source[16];
+static uint16_t track_recorded_punch_edited[TRACK_PATTERNS];
 /* Saved mixer-style Punch preset is separate from temporary playback automation. */
-static uint8_t track_punch_base_param[5];
+static uint8_t track_punch_base_param[13];
 /* PUNCH 2 now Ring Mod: persisted wet intensity 0..100, default 20. */
 static uint8_t track_sel_tracker_ready; /* only a fresh tracker-only SEL rising edge can delete */
+static uint8_t track_punch_saved_value(uint8_t fx);
 static void track_sync_punch_params(void);
-static uint8_t track_punch_focus=255u; /* most recently depressed FX key */
+static uint8_t track_punch_focus=255u;
+static uint8_t track_punch_held_order[16],track_punch_held_count;
+static uint8_t track_punch_page=0u; /* most recently depressed FX key */
 static uint32_t track_seq_since;
 static uint8_t track_seq_fired;
 static struct track_lane_clipboard beetle_lane_clip;
@@ -484,7 +487,7 @@ static void beetle_project_capture(uint8_t slot){
  beetle_staged.song=track_song;beetle_staged.mixer=track_mix;beetle_staged.snapshots=track_snapshots;beetle_staged.groups=track_groups;beetle_staged.library=track_library;
  for(uint8_t i=0u;i<TRACK_DRUM_COUNT;i++)beetle_staged.drum[i]=track_drum.components[i];
  beetle_staged.master=track_master_cfg;
- for(uint8_t i=0u;i<5u;i++)beetle_staged.punch_param[i]=track_punch_base_param[i];
+ for(uint8_t i=0u;i<13u;i++)beetle_staged.punch_param[i]=track_punch_base_param[i];
  for(uint8_t i=0u;i<TRACK_CHIP_SLOTS;i++){track_type_capture(i);beetle_staged.type_valid[i]=track_type_valid[i];
   for(uint8_t t=0u;t<TRACK_CHIP_TYPES;t++)if(track_type_valid[i]&(1u<<t))
    beetle_staged.type_presets[i][t]=track_type_presets[i][t];}
@@ -513,7 +516,7 @@ static void beetle_project_apply(void){
   for(uint8_t t=0u;t<TRACK_CHIP_TYPES;t++)if(track_type_valid[i]&(1u<<t))
     track_type_presets[i][t]=beetle_staged.type_presets[i][t];
  }
- for(uint8_t i=0u;i<5u;i++)track_punch_base_param[i]=beetle_staged.punch_param[i];
+ for(uint8_t i=0u;i<13u;i++)track_punch_base_param[i]=beetle_staged.punch_param[i];
  /* Stored Ring Mod intensity is restored without transient overrides. */
  track_live_punch_mask=track_replay_punch_mask=0u;beetle_live_reset();track_sync_punch_params();
  track_state.harmony=beetle_staged.harmony;
@@ -707,13 +710,13 @@ static int beetle_project_load_slot(uint8_t slot){
 static void track_punch_record_reset(void){
  memset(track_recorded_punch_edited,0,sizeof(track_recorded_punch_edited));
  track_recorded_punch_mask=0u;
- for(uint8_t i=0u;i<8u;i++)track_recorded_punch_source[i]=TRACK_PATTERNS;
+ for(uint8_t i=0u;i<16u;i++)track_recorded_punch_source[i]=TRACK_PATTERNS;
 }
 /* Called with IRQs off, on explicit STOP. Any captured down must have a
  * matching recorded up; a stopped take cannot become an indefinite loop. */
 static void track_punch_record_finish(void){
  {
-  for(uint8_t fx=0u;fx<8u;fx++)if(track_recorded_punch_mask&(1u<<fx)){
+  for(uint8_t fx=0u;fx<16u;fx++)if(track_recorded_punch_mask&(1u<<fx)){
    uint8_t src=track_recorded_punch_source[fx];
    uint8_t next=(uint8_t)((track_state.transport.play_step+1u)%TRACK_STEPS);
    if(src<TRACK_PATTERNS && track_song_record_value(&track_song,src,next,fx,0u,255u)==0)
@@ -728,14 +731,14 @@ static void track_punch_record_finish(void){
 static void track_punch_record_song_transition(void){
  if(!track_punch_rec_armed || !track_song.enabled)return;
  uint8_t source=track_song_punch_pattern(&track_song,&track_state);
- for(uint8_t fx=0u;fx<8u;fx++){
-  uint8_t flag=(uint8_t)(1u<<fx);
+ for(uint8_t fx=0u;fx<16u;fx++){
+  uint16_t flag=(uint16_t)(1u<<fx);
   uint8_t old=track_recorded_punch_source[fx];
   if(old==source)continue;
   if(old<TRACK_PATTERNS && (track_recorded_punch_mask&flag)){
    if(track_song_record_value(&track_song,old,0u,fx,0u,255u)==0)track_state.dirty=1u;
   }
-  track_recorded_punch_mask&=(uint8_t)~flag;
+  track_recorded_punch_mask&=(uint16_t)~flag;
   track_recorded_punch_source[fx]=TRACK_PATTERNS;
   if(source<TRACK_PATTERNS && (track_live_punch_mask&flag)){
    if(!(track_recorded_punch_edited[source]&flag)){
@@ -743,7 +746,7 @@ static void track_punch_record_song_transition(void){
     track_recorded_punch_edited[source]|=flag;
    }
    if(track_song_record_value(&track_song,source,0u,fx,1u,
-                fx<5u?track_punch_base_param[fx]:255u)==0){
+                track_punch_saved_value(fx))==0){
     track_recorded_punch_mask|=flag;
     track_recorded_punch_source[fx]=source;
     track_state.dirty=1u;
@@ -751,14 +754,19 @@ static void track_punch_record_song_transition(void){
   }
  }
 }
+static uint8_t track_punch_saved_value(uint8_t fx){
+ return fx<5u?track_punch_base_param[fx]:fx>=8u&&fx<16u?track_punch_base_param[fx-3u]:255u;
+}
 static void track_sync_punch_params(void){
- for(uint8_t fx=0u;fx<5u;fx++){
-  uint8_t value=track_punch_base_param[fx];
+ for(uint8_t fx=0u;fx<16u;fx++){
+  uint8_t value=track_punch_saved_value(fx);
+  if(value==255u)continue;
   if(!(track_live_punch_mask&(1u<<fx)) && (track_replay_punch_mask&(1u<<fx)))
    value=track_song_effect_parameter(&track_song,track_song_punch_pattern(&track_song,&track_state),
            track_state.transport.play_step,fx,value);
   track_chip.punch_param[fx]=value;
  }
+ track_chip.punch_focus=track_punch_focus;
 }
 static void track_ui_inst_reset(void){
  for(uint8_t i=0u;i<TRACK_CHIP_SLOTS;i++)track_type_valid[i]=0u;
@@ -875,7 +883,7 @@ static void track_fm1_boot(void){
  track_song_init(&track_song,&track_state);track_chip_init(&track_chip);
  beetle_ed.pending=&beetle_edit_pending;beetle_ed.whole_clip=&beetle_edit_whole;
  beetle_ed.block=beetle_edit_block;beetle_edit_reset(&beetle_ed);
- for(uint8_t k=0u;k<5u;k++)track_punch_base_param[k]=track_chip.punch_param[k];
+ for(uint8_t k=0u;k<13u;k++)track_punch_base_param[k]=track_chip.punch_param[k<5u?k:k+3u];
  track_chip_fx_reset();track_ui_inst_reset();beetle_library_init(&track_library);track_library_slot=track_library_action=track_library_target=track_library_copy_source=track_library_notice=0u;track_drum_init(&track_drum);
 #if BEETLE_NATIVE_STORAGE
  memset(&beetle_staged.oneshots,0,sizeof(beetle_staged.oneshots));
@@ -888,7 +896,7 @@ static void track_fm1_boot(void){
 #endif
  track_old_note_mask=0;track_page=29u;track_boot_menu_choice=0u;track_load_from_boot=0u;track_save_return_page=0u;track_new_project_full=0u;track_preset_focus_valid=0u;track_rc_tab=0u;track_named=0u;
  track_last_encoder_ms=0u;track_last_encoder_id=0u;track_last_encoder_delta=0;track_recovered_state_faults=0u;
- track_live_punch_mask=0u;track_replay_punch_mask=0u;track_punch_focus=255u;track_seq_since=0u;track_seq_fired=0u; /* lane clipboard persists after SEQ release */
+ track_live_punch_mask=0u;track_replay_punch_mask=0u;track_punch_focus=255u;track_punch_held_count=0u;track_seq_since=0u;track_seq_fired=0u; /* lane clipboard persists after SEQ release */
  track_last_poll=0u;track_last_paint=0u;track_boot_input_unlock_ms=etch_ms+550u;track_home_since=0u;track_home_fired=0u;track_song_follow_active=0u;track_song_preplay_row=0u;
  track_scroll_preview_active=0u;track_scroll_preview_until=0u;
  track_audio_clock=0u;track_audio_started=0u;track_swing_pending_mask=0u;for(uint8_t ci=0;ci<TRACK_CHANNELS;ci++)track_swing_pending_at[ci]=0u;track_preview_mask=0u;
@@ -1172,7 +1180,7 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
   if(track_song.enabled&&track_song.composite_active)track_song_apply_stops();
   track_replay_punch_mask=track_song_effect_mask_boundary(&track_song,track_song_punch_pattern(&track_song,&track_state),0u,0u);
   track_sync_punch_params();
-  track_state.punch_mask=(uint8_t)(track_live_punch_mask|track_replay_punch_mask);
+  track_state.punch_mask=(uint16_t)(track_live_punch_mask|track_replay_punch_mask);
   track_chip_begin_step(&track_chip);
   track_swing_pending_mask=0u;
   uint32_t period=661500u/(track_state.transport.bpm?track_state.transport.bpm:120u);
@@ -1231,7 +1239,7 @@ static void track_fm1_audio_process(struct etch_native_audio *audio,uint32_t fra
                   !track_song.enabled || !track_song.composite_active ||
                   track_song.position==song_position_before_wrap));
    track_sync_punch_params();
-   track_state.punch_mask=(uint8_t)(track_replay_punch_mask|track_live_punch_mask);
+   track_state.punch_mask=(uint16_t)(track_replay_punch_mask|track_live_punch_mask);
    track_chip_begin_step(&track_chip);
    track_swing_pending_mask=0u;
    /* Transport-facing live mutes commit exactly at the new pattern start.
@@ -2019,8 +2027,8 @@ static void track_fm1_paint(void){
    char num[4];track_u8(num,row);track_pix_text(num,14u,y,TRACK_BRIGHT);
    uint8_t count=0u;const struct track_song_event *ev=0;
    for(uint8_t n=0u;n<clip->count;n++)if(clip->data[n].step==row){if(count==track_punch_edit_index)ev=&clip->data[n];count++;}
-   static const char *const fx[]={"REPEAT","RING MOD","FILTER","TAPE","STUTTER","OCT UP","OCT DN","MUTE"};
-   track_pix_text(ev?(ev->down?fx[ev->fx&7u]:"[STP]"):"---",68u,y,TRACK_BRIGHT);
+   static const char *const fx[]={"REPEAT","RING MOD","FILTER","TAPE","STUTTER","OCT UP","OCT DN","MUTE","SCRATCH","BITCRUSH","PUMP","GLITCH","WOW","PHASER","RADIO","ISOLATOR"};
+   track_pix_text(ev?(ev->down?fx[ev->fx&15u]:"[STP]"):"---",68u,y,TRACK_BRIGHT);
    if(ev&&ev->down==2u){char param[12]="ALG ";track_fmt_int(param+4u,ev->param);
     track_pix_text(param,154u,y,TRACK_PINK);
    }else track_pix_text(ev?(ev->down?"ON":"STOP"):"--",154u,y,TRACK_WHITE);
@@ -2068,29 +2076,32 @@ static void track_fm1_paint(void){
   return;
  }
  if(track_page==4u){
-  track_page_header("PUNCH-IN FX",43u);
-  static const char *const punches[]={"REPEAT","RING MOD","FILTER","TAPE STOP","STUTTER","OCT UP","OCT DOWN","MUTE"};
+  track_page_header(track_punch_page?"PUNCH-IN FX 2/2":"PUNCH-IN FX 1/2",43u);
+  static const char *const punches[]={"REPEAT","RING MOD","FILTER","TAPE STOP","STUTTER","OCT UP","OCT DOWN","MUTE",
+   "SCRATCH","BITCRUSH","PUMP","GLITCH","WOW","PHASER","RADIO","DJ ISOLATOR"};
   for(uint8_t j=0u;j<8u;j++){
+   uint8_t fx=(uint8_t)(j+track_punch_page*8u);
    uint16_t x=(uint16_t)(17u+(j%2u)*106u),y=(uint16_t)(58u+(j/2u)*32u);
-   uint8_t held=(uint8_t)(((track_live_punch_mask|track_replay_punch_mask)&(1u<<j))!=0u);
+   uint8_t held=(uint8_t)(((track_live_punch_mask|track_replay_punch_mask)&(1u<<fx))!=0u);
    lcd_fill(x,y,99u,26u,held?0xE818u:0x3806u);
-   char name[20];name[0]=(char)('1'+j);name[1]=' ';
-   uint8_t k=0u;while(punches[j][k]&&k<16u){name[k+2u]=punches[j][k];k++;}name[k+2u]=0;
+   char name[22];uint8_t a=0u,number=(uint8_t)(fx+1u);
+   if(number>=10u)name[a++]='1';name[a++]=(char)('0'+(number%10u));name[a++]=' ';
+   uint8_t k=0u;while(punches[fx][k]&&k<15u){name[a++]=punches[fx][k++];}name[a]=0;
    track_pix_text(name,x+4u,y+6u,held?TRACK_DARK:TRACK_WHITE);
-   if(held&&j<5u){
-    if(j==4u){
+   if(held&&(fx<5u||fx>=8u)){
+    if(fx==4u){
      static const char *const rates[]={"/8","/4","/2","X1","X2","X4","X8"};
      char alg[16]="BPM ";const char *rate=rates[beetle_stutter_index(track_chip.punch_param[4])];
      uint8_t i=4u;for(uint8_t p=0u;rate[p]&&i<14u;)alg[i++]=rate[p++];alg[i]=0;
      track_pix_text(alg,x+4u,y+16u,TRACK_WHITE);
-    }else {char alg[16]="K1  ";char val[12];track_fmt_int(val,track_chip.punch_param[j]);
+    }else {char alg[16]="K1  ";char val[12];track_fmt_int(val,track_chip.punch_param[fx]);
      uint8_t i=4u;for(uint8_t p=0u;val[p]&&i<14u;)alg[i++]=val[p++];alg[i]=0;
      track_pix_text(alg,x+4u,y+16u,TRACK_WHITE);}
    }
   }
-  track_pix_text("HOLD KEY + K1: INTENSITY",12u,192u,TRACK_PINK);
+  track_pix_text("HOLD KEY + K1: VALUE",12u,192u,TRACK_PINK);
   track_pix_text(track_punch_rec_armed?"FX REC: ON":"FX REC: OFF",12u,202u,track_punch_rec_armed?TRACK_PINK:TRACK_WHITE);
-  track_pix_text(track_replay_punch_mask?"REC FX PLAYING / LIT":"WHITE KEYS HOLD TO PLAY",12u,221u,TRACK_BRIGHT);return;
+  track_pix_text(track_replay_punch_mask?"REC FX PLAYING / LIT":"FX BUTTON: NEXT PAGE",12u,221u,TRACK_BRIGHT);return;
  }
  if(track_page==5u){
   track_page_header(track_osc_bank==0u?"INSTRUMENT / OSC":
@@ -2620,7 +2631,7 @@ static void beetle_project_new_session(void){
  track_drum_bind_oneshots(&track_drum,&beetle_live_oneshots);
 #endif
  track_chip_init(&track_chip);
- for(uint8_t k=0u;k<5u;k++)track_punch_base_param[k]=track_chip.punch_param[k];
+ for(uint8_t k=0u;k<13u;k++)track_punch_base_param[k]=track_chip.punch_param[k<5u?k:k+3u];
  track_punch_clear(&track_rec_events);
  track_ui_inst_reset();beetle_library_init(&track_library);track_library_slot=track_library_action=track_library_target=track_library_copy_source=track_library_notice=0u;
  for(uint8_t c=0;c<TRACK_SYNTH_CHANNELS;c++){track_lane_instrument[c]=c;track_input_instrument[c]=c;}
@@ -3338,46 +3349,56 @@ static void track_fm1_poll(void){
   * pressing PLAY or entering REC. No stuck notes after navigation. */
  track_preview_release((track_page==0u && !track_state.transport.playing)?fm1_in.notes:0u);
 
- /* Punch-In white keys: F G A B C D E F (left to right), hold-to-play.
-  * Input read is from the existing Felucca debounced key matrix. */
+ /* The sixteen white keys select sixteen independent Punch-In FX. Pressing
+  * a key focuses its owning page, regardless of what is currently shown.
+  * Releasing the most recent key restores the previous still-held effect. */
  if(track_page==3u || track_page==4u){
-  static const uint8_t white_key_pos[8]={0u,2u,4u,6u,7u,9u,11u,12u};
+  static const uint8_t white_key_pos[16]={0u,2u,4u,6u,7u,9u,11u,12u,14u,16u,18u,19u,21u,23u,24u,26u};
   uint32_t mask=fm1_in.notes;
-  for(uint8_t i=0u;i<8u;i++){
+  if(track_page==3u){ /* FX shortcuts also work while per-step page is visible */ }
+  for(uint8_t i=0u;i<16u;i++){
    uint32_t bit=1u<<white_key_pos[i];uint8_t before=(uint8_t)((track_old_note_mask&bit)!=0u);
    uint8_t after=(uint8_t)((mask&bit)!=0u);
-   if(before!=after){
-    fm1_irq_off();
-    if(after){track_live_punch_mask|=(uint8_t)(1u<<i);track_punch_focus=i;}
-    else {track_live_punch_mask&=(uint8_t)~(1u<<i);
-     if(track_punch_focus==i){track_punch_focus=255u;for(uint8_t j=0u;j<8u;j++)if(track_live_punch_mask&(1u<<j))track_punch_focus=j;}}
-    track_state.punch_mask=(uint8_t)(track_live_punch_mask|track_replay_punch_mask);
-    track_sync_punch_params();fm1_irq_enable_all();
-    if(track_punch_rec_armed&&track_state.transport.playing&&track_audio_started){
-     fm1_irq_off();
-     uint8_t source=after?track_song_punch_pattern(&track_song,&track_state):track_recorded_punch_source[i];
-     if(source<TRACK_PATTERNS && (after || (track_recorded_punch_mask&(1u<<i)))){
-      if(after && !(track_recorded_punch_edited[source]&(1u<<i))){
-       track_song_clear_punch_fx(&track_song,source,i);
-       track_recorded_punch_edited[source]|=(uint8_t)(1u<<i);
-      }
-      if(track_song_record_value(&track_song,source,track_state.transport.play_step,i,after,
-            (after&&i<5u)?track_punch_base_param[i]:255u)==0){
-       (void)track_punch_add(&track_rec_events,track_state.transport.play_step,i,after);
-       if(after){track_recorded_punch_mask|=(uint8_t)(1u<<i);track_recorded_punch_source[i]=source;}
-       else{track_recorded_punch_mask&=(uint8_t)~(1u<<i);track_recorded_punch_source[i]=TRACK_PATTERNS;}
-       track_state.dirty=1u;
-      }
-     }
-     fm1_irq_enable_all();
-    }
-    changed=1u;
+   if(before==after)continue;
+   fm1_irq_off();
+   if(after){
+    track_live_punch_mask|=(uint16_t)(1u<<i);
+    for(uint8_t q=0u;q<track_punch_held_count;q++)if(track_punch_held_order[q]==i){
+      for(uint8_t z=q;z+1u<track_punch_held_count;z++)track_punch_held_order[z]=track_punch_held_order[z+1u];track_punch_held_count--;break;}
+    if(track_punch_held_count<16u)track_punch_held_order[track_punch_held_count++]=i;
+   }else{
+    track_live_punch_mask&=(uint16_t)~(1u<<i);
+    for(uint8_t q=0u;q<track_punch_held_count;q++)if(track_punch_held_order[q]==i){
+      for(uint8_t z=q;z+1u<track_punch_held_count;z++)track_punch_held_order[z]=track_punch_held_order[z+1u];track_punch_held_count--;break;}
    }
+   track_punch_focus=track_punch_held_count?track_punch_held_order[track_punch_held_count-1u]:255u;
+   if(track_punch_focus<16u)track_punch_page=(uint8_t)(track_punch_focus>>3u);
+   if(after||track_punch_focus<16u)track_page=4u;
+   track_state.punch_mask=(uint16_t)(track_live_punch_mask|track_replay_punch_mask);
+   track_sync_punch_params();fm1_irq_enable_all();
+   if(track_punch_rec_armed&&track_state.transport.playing&&track_audio_started){
+    fm1_irq_off();
+    uint8_t source=after?track_song_punch_pattern(&track_song,&track_state):track_recorded_punch_source[i];
+    if(source<TRACK_PATTERNS&&(after||(track_recorded_punch_mask&(1u<<i)))){
+     if(after&&!(track_recorded_punch_edited[source]&(1u<<i))){
+      track_song_clear_punch_fx(&track_song,source,i);
+      track_recorded_punch_edited[source]|=(uint16_t)(1u<<i);
+     }
+     if(track_song_record_value(&track_song,source,track_state.transport.play_step,i,after,
+           after?track_punch_saved_value(i):255u)==0){
+      (void)track_punch_add(&track_rec_events,track_state.transport.play_step,i,after);
+      if(after){track_recorded_punch_mask|=(uint16_t)(1u<<i);track_recorded_punch_source[i]=source;}
+      else{track_recorded_punch_mask&=(uint16_t)~(1u<<i);track_recorded_punch_source[i]=TRACK_PATTERNS;}
+      track_state.dirty=1u;
+     }
+    }
+    fm1_irq_enable_all();
+   }
+   changed=1u;
   }
   track_old_note_mask=mask;
  }else if(track_live_punch_mask){
-  fm1_irq_off();track_live_punch_mask=0u;track_punch_focus=255u;
-  /* Retain all five adjustable Punch-In settings, including Ring Mod. */
+  fm1_irq_off();track_live_punch_mask=0u;track_punch_focus=255u;track_punch_held_count=0u;
   track_state.punch_mask=track_replay_punch_mask;track_sync_punch_params();fm1_irq_enable_all();
   track_old_note_mask=0u;changed=1u;
  }
@@ -3385,30 +3406,38 @@ static void track_fm1_poll(void){
   /* ALGORITHM edits a held Punch-In and remembers its value until reconfigured.
   * Octaves/MUTE deliberately have no parameter. Otherwise ALG chooses
   * the current pattern in the TRACK screen; SELECT remains channel turn. */
- if(k1){
+ if(k1 && track_live_punch_mask){
   uint8_t fx=track_punch_focus;
-  if(fx>=5u){fx=255u;for(uint8_t j=0u;j<5u;j++)if(track_live_punch_mask&(1u<<j))fx=j;}
-  if(fx<5u && (track_live_punch_mask&(1u<<fx))){
+  if(fx>=16u || (fx>=5u&&fx<8u)){
+   fx=255u;
+   for(uint8_t j=0u;j<track_punch_held_count;j++){
+    uint8_t choice=track_punch_held_order[track_punch_held_count-1u-j];
+    if(choice<5u||choice>=8u){fx=choice;break;}
+   }
+  }
+  if(fx<16u&&(track_live_punch_mask&(1u<<fx))){
+   uint8_t pi=fx<5u?fx:(uint8_t)(fx-3u);
    int32_t value;
    if(fx==4u){
     int32_t index=(int32_t)beetle_stutter_index(track_punch_base_param[4])+k1;
     if(index<0)index=0;if(index>6)index=6;
     value=beetle_stutter_value((uint8_t)index);
-   }else value=(int32_t)track_punch_base_param[fx]+k1;
+   }else value=(int32_t)track_punch_base_param[pi]+k1;
    if(value<0)value=0;if(value>100)value=100;
    fm1_irq_off();
-   if(track_punch_base_param[fx]!=(uint8_t)value){
-    track_punch_base_param[fx]=(uint8_t)value;
+   if(track_punch_base_param[pi]!=(uint8_t)value){
+    track_punch_base_param[pi]=(uint8_t)value;
     if(track_punch_rec_armed&&track_state.transport.playing&&(track_page==3u||track_page==4u)){
-     uint8_t source=track_recorded_punch_mask&(1u<<fx)?track_recorded_punch_source[fx]:TRACK_PATTERNS;
-     if(source<TRACK_PATTERNS && track_song_record_value(&track_song,source,
-             track_state.transport.play_step,fx,2u,(uint8_t)value)==0)track_state.dirty=1u;
+     uint8_t source=(track_recorded_punch_mask&(1u<<fx))?track_recorded_punch_source[fx]:TRACK_PATTERNS;
+     if(source<TRACK_PATTERNS&&track_song_record_value(&track_song,source,
+            track_state.transport.play_step,fx,2u,(uint8_t)value)==0)track_state.dirty=1u;
     }
     track_state.dirty=1u;
    }
-   track_sync_punch_params();fm1_irq_enable_all();
+   track_sync_punch_params();fm1_irq_enable_all();changed=1u;
   }
  }
+
  if(alg && !track_live_punch_mask && track_page==0u &&
     (buttons&(1u<<11)) && !track_state.transport.playing){
   fm1_irq_off();beetle_edit_begin(&beetle_ed,&track_song,&track_state);
@@ -3507,7 +3536,9 @@ static void track_fm1_poll(void){
      if(track_state.transport.edit_channel==TRACK_DRUM_CHANNEL)
       track_fx_drum_lane=(uint8_t)(track_state.transport.edit_column==1u);
     }
-    track_page=track_page==3u?4u:3u;
+    if(track_page==3u){track_page=4u;track_punch_page=0u;}
+    else if(track_page==4u){if(track_punch_page)track_page=3u;else track_punch_page=1u;}
+    else{track_page=3u;track_punch_page=0u;}
    }
   if(pressed&(1u<<6)){if(track_page!=5u)track_edit_focus_step(track_state.transport.edit_channel);track_page=(uint8_t)(track_state.transport.edit_channel==TRACK_DRUM_CHANNEL?16u:(track_page==5u?16u:5u));track_osc_cursor=0u;track_osc_bank=0u;track_type_queued=0;}
   if(pressed&(1u<<5)){track_page=17u;track_osc_cursor=0u;} /* LFO => MASTER */
@@ -3530,7 +3561,7 @@ static void track_fm1_poll(void){
   if(released&(1u<<13)){
    if(track_page==3u || track_page==4u){
     fm1_irq_off();track_punch_rec_armed^=1u;
-    if(!track_punch_rec_armed){track_punch_record_finish();track_live_punch_mask=0u;
+    if(!track_punch_rec_armed){track_punch_record_finish();track_live_punch_mask=0u;track_punch_held_count=0u;track_punch_focus=255u;
       track_state.punch_mask=track_replay_punch_mask;}
     else track_punch_record_reset();
     fm1_irq_enable_all();track_old_note_mask=fm1_in.notes;

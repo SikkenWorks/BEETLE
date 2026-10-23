@@ -206,7 +206,7 @@ uint8_t track_chord_keylocked(uint8_t root,uint8_t type,const struct track_harmo
  return count;
 }
 
-void track_punch(struct track_engine *e,uint8_t fx,uint8_t held){if(!e||fx>=TRACK_PUNCH_COUNT)return;if(held)e->punch_mask|=(uint8_t)(1u<<fx);else e->punch_mask&=(uint8_t)~(1u<<fx);}
+void track_punch(struct track_engine *e,uint8_t fx,uint8_t held){if(!e||fx>=TRACK_PUNCH_COUNT)return;if(held)e->punch_mask|=(uint16_t)(1u<<fx);else e->punch_mask&=(uint16_t)~(1u<<fx);}
 int track_is_lit(uint8_t button){return button>=2u&&button<14u&&button!=10u;}
 uint32_t track_home_action(uint32_t held_ms,uint8_t released){if(held_ms>=1500u)return 2u;return released?1u:0u;}
 /* TR version 2 includes dynamics explicitly. Original TR version 1 still

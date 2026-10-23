@@ -144,7 +144,7 @@ static int beetle_mig_initialize(void){
 #include "beetle_sample_transfer.inc"
 static int beetle_transfer_handle(uint32_t d){
  const uint8_t cmd=ota_dec[2];
- if(cmd>=0x70u && cmd<=0x75u)return beetle_sample_transfer_handle(cmd,ota_dec+6u,d-7u);
+ if(cmd>=0x70u && cmd<=0x76u)return beetle_sample_transfer_handle(cmd,ota_dec+6u,d-7u);
  if(cmd<0x50u || cmd>0x5Eu)return 0;
  const uint8_t *arg=ota_dec+6u;
  const uint32_t n=d-7u;

@@ -18,8 +18,14 @@ static const char *const names[TRACK_DRUM_COUNT]={"KIK","SNR","HHC","HHO","TM1",
 static const uint8_t physical[TRACK_DRUM_COUNT]={0u,1u,6u,10u,14u,12u,11u,13u,15u,3u,5u,7u,9u,4u};
 const char *track_drum_name(uint8_t id){
  static const char *const user_names[BEETLE_ONESHOT_NOTES]={"U01","U02","U03","U04","U05","U06","U07","U08","U09","U10","U11","U12","U13"};
- return id==TRACK_NOTE_STOP?"STP":id<TRACK_DRUM_COUNT?names[id]:
-   id<TRACK_DRUM_NOTE_COUNT?user_names[id-BEETLE_ONESHOT_FIRST]:"---";
+ if(id==TRACK_NOTE_STOP)return "STP";
+ if(id<TRACK_DRUM_COUNT)return names[id];
+ if(id>=TRACK_DRUM_NOTE_COUNT)return "---";
+#if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
+ const char *label=beetle_bd4_live_label((uint8_t)(id-BEETLE_ONESHOT_FIRST));
+ if(label)return label;
+#endif
+ return user_names[id-BEETLE_ONESHOT_FIRST];
 }
 static uint32_t rnd(uint32_t *state){uint32_t x=*state;x^=x<<13;x^=x>>17;x^=x<<5;*state=x?x:0x9E3779B9u;return *state;}
 /* Studio-balanced default digital kit. EQ 50 is neutral; 0..100 is a

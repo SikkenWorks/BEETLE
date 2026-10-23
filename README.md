@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.4.24</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.4.25 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
   <br>
   <b>The user sample feature is still experimental!</b>
 </p>
@@ -43,6 +43,16 @@ Read [Global User Samples & Storage V2](#global-user-samples--storage-v2-v1424-e
 
 ---
 
+## New in V1.4.25: Sixteen Punch-In FX & Custom Sample Labels
+
+**PUNCH-IN FX now has two pages with 16 playable white-key effects.** Page 1 retains REPEAT, RING MOD, FILTER, TAPE STOP, STUTTER, OCT UP, OCT DOWN and MUTE. Page 2 adds **SCRATCH, BITCRUSH, PUMP, GLITCH, WOW, PHASER, RADIO and DJ ISOLATOR**. Press **FX** to cycle through Per-Step FX, Punch-In 1/2 and Punch-In 2/2. The display **automatically jumps to the page of the most recently pressed Punch-In key**, regardless of the currently shown page. If that key is released while another remains held, the display switches back to the most recently held effect. Hold a parameterized key and turn **K1** to adjust its live setting. Existing REVERSE is *not* reintroduced: SCRATCH uses bounded bidirectional movement through a short shared audio buffer rather than promising full-length reverse playback.
+
+**GLOBAL SAMPLE LIBRARY labels are now editable in the Project Manager**. Each U01–U13 slot can have its own **three-character tracker label**, such as `KIK`, `SN2` or `!FX`. These labels are saved to `.beetlebank` V2 with backward-compatible loading of V1 banks, and are transferred alongside sample data to compatible Storage V2 firmware. Labels are global, not stored separately in each project; the default labels remain U01–U13. The short name is distinct from the full PC-side WAV filename/sample name. Samples must be uploaded again for edited labels to appear on the FM1.
+
+**Project format:** TRK1 **V25** stores the additional Punch-In parameters and full sixteen-effect event IDs. Supported older projects, including V24, remain readable, but older firmware cannot read newly saved V25 projects. Back up projects before upgrading or downgrading. The updated 32-bit Punch-In interpolation avoids the former 64-bit per-sample multiply without reducing interpolation precision. The existing shared audio history is retained rather than enlarging RAM buffers.
+
+**Development warning:** native compilation and software tests are not physical FM1 performance measurements. Simultaneous heavy FX, user samples, USB multitrack, timing and OTA recovery remain hardware-unverified. Storage V2 migration is destructive and requires independent verified backups.
+
 ## What is BEETLE?
 
 BEETLE turns the **M-VAVE FM1** into a standalone, hands-on music workstation. Compose patterns, play the built-in keyboard, design instruments, program drums, arrange songs and perform with live effects, all using the FM1's own controls.
@@ -56,7 +66,7 @@ BEETLE turns the **M-VAVE FM1** into a standalone, hands-on music workstation. C
 | **User samples** | 13 additional CH6 one-shot slots (U01–U13), shared across projects after Storage V2 migration; experimental |
 | **Sound design** | Eight active synth instrument patches, 12 selectable oscillator types, two VA oscillator modes, plus eight project-local library presets |
 | **Performance** | Mixer, mute/solo, Punch-In FX, snapshots and mute groups |
-| **Projects** | 12 project slots, TRK1 V24 project format, encrypted `.beetle` backups and an optional shared Storage V2 volume |
+| **Projects** | 12 project slots, TRK1 V25 project format, encrypted `.beetle` backups and an optional shared Storage V2 volume |
 
 ## Where to Start
 
@@ -84,7 +94,9 @@ Chapters: Tracker Basics, Pattern Editing, Step Dynamics / Groove, Instrument / 
 
 BEETLE has **14 built-in digital drum sounds** and **13 additional global one-shot slots, U01–U13**, assigned to CH6 drum note IDs **14–26**. The global bank is independent of individual `.beetle` projects: when it is stored on a compatible FM1, the same U-slots are available to all twelve projects. The native playback path uses the existing **six drum voices**, not extra synth voices. Global sample playback requires a **successfully migrated Storage V2 volume**; installing V1.4.24 firmware alone does not activate samples on a legacy A/B volume.
 
-The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html) includes a **GLOBAL SAMPLE LIBRARY**. Open or build a `.beetlebank`, import/replace/delete WAVs in U01–U13, and **SAVE GLOBAL LIBRARY** to keep your original WAV files in a portable computer backup. On a connected Storage V2 FM1, choose **STORE U01–U13 ON FM1** to synchronize the bank. The manager converts device-bound WAVs to BEETLE's **22,050 Hz mono, 4-bit BD4S** format and verifies their transfers. The `.beetlebank` computer-file limit is **not** the FM1's capacity; available sample duration depends on occupied flash space and the twelve projects. A full volume rejects new writes instead of silently replacing saved data.
+The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html) includes a **GLOBAL SAMPLE LIBRARY**. Open or build a `.beetlebank`, import/replace/delete WAVs in U01–U13, and **SAVE GLOBAL LIBRARY** to keep your original WAV files in a portable computer backup. On a connected Storage V2 FM1, choose **UPLOAD PC WAVs · KEEP OTHER FM1 SLOTS** to transfer only the WAV slots you have loaded locally. The manager converts device-bound WAVs to BEETLE's **22,050 Hz mono, 4-bit BD4S** format and verifies their transfers. The `.beetlebank` computer-file limit is **not** the FM1's capacity; available sample duration depends on occupied flash space and the twelve projects. A full volume rejects new writes instead of silently replacing saved data.
+
+**V1.4.25 Project Manager sample-safety update:** On every connection, all 13 FM1 sample slots are scanned read-only. The display distinguishes **STORED ON FM1** from **PC WAV NOT LOADED**, including after reconnecting. Empty PC slots now **preserve existing device samples** rather than deleting them. Only explicitly loaded WAV slots are eligible for upload; any occupied device slot that would be replaced requires separate confirmation. To erase a sample from the FM1, use the individual **DELETE ON FM1** control with backup acknowledgment. If the device scan fails, uploads are blocked. Note that the currently installed native protocol only exposes device occupancy, byte count and CRC/generation: **it cannot download the original WAV or read back its 3-character tracker label**. Keep your `.beetlebank` original backup. The fix changes only browser tools and requires **no firmware reflash**.
 
 ### Migrating an existing FM1 to Storage V2
 
@@ -96,6 +108,12 @@ The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project
 6. Once **STORAGE V2 READY** is confirmed, transfer U01–U13 using **STORE U01–U13 ON FM1**, then select those notes from CH6.
 
 **Important:** V1.4.24's conversion **erases the previous BEETLE-owned project volume** before restoring it and is **not an atomic or power-loss-safe migration**. A failed conversion may leave some or all projects unavailable until restored from the computer backup. Firmware recovery, physical flash/USB behavior and heavy-load DPCM4 sample playback have **not been validated on a real FM1**. See [`docs/V1424-STORAGE-MIGRATION.md`](docs/V1424-STORAGE-MIGRATION.md) and [`docs/V1422-GLOBAL-SAMPLES-NATIVE-RELEASE.md`](docs/V1422-GLOBAL-SAMPLES-NATIVE-RELEASE.md).
+
+### Project-reserved sample capacity meter (V1.4.25 storage-safety variant)
+
+The Project Manager includes an **FM1 SAMPLE SPACE** bar. With firmware supporting the read-only `0x76` capacity command, it shows current compressed sample bytes, an estimate of remaining flash pages usable for samples, plus an explicit **32 KiB (eight-sector) project reserve and 16 KiB (four-sector) recovery guard**. The new firmware refuses a sample upload during preflight if it would violate those limits, before programming flash. This is a *minimum* allowance for future project saving, **not** a guarantee that every full-size future project will always fit: project size, journal generations, fragmentation and flash wear matter.
+
+BEETLE V1.4.24 and earlier V1.4.25 firmware builds lack the read-only capacity command and the new project-reserve enforcement. The Manager labels their available sample capacity **NOT VERIFIED**, rather than inventing a free-space percentage; its existing safe sample inventory and explicit replacements still work. On those older builds, uploading many samples may leave too little space for future project saves. Update firmware only with a tested recovery path; do not interpret successful software builds as validation on a physical FM1. The `.beetlebank` PC-file capacity is distinct from real FM1 flash space.
 
 ## USB-C audio capture: stereo or six-track mode (experimental)
 
@@ -209,20 +227,30 @@ Press **LFO** for the master effects chain. Turn **SELECT** to focus **EQ**, **C
 
 ### Punch-In FX
 
-Press **FX** until **PUNCH-IN FX** is displayed, or use its dedicated FX page to record performance effects with **REC**. Hold one of the eight mapped white keys. For the first five effects, **turn K1 while holding the key** to edit its setting; the last three are direct actions without a K1 parameter. **REC on these FX pages controls Punch-In recording, not Tracker note entry.**
+Press **FX** to move between Per-Step FX, **PUNCH-IN 1/2** and **PUNCH-IN 2/2**. The **first eight white keys** trigger the original effects; the **next eight white keys** trigger the new effects, regardless of which page is visible. Pressing an FX key immediately shows its page. If you hold several, the most recently pressed effect takes display focus; releasing it restores focus to the latest still-held effect. Hold the key and turn **K1** to adjust its setting. **REC on either Punch-In page** arms performance-FX recording independently of Tracker note recording.
 
-| Effect | Behavior |
-| :-- | :-- |
-| **REPEAT** | Loops a short recent audio fragment. K1 adjusts its length. |
-| **RING MOD** | Applies ring modulation to the current mix. K1 adjusts intensity (default 20). |
-| **FILTER** | Applies a live filter. K1 adjusts its setting. |
-| **TAPE STOP** | Slows the audio and drops its pitch. K1 adjusts its setting. |
-| **STUTTER** | Rhythmically gates the mix. K1 chooses a tempo-related rate (default ×1). |
-| **OCT UP** | Temporarily shifts the effect's pitch upward. |
-| **OCT DOWN** | Temporarily shifts the effect's pitch downward. |
-| **MUTE** | Temporarily mutes the output. |
+| Page | Effect | Behavior / K1 parameter |
+| :-- | :-- | :-- |
+| **1/2** | **REPEAT** | Loop captured audio; K1 adjusts fragment length. |
+| **1/2** | **RING MOD** | Ring-modulate the mix; K1 controls intensity. |
+| **1/2** | **FILTER** | Live filter; K1 adjusts frequency/character. |
+| **1/2** | **TAPE STOP** | Slow and pitch-drop a captured fragment; K1 changes the slowdown duration. |
+| **1/2** | **STUTTER** | Rhythmic audio gate; K1 selects the tempo-related rate. |
+| **1/2** | **OCT UP** | Temporary pitch-shift up; no K1 parameter. |
+| **1/2** | **OCT DOWN** | Temporary pitch-shift down; no K1 parameter. |
+| **1/2** | **MUTE** | Temporarily mute the mix; no K1 parameter. |
+| **2/2** | **SCRATCH** | Bidirectional transport of a short frozen audio fragment; K1 changes the scratch movement. Not a long-record scratch. |
+| **2/2** | **BITCRUSH** | Reduce effective PCM bit resolution; K1 adjusts crush depth. |
+| **2/2** | **PUMP** | BPM-linked sidechain-style level modulation; K1 selects rhythmic rate. |
+| **2/2** | **GLITCH** | Jump between short, deterministic fragments of captured audio; K1 adjusts fragment size/chaos. |
+| **2/2** | **WOW** | Tape-like pitch/speed fluctuations; K1 adjusts modulation amount. |
+| **2/2** | **PHASER** | Moving phase/notch-style coloration; K1 adjusts sweep speed. |
+| **2/2** | **RADIO** | Lo-fi radio-like bandwidth and distortion; K1 changes intensity. |
+| **2/2** | **DJ ISOLATOR** | Performance EQ/kill-style filtering; K1 selects frequency emphasis. |
 
-The five adjustable Punch-In settings are saved with the project. With **Punch-In REC** armed and playback running, BEETLE can record held effects and parameter changes for later playback. Leaving the FX page disarms Punch-In capture but does not turn Tracker note recording off.
+**Buffer sharing:** REPEAT, TAPE STOP, SCRATCH and GLITCH use the same bounded frozen audio history. Only one of these snapshot readers can own it at a time; other lightweight effects may be layered where CPU permits. The available snapshot is only approximately **128 ms**. This does not provide full-length audio REVERSE; no such feature is claimed.
+
+All **thirteen adjustable Punch-In settings** (five original and eight new) are saved with the project. With Punch-In REC armed and playback running, BEETLE can record effect holds and parameter changes. Leaving the FX page disarms Punch-In capture without affecting Tracker note recording. Recorded FX IDs and settings are stored using the new V25 project format; older supported projects remain readable.
 
 ### Song Chains
 
@@ -243,9 +271,9 @@ Press **ARP** to arrange patterns into a complete song. A song has up to **64 po
 
 ### Projects and Project Manager
 
-Press **HOME** to access **NEW**, **SAVE**, **SAVE AS**, **LOAD**, **HELP** and other project tools. There are **12 project slots**. A project saves patterns, song arrangements, instruments and library, drums, mixer, effects and performance settings. The current native project schema is **TRK1 V24**. Older supported project versions can be read and, via the Project Manager, explicitly converted with authenticated backup and readback verification. **TRK1 V24 is not the same thing as Storage V2**: the former is a project-file format; the latter is a destructive, opt-in reorganization of the BEETLE flash volume. Older firmware may not open projects newly saved in V24; export copies before downgrading.
+Press **HOME** to access **NEW**, **SAVE**, **SAVE AS**, **LOAD**, **HELP** and other project tools. There are **12 project slots**. A project saves patterns, song arrangements, instruments and library, drums, mixer, effects and performance settings. The current native project schema is **TRK1 V25**. Older supported project versions can be read and, via the Project Manager, explicitly converted with authenticated backup and readback verification. **TRK1 V25 is not the same thing as Storage V2**: the former is a project-file format; the latter is a destructive, opt-in reorganization of the BEETLE flash volume. Older firmware may not open projects newly saved in V25; export copies before downgrading.
 
-The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html) can import/export encrypted `.beetle` projects, inspect the twelve physical slots, convert older project formats to V24, and maintain a separate global `.beetlebank` sample library. Its AES-GCM project-container encryption uses a shared key included in the open-source tools: this protects against casual inspection and detects tampering, **not determined decryption**. Device operations require compatible **Project Transfer** firmware; **Storage V2 conversion and restoration require protocol V5 (V1.4.24)**. All FM1 USB transfer, conversion and sample playback remain hardware-unverified.
+The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html) can import/export encrypted `.beetle` projects, inspect the twelve physical slots, convert older project formats to V25, and maintain a separate global `.beetlebank` sample library. Its AES-GCM project-container encryption uses a shared key included in the open-source tools: this protects against casual inspection and detects tampering, **not determined decryption**. Device operations require compatible **Project Transfer** firmware; **Storage V2 conversion and restoration require protocol V5 (V1.4.24)**. All FM1 USB transfer, conversion and sample playback remain hardware-unverified.
 
 **Storage and firmware safety:** On-device flash capacity is finite; a completely filled 48-pattern project or thirteen long samples may not fit. Storage V2 migration explicitly erases the BEETLE-owned **`0x97000–0xDFFFF`** partition after a verified project backup, then restores projects. It is **not power-loss atomic**, and older ETCH/Felucca user storage within those sectors could be lost. Obtain a verified full-flash backup and a working independent recovery method before destructive storage or firmware updates. The WebInstaller does not make a full device backup, and successful checksums do not guarantee safe boot, DMA behavior, a successful Firmware Hub switch or reliable recovery. BEETLE retains guarded outgoing OTA checks for selected Felucca-family loaders, not unrestricted cross-firmware flashing.
 

@@ -200,7 +200,7 @@ int track_song_record(struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t
  return track_song_record_value(b,pat,step,fx,down,255u);
 }
 uint8_t track_song_effect_parameter(const struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t fx,uint8_t fallback){
- if(!b||pat>=TRACK_PATTERNS||step>=TRACK_STEPS||fx>=5u)return fallback;
+ if(!b||pat>=TRACK_PATTERNS||step>=TRACK_STEPS||fx>=TRACK_PUNCH_COUNT)return fallback;
  const struct track_song_clip *clip=&b->clips[pat];
  int best=-1,best_time=-1;
  for(uint8_t i=0u;i<clip->count;i++){
@@ -215,9 +215,9 @@ uint8_t track_song_effect_parameter(const struct track_song_bank *b,uint8_t pat,
  }
  return best<0?fallback:clip->data[best].param;
 }
-uint8_t track_song_effect_mask_boundary(const struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t allow_wrap){
+uint16_t track_song_effect_mask_boundary(const struct track_song_bank *b,uint8_t pat,uint8_t step,uint8_t allow_wrap){
  if(!b||pat>=TRACK_PATTERNS||step>=TRACK_STEPS)return 0u;
- const struct track_song_clip *clip=&b->clips[pat];uint8_t mask=0u;
+ const struct track_song_clip *clip=&b->clips[pat];uint16_t mask=0u;
  /* Evaluate each Punch lane as a periodic timeline. Record order only wins
   * ties on exactly the same step. This correctly handles a short hit on
   * step 15 whose STP falls on step 00 of the next loop. */
@@ -237,12 +237,12 @@ uint8_t track_song_effect_mask_boundary(const struct track_song_bank *b,uint8_t 
     if((int)ev->step>=best_time){best_time=ev->step;best=i;}
    }
   }
-  if(best>=0&&clip->data[best].down)mask|=(uint8_t)(1u<<fx);
+  if(best>=0&&clip->data[best].down)mask|=(uint16_t)(1u<<fx);
  }
  return mask;
 }
 
-uint8_t track_song_effect_mask(const struct track_song_bank *b,uint8_t pat,uint8_t step){
+uint16_t track_song_effect_mask(const struct track_song_bank *b,uint8_t pat,uint8_t step){
  return track_song_effect_mask_boundary(b,pat,step,1u);
 }
 

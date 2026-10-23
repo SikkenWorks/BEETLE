@@ -168,7 +168,7 @@ static int reserve(struct beetle_v2_writer *w,uint8_t domain,uint32_t n,uint8_t 
 }
 /* Must retain four COMPLETE erased sectors, even when there are spare pages in
  * sectors already containing project/sample records. */
-static int guard(struct beetle_v2_writer *w,uint8_t *page){
+static int guard(struct beetle_v2_writer *w,uint8_t *page,uint8_t domain){
  unsigned remain=0;
  for(unsigned sec=2;sec<NSEC;sec++){
   if(w->domain[sec])continue;
@@ -180,7 +180,11 @@ static int guard(struct beetle_v2_writer *w,uint8_t *page){
   }
   remain+=(unsigned)all;
  }
- return remain>=BEETLE_V2_GUARD_SECTORS?0:-2;
+ /* A sample may not consume the extra blank sectors reserved for project
+  * writes. Project writes still use the original four-sector guard. */
+ const unsigned minimum=BEETLE_V2_GUARD_SECTORS+
+   (domain==2u?BEETLE_V2_PROJECT_RESERVE_SECTORS:0u);
+ return remain>=minimum?0:-2;
 }
 static int write_record(struct beetle_v2_writer *w,uint8_t kind,uint8_t slot,
  uint16_t part,uint32_t gen,const uint8_t *data,uint32_t len,
@@ -241,7 +245,7 @@ int beetle_v2_write_project(struct beetle_v2_writer *w,uint8_t slot,
  uint32_t oldgen=g32(idx+slot_off),gen=oldgen?oldgen+1u:1u;
  uint32_t off;
  rc=reserve(w,1u,len,page,&off);if(rc)return rc;
- rc=guard(w,page);if(rc)return rc;
+ rc=guard(w,page,1u);if(rc)return rc;
  rc=write_record(w,1u,slot,0u,gen,data,len,off,page);if(rc)return rc;
  move_bytes(idx+slot_off+16u,idx+slot_off,16u);
  s32(idx+slot_off,gen);s32(idx+slot_off+4,off);
@@ -274,7 +278,7 @@ int beetle_v2_write_sample(struct beetle_v2_writer *w,uint8_t slot,
   uint32_t n=len-i*MAX_CHUNK;if(n>MAX_CHUNK)n=MAX_CHUNK;
   rc=reserve(w,2u,n,page,&planned[i]);if(rc)return rc;
  }
- rc=guard(w,page);if(rc)return rc;
+ rc=guard(w,page,2u);if(rc)return rc;
  /* Caller data must remain immutable until commit, and no voice can be
   * reading from sectors being reallocated during this transaction. */
  for(uint32_t i=0;i<count;i++){
@@ -327,6 +331,55 @@ int beetle_v2_collect(struct beetle_v2_writer *w,uint8_t *idx,uint8_t *other){
  return count;
 }
 
+
+/* Capacity display: current, verified *active* sample bytes + conservative
+ * physical page budget after keeping a project-save reserve. Historical
+ * generations and dirty/orphan sectors are EXCLUDED from available space. */
+int beetle_v2_get_sample_capacity(struct beetle_v2_writer *w,
+ const uint8_t *newest,uint8_t page[256],
+ struct beetle_v2_sample_capacity *out){
+ if(!w||!newest||!page||!out||!valid(newest))return -3;
+ memset(out,0,sizeof(*out));
+ uint32_t pos=20u+12u*32u;
+ for(unsigned k=0;k<13u;k++){
+  uint32_t len=g32(newest+pos+4u);
+  uint16_t count=g16(newest+pos+12u);
+  if(out->current_sample_bytes>UINT32_MAX-len)return -3;
+  out->current_sample_bytes+=len;
+  pos+=14u+(uint32_t)count*12u;
+ }
+ uint32_t blank_in_sample_sectors=0;
+ uint32_t erased_ownerless=0;
+ for(unsigned sec=2u;sec<NSEC;sec++){
+  if(w->domain[sec]==1u)continue;
+  if(w->domain[sec]==2u){
+   for(unsigned pg=0;pg<16u;pg++){
+    if(w->occupied[sec]&(1u<<pg))continue;
+    int blank=page_blank(w,sec*SECTOR+pg*PAGE,page);
+    if(blank<0)return -1;
+    blank_in_sample_sectors+=(unsigned)blank;
+   }
+  }else{
+   int clean=1;
+   for(unsigned pg=0;pg<16u;pg++){
+    int blank=page_blank(w,sec*SECTOR+pg*PAGE,page);
+    if(blank<0)return -1;
+    if(!blank){clean=0;break;}
+   }
+   erased_ownerless+=(unsigned)clean;
+  }
+ }
+ const uint32_t floor=BEETLE_V2_GUARD_SECTORS+BEETLE_V2_PROJECT_RESERVE_SECTORS;
+ uint32_t spendable=erased_ownerless>floor?erased_ownerless-floor:0u;
+ uint32_t possible_pages=blank_in_sample_sectors+spendable*16u;
+ /* 24-byte header per fragment, page rounding and fragmentation mean this is
+  * an upper-bound estimate, NOT a promise that every file of this size fits. */
+ out->estimated_additional_bytes=possible_pages*BEETLE_V2_PAGE;
+ out->erased_free_sectors=(uint16_t)erased_ownerless;
+ out->sample_blank_pages=(uint16_t)blank_in_sample_sectors;
+ return 0;
+}
+
 /* BEETLE original V1.4.21 streaming sample transaction. Destination sectors
  * and B2SB index capacity are fully checked before any program/erase call. */
 int beetle_v2_sample_upload_begin(struct beetle_v2_writer *w,
@@ -346,7 +399,7 @@ int beetle_v2_sample_upload_begin(struct beetle_v2_writer *w,
   uint32_t n=total-i*MAX_CHUNK;if(n>MAX_CHUNK)n=MAX_CHUNK;
   rc=reserve(w,2u,n,page,&u->destinations[i]);if(rc)return rc;
  }
- rc=guard(w,page);if(rc)return rc;
+ rc=guard(w,page,2u);if(rc)return rc;
  uint32_t oldgen=g32(idx+pos);
  u->generation=oldgen?oldgen+1u:1u;
  if(u->generation==0u)return -3;

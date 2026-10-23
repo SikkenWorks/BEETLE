@@ -23,7 +23,7 @@ int main(void){
  assert(track_extra_effect(track_extra_find(&a.song,0,key,1))==TRACK_FX_VOLUME);
  assert(track_extra_count(&a.song,0,key)==1u);
  uint32_t n=0;assert(track_store_encode(&a,bytes,sizeof(bytes),&n)==0);
- assert(bytes[4]==22u&&n>40u);
+ assert(bytes[4]==TRACK_STORE_VERSION&&n>40u);
  assert(track_store_decode(&b,bytes,n)==0);
  assert(track_extra_find(&b.song,0,key,0)==NULL);
  assert(track_extra_effect(track_extra_find(&b.song,0,key,1))==TRACK_FX_VOLUME);
@@ -54,5 +54,5 @@ int main(void){
  assert(a.song.extras.count==48);
  assert(track_extra_add(&a.song,3u,track_extra_key(0,0,0),1,2,50)==-1);
  assert(track_extra_add(&a.song,0,key,1,2,50)==0);
- puts("PASS V1.3.5 native: independent FX slots, V22 encode/decode, DSP FX3 without FX1, pool limit");
+ puts("PASS V1.3.5 native: independent FX slots, current-schema encode/decode, DSP FX3 without FX1, pool limit");
 }

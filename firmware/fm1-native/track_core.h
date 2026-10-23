@@ -19,7 +19,7 @@
 #define TRACK_NOTE_EMPTY 255u
 #define TRACK_FX_VOLUME 10u
 #define TRACK_CHORD_COUNT 12u
-#define TRACK_PUNCH_COUNT 8u
+#define TRACK_PUNCH_COUNT 16u
 /* Sparse pattern backing store: an inactive pattern may be loaded on demand. */
 /* A 5-byte packed step: 8 NOTE + 3 INST + 4 CHORD + 4 FX + 7 VALUE
  * + 8 dynamics bits. Keeps the 48-pattern bank the SAME RAM size.
@@ -64,7 +64,7 @@ static inline uint8_t track_extra_key(uint8_t lane,uint8_t row,uint8_t note2){
 }
 struct track_harmony {uint8_t root,mode,keylock;};
 struct track_transport {uint16_t bpm;uint8_t playing,play_step,edit_step,edit_column,edit_channel,stop_step;uint32_t tick_remainder;};
-struct track_engine {struct track_pattern active;struct track_harmony harmony;struct track_transport transport;uint8_t project_slot,pattern_slot,record_armed,punch_mask,dirty;};
+struct track_engine {struct track_pattern active;struct track_harmony harmony;struct track_transport transport;uint8_t project_slot,pattern_slot,record_armed,dirty;uint16_t punch_mask;};
 /* MIDI 0..127 notes, 254 STP and 255 ---; no sentinels ever reach DSP pitch arrays. */
 uint8_t track_note_scroll(uint8_t value,int32_t detents,uint8_t drum);
 /* LOCK scrolls only through the selected scale; OFF/GUIDE preserve chromatic editing. */
