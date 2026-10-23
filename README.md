@@ -24,6 +24,25 @@
 
 ---
 
+<h2 align="center">USB MULTITRACK RECORDING + USER SAMPLES</h2>
+<p align="center">
+  <strong>Record BEETLE's six channels separately over USB-C, and play your own samples directly on the FM1.</strong><br>
+  <sub>Both features are experimental and have not been fully validated on physical FM1 hardware.</sub>
+</p>
+
+| | |
+| :-- | :-- |
+| **6-track USB recording** | **Six independent mono tracks**, CH1–CH6, at **44.1 kHz / 16-bit** into a DAW. Enable **HOME → PROJECTS → SETTINGS → USB MULTITRACK → ON**. The stems are recorded before global MASTER and Punch-In FX, without mixer pan; switching OFF records the processed stereo master instead. |
+| **13 global user samples** | Import your own WAV one-shots into **U01–U13** with the [Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html). These samples are shared by **all 12 projects** and supplement the 14 factory drum sounds. Requires **Storage V2** migration. |
+| **Total sample duration** | **Approximately 10–20 seconds combined across all 13 slots** is the design target, **not 10–20 seconds per sample or a fixed guaranteed limit**. Small projects may leave room for around 20 seconds (sometimes more); large projects can leave substantially less, or no safe space for new samples. |
+| **What determines the limit?** | The **288 KiB** FM1 volume is shared between the **12 saved projects** and global samples. Project sizes and compression, existing sample data, previous record generations, sector fragmentation, metadata and the mandatory free-space safety reserve all affect the amount available. |
+
+**For scale:** BEETLE converts device samples to **22,050 Hz mono, 4-bit BD4S**. About **10 seconds need 114 KB** and **20 seconds need 227 KB**, before additional storage overhead. In software storage tests, a roughly 20-second combined sample bank fits alongside one larger and eleven smaller projects, but **20 seconds does not fit with twelve maximum-size projects**. The Project Manager / device storage checks determine what can actually be stored and refuse uploads that would compromise existing data.
+
+Read [Global User Samples & Storage V2](#global-user-samples--storage-v2-v1424-experimental) and [USB-C audio capture](#usb-c-audio-capture-stereo-or-six-track-mode-experimental) for setup, limitations and safety information.
+
+---
+
 ## What is BEETLE?
 
 BEETLE turns the **M-VAVE FM1** into a standalone, hands-on music workstation. Compose patterns, play the built-in keyboard, design instruments, program drums, arrange songs and perform with live effects, all using the FM1's own controls.
