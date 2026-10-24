@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.4.27 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.4.28 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
   <br>
   <b>The user sample feature is still experimental!</b>
 </p>
@@ -42,6 +42,14 @@
 Read [Global User Samples & Storage V2](#global-user-samples--storage-v2-v1424-experimental) and [USB-C audio capture](#usb-c-audio-capture-stereo-or-six-track-mode-experimental) for setup, limitations and safety information.
 
 ---
+
+## New in V1.4.28: User-Sample Streaming Optimization
+
+**Faster, lower-overhead global user-sample playback.** The native 22,050 Hz BD4S streamer now reuses the source sample pair across each two 44,100 Hz output frames instead of repeating PCM-window searches on both frames. Full 256-frame encoded blocks are obtained with a single bounded background flash read, instead of a separate six-byte header read and second full-block fetch. Short final blocks remain bounds-checked. The six-channel drum mixer also bypasses unnecessary factory-ROM 64-bit interpolation for global user samples, which are already resampled in the BD4S engine.
+
+**No new sample storage format, no new flash partition, no extra drum voices, and no changes to user sample labels or NOTE2 mapping.** All 13 global user samples, six drum voices, Punch-In FX, USB stereo/multitrack, Storage V2 safety margins and project schema **TRK1 V25** are preserved. Existing `.beetlebank` and `.beetle` files remain in their existing formats.
+
+**Software validation:** 64 consecutive pattern-loop retriggers across six independent sample voices, exact PCM comparison, long six-voice playback, underrun/recovery tests, and live Storage V2 stream tests pass on the host. The native JieLi/USB/Storage V2 build and firmware packaging have passed software checks. **This does not yet demonstrate that physical FM1 looping glitches, CPU/DMA overload or USB recording issues have been resolved**; test on real hardware with backed-up projects and a known-working recovery path.
 
 ## New in V1.4.27: CRY, Audible BITCRUSH & RADIO Low-Cut
 
@@ -72,6 +80,8 @@ Read [Global User Samples & Storage V2](#global-user-samples--storage-v2-v1424-e
 **Project format:** TRK1 **V25** stores the additional Punch-In parameters and full sixteen-effect event IDs. Supported older projects, including V24, remain readable, but older firmware cannot read newly saved V25 projects. Back up projects before upgrading or downgrading. The updated 32-bit Punch-In interpolation avoids the former 64-bit per-sample multiply without reducing interpolation precision. The existing shared audio history is retained rather than enlarging RAM buffers.
 
 **Development warning:** native compilation and software tests are not physical FM1 performance measurements. Simultaneous heavy FX, user samples, USB multitrack, timing and OTA recovery remain hardware-unverified. Storage V2 migration is destructive and requires independent verified backups.
+
+**V1.4.29 RETRO PULSE sustain correction (source patch):** Removed the 4-bit quantization of the ADSR envelope, which could cause audible stepped amplitude during sustained notes. The original eight-step Game Boy-style duty oscillator is preserved, but its known duty cycle is now centered directly instead of relying on a slow DC tracking filter. A small voice-local smoothing stage reduces high-frequency edge harshness without allocating any new audio buffer. An automated host PCM test confirms stable voice identity, sustained output, negligible DC and note-off release. Physical FM1 listening and timing tests are still required. **No new flashable firmware has been validated in this source-only build.**
 
 ## What is BEETLE?
 

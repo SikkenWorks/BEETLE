@@ -1,3 +1,20 @@
+## V1.4.29 — RETRO PULSE sustain/DC correction (source-only candidate)
+
+- Removed 4-bit amplitude stepping from the ADSR that could sound like retriggers during sustain/decay/release. Preserved the DMG eight-step duty waveform.
+- Centered the duty waveform by its exact high-time fraction, avoiding the old slow per-voice DC correction that could contribute a low-frequency residual.
+- Reused existing per-voice DSP state, no additional audio buffers, unchanged project format or stored patches.
+- Host regression `tests/track/test_v1429_retro_sustain.c` verifies no new note-on serial, stable sustain, DC < 5% of absolute amplitude, and full release.
+- **Build packaging pending:** a new physical-device-flashable `.fwsc` for this change is not verified. Old V1.4.28 firmware must not be relabelled as V1.4.29.
+
+## V1.4.28 — Global User-Sample Streaming & Loop Optimization (experimental)
+
+- BD4S interpolator caches the pair of 22.05 kHz source samples for each 44.1 kHz even/odd output pair, removing redundant per-frame two-window scans while retaining sample-exact output and bounded underrun recovery.
+- Full 256-frame BD4S blocks are read in one 134-byte background flash transaction; short/tail blocks remain bounds checked with a two-stage fallback. No flash I/O or decoding is added to the audio interrupt.
+- Global user-sample drum voices bypass the unrelated factory-ROM 64-bit interpolator; legacy drums still use their original resampling behavior.
+- Added 64-loop x six-voice retrigger stress test with PCM-exact output, no render-time flash reads and zero host underruns, along with preexisting Storage V2 40,000-frame live-decode tests.
+- Project TRK1 V25, global BD4S sample format, labels, NOTE2, Punch-In FX, Storage V2 project reserve and protected OTA assets retained. FM1 hardware stress/OTA verification still outstanding.
+- **Release hygiene:** obsolete generated binaries, prior-version duplicate HTML/README files, build directories, bytecode and Git object history are excluded from the release ZIP; functional source, web tools, tests, licenses, references and documentation are retained.
+
 ### V1.4.27 — Punch-In BITCRUSH/RADIO DSP & CRY Renaming (experimental)
 
 - Renamed Punch-In FX 09 from SCRATCH to **CRY**, including native UI, Punch-In event editor, simulator and README. FX ID 8 (zero-based) and project schema **V25** remain unchanged.

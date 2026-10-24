@@ -264,14 +264,22 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
     * offset lookup or two function-level branch ladders per active voice/sample.
     * The second fetch past the final ROM frame must still decode to ZERO. */
    const uint8_t *rom=v->id<16u?beetle_drum_rom+beetle_drum_offsets[rom_index[v->id]]:0;
-   const int32_t one=v->id>=32u?0:rom?beetle_ulaw_decode[rom[idx]]:
-          get_pcm(v->id,idx,d->oneshots,v->oneshot_offset);
-   const int32_t two=v->id>=32u?0:rom?(idx+1u<voice_frames[i]?beetle_ulaw_decode[rom[idx+1u]]:0):
-          get_pcm(v->id,idx+1u,d->oneshots,v->oneshot_offset);
-   int32_t wave=one+(int32_t)(((int64_t)(two-one)*frac)>>16u);
+   int32_t wave;
 #if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
-   if(v->id>=32u)wave=streamed;
+   if(v->id>=32u){
+    /* BD4S playback is already fully resampled to 44.1 kHz by its own
+     * RAM-only decoder. Skip the unrelated factory-ROM 64-bit interpolation
+     * entirely for global user samples (six voices x every audio frame). */
+    wave=streamed;
+   }else
 #endif
+   {
+    const int32_t one=rom?beetle_ulaw_decode[rom[idx]]:
+         get_pcm(v->id,idx,d->oneshots,v->oneshot_offset);
+    const int32_t two=rom?(idx+1u<voice_frames[i]?beetle_ulaw_decode[rom[idx+1u]]:0):
+         get_pcm(v->id,idx+1u,d->oneshots,v->oneshot_offset);
+    wave=one+(int32_t)(((int64_t)(two-one)*frac)>>16u);
+   }
    /* Real 3-band sample EQ (low/mid/high); all voice state is independent. */
    v->noise_lp+= (wave-v->noise_lp)>>5u; /* approx 220 Hz */
    v->noise_lp2+=(wave-v->noise_lp2)>>2u;/* approx 2 kHz */

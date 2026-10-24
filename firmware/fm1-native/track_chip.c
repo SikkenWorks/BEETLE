@@ -460,37 +460,20 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   else v->envelope-=v->release_rate;
  }
  if(v->type==TRACK_CHIP_RETRO_PULSE){
-  /* DMG 4-bit channel DAC and AC-coupled analog output. Quantizing the
-   * existing ADSR to 16 discrete steps gives the characteristic coarse
-   * volume changes without adding a second RAM envelope or breaking
-   * existing saved patches. Filter state is voice-local, bounded and
-   * updated once per sample, including during note release. */
-  uint32_t env4=(v->envelope*15u+524288u)>>20u;
-  if(env4>15u)env4=15u;
-  int32_t discrete=(int32_t)env4*1370;
-  int32_t amplitude=discrete;
-  if(v->env_stage==3u){
-   /* During release, 16 discrete gain steps produce audible low-rate
-    * amplitude zippering (the reported buzzy tail). Preserve the original
-    * DMG duty oscillator and sustained DAC level, but crossfade for 128
-    * samples into a smooth release envelope. Uses only bounded 32-bit math. */
-   uint32_t fade=v->release_left;
-   if(fade<128u){fade++;v->release_left=(uint16_t)fade;}
-   int32_t smooth=(int32_t)((((v->envelope>>8u)*20550u)+2048u)>>12u);
-   amplitude=(discrete*(int32_t)(128u-fade)+smooth*(int32_t)fade+64)>>7u;
-  }
-  int32_t dac=level?amplitude:0;
-  v->lowpass+=(dac-v->lowpass)>>8u;
-  /* DMG headphone output: AC coupling, a slightly dark single-pole
-   * analogue roll-off and smooth saturation. This is intentionally a
-   * different timbre from the open/bipolar NES PULSE implementation. */
-  int32_t ac=dac-v->lowpass;
-  v->sid_bandpass+=(ac-v->sid_bandpass)>>2u;
-  int32_t shaped=(v->sid_bandpass*3+ac)/4;
-  /* 4-bit headphone DAC clips asymmetrically before a modest gain lift. */
-  if(shaped>14500)shaped=14500+(shaped-14500)/4;
-  if(shaped< -14500)shaped=-14500+(shaped+14500)/4;
-  level=shaped*2;
+  /* V1.4.29: The old 4-bit envelope quantized a *continuous* ADSR every
+   * sample, introducing audible volume retriggers/zipper during decay and
+   * release. A slow AC-coupling integrator also tracked the pulsetrain and
+   * could create low-frequency modulation. Keep the genuine DMG 8-step
+   * duty waveform, but center its known duty cycle analytically so there
+   * is no sustained DC or moving servo. Use the original smooth ADSR. */
+  static const uint8_t duty_high[4]={1u,2u,4u,6u};
+  const uint8_t duty=(uint8_t)(s->duty[v->channel]&3u);
+  const int32_t centered=(level?8:0)-(int32_t)duty_high[duty];
+  /* One-pole gentle output smoothing; voice-local state, no RAM addition.
+   * Signed shift avoided for portable arithmetic on negative values. */
+  const int32_t raw=centered*3200;
+  v->sid_bandpass+=(raw-v->sid_bandpass)/4;
+  level=(int32_t)(((int64_t)v->sid_bandpass*v->envelope)>>20u);
  }else level=(int32_t)(((int64_t)level*v->envelope)>>20u);
  /* Normalize intrinsic waveform loudness before lane gain and effects.
   * Never normalize based on live RMS (which would flatten performance). */
