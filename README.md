@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.4.28 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.4.30 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
   <br>
   <b>The user sample feature is still experimental!</b>
 </p>
@@ -42,6 +42,16 @@
 Read [Global User Samples & Storage V2](#global-user-samples--storage-v2-v1424-experimental) and [USB-C audio capture](#usb-c-audio-capture-stereo-or-six-track-mode-experimental) for setup, limitations and safety information.
 
 ---
+
+## New in V1.4.30: SID Character & Boot Keyboard Isolation
+
+**SID 6581 / SID 8580:** separate 17-point ROM cutoff curves, safer 32-bit fixed-point filter processing (three former 64-bit multiplications per SID sample removed), and **two independently running A/B oscillator phases**. This adds useful tonal and filter differences while keeping the existing eight shared synthvoices and project file format **TRK1 V25**.
+
+In **EDIT → OSC → Bank 3**, SID patches now reuse three previously SID-inactive parameters: **HARD SYNC** (the former SUB OSC knob), **RING MOD** (formerly NOISE, active when oscillator A is TRIANGLE), and **COMBINE** (formerly FM DEPTH, 0–100%). COMBINE blends a SID-inspired masked A/B waveform with the normal linear mix. All default to OFF on unchanged presets. These are lightweight **SID-inspired models**, not a cycle-accurate original MOS 6581/8580 or reSID. The browser simulator only approximates the native audio implementation.
+
+**Boot project keyboard fix:** musical key presses while **NEW PROJECT / LOAD PROJECT** and related modal confirmation/loading screens are open are discarded; keys held across the exit are ignored until released. They can no longer unexpectedly insert notes or trigger SEQ musical-key shortcuts on returning to the tracker. Freshly pressed keys in the tracker still work normally.
+
+**Compatibility & safety:** existing projects, the instrument library, 13 global user-sample slots, NOTE2, Punch-In FX, USB capture, sample capacity protections, and retained OTA loader/header are unchanged. The new SID filter curves intentionally change the audio timbre of existing SID patches. JieLi builds and host tests are software-only; hardware stability and OTA recovery remain unverified. Make independent project/sample backups and confirm a working recovery path before flashing experimental firmware.
 
 ## New in V1.4.28: User-Sample Streaming Optimization
 

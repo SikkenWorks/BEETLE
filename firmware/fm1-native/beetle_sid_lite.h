@@ -64,21 +64,32 @@ struct beetle_sid_prepared {
  uint8_t mix;
  uint16_t threshold_a,threshold_b;
  int32_t filter_coefficient,damping;
+ uint8_t combine,sync,ring;
 };
 static inline struct beetle_sid_prepared beetle_sid_prepare(uint8_t chip,
  uint8_t wave_a,uint8_t wave_b,uint8_t width_a,uint8_t width_b,
- uint8_t mix,uint8_t filter_cut,uint8_t resonance,uint8_t filter_mode){
+ uint8_t mix,uint8_t filter_cut,uint8_t resonance,uint8_t filter_mode,
+ uint8_t combine,uint8_t sync,uint8_t ring){
  struct beetle_sid_prepared x;
  x.shape_a=wave_a;x.shape_b=wave_b;x.chip=chip;x.mode=filter_mode;
- x.mix=mix;x.threshold_a=(uint16_t)((uint32_t)width_a*4095u/100u);
+ x.mix=mix;x.combine=combine;x.sync=sync;x.ring=ring;x.threshold_a=(uint16_t)((uint32_t)width_a*4095u/100u);
  x.threshold_b=(uint16_t)((uint32_t)width_b*4095u/100u);
  x.is8580=(uint8_t)(chip==BEETLE_SID_8580||chip==BEETLE_SID_NOISE);
- x.filter_coefficient=x.is8580 ? 12+(int32_t)filter_cut*84/125
-                      : 9+(int32_t)filter_cut*(int32_t)filter_cut*31/10000;
- if(x.filter_coefficient>124)x.filter_coefficient=124;
- x.damping=x.is8580 ? 227-(int32_t)resonance*152/100
-                      : 204-(int32_t)resonance*119/100;
- if(x.damping<74)x.damping=74;
+ /* 17-point ROM-only cutoff curves; precomputed ONCE per voice/chunk.
+  * The 6581 has a low-cutoff plateau and rises later, while the 8580
+  * tracks much more evenly. Approximation, not a calibration claim. */
+ static const uint8_t curve6581[17]={5,6,7,8,10,12,16,21,28,37,47,56,65,75,85,94,102};
+ static const uint8_t curve8580[17]={7,12,17,22,27,32,37,42,47,53,59,65,71,78,86,95,105};
+ const uint8_t *curve=x.is8580?curve8580:curve6581;
+ if(filter_cut>100u)filter_cut=100u;
+ uint32_t idx=(uint32_t)filter_cut*16u;
+ uint32_t cell=idx/100u,frac=idx%100u;
+ x.filter_coefficient=(int32_t)curve[cell];
+ if(cell<16u)x.filter_coefficient+=(int32_t)(((uint32_t)(curve[cell+1u]-curve[cell])*frac+50u)/100u);
+ /* Q8 feedback: bounded at maximum resonance on both chip families. */
+ x.damping=x.is8580 ? 228-(int32_t)resonance*135/100
+                       : 212-(int32_t)resonance*128/100;
+ if(x.damping<80)x.damping=80;
  return x;
 }
 static inline int32_t beetle_sid_cached_wave(uint8_t shape,uint32_t phase,
@@ -87,7 +98,7 @@ static inline int32_t beetle_sid_cached_wave(uint8_t shape,uint32_t phase,
  return beetle_sid_wave(shape,phase,0u,noise);
 }
 static inline int32_t beetle_sid_sample_prepared(const struct beetle_sid_prepared *x,
- uint32_t phase,uint32_t step,uint32_t *lfsr,int32_t *lp,int32_t *bp){
+ uint32_t phase,uint32_t step,uint32_t phase_b,uint32_t *lfsr,int32_t *lp,int32_t *bp){
  uint32_t last=phase-step;
  if(((last^phase)&phase&(1u<<27u))!=0u){
   uint32_t fb=((*lfsr>>22u)^(*lfsr>>17u))&1u;
@@ -95,15 +106,35 @@ static inline int32_t beetle_sid_sample_prepared(const struct beetle_sid_prepare
   if(!*lfsr)*lfsr=0x7ffff8u;
  }
  int32_t a=beetle_sid_cached_wave(x->shape_a,phase,x->threshold_a,*lfsr);
- int32_t b=beetle_sid_cached_wave(x->shape_b,phase,x->threshold_b,*lfsr);
- int32_t input=((a*(100-(int32_t)x->mix)+b*(int32_t)x->mix)/100-2048)*6;
+ int32_t b=beetle_sid_cached_wave(x->shape_b,phase_b,x->threshold_b,*lfsr);
+ /* On SID, oscillator B genuinely has its own phase and pitch. The optional
+  * combined DAC is a masked nonlinear approximation for SAW/TRI/PULSE;
+  * drive the existing (formerly unused SID) FM DEPTH knob as COMBINE.
+  * Default 0 keeps legacy patches' linear oscillator mix. */
+ int32_t base=(a*(100-(int32_t)x->mix)+b*(int32_t)x->mix)/100;
+ if(x->ring && x->shape_a==1u){
+  /* Ring modulation of a triangle by oscillator B's high phase bit. */
+  if(phase_b&0x80000000u)a=4095-a;
+  base=(a*(100-(int32_t)x->mix)+b*(int32_t)x->mix)/100;
+ }
+ if(x->combine && x->shape_a!=3u && x->shape_b!=3u){
+  int32_t combined=a&b;
+  /* Combined waves tend to lose amplitude in real SID DACs. Recenter
+   * their output before interpolation to avoid a huge DC step. */
+  combined=beetle_sid_clamp((combined-1024)*2+2048,4095);
+  if(combined<0)combined=0;
+  base=(base*(100-(int32_t)x->combine)+combined*(int32_t)x->combine)/100;
+ }
+ int32_t input=(base-2048)*6;
  if(!x->is8580)input=beetle_sid_6581_nonlinear(input);
  int32_t f=x->filter_coefficient,damping=x->damping;
- int32_t hi=input-*lp-(int32_t)(((int64_t)*bp*damping)>>8u);
+ /* Exact max products: 28000*228 = 6,384,000 and 28000*105 =
+  * 2,940,000, both far below INT32_MAX. No int64 multiply in the ISR. */
+ int32_t hi=input-*lp-((*bp*damping)>>8u);
  hi=beetle_sid_clamp(hi,28000);
- int32_t next_bp=*bp+(int32_t)(((int64_t)hi*f)>>8u);
+ int32_t next_bp=*bp+((hi*f)>>8u);
  next_bp=beetle_sid_clamp(next_bp,28000);
- int32_t next_lp=*lp+(int32_t)(((int64_t)next_bp*f)>>8u);
+ int32_t next_lp=*lp+((next_bp*f)>>8u);
  next_lp=beetle_sid_clamp(next_lp,28000);
  *lp=next_lp;*bp=next_bp;
  int32_t output=x->mode<34u?next_lp:(x->mode<67u?next_bp:input-next_lp);
@@ -113,42 +144,8 @@ static inline int32_t beetle_sid_sample_prepared(const struct beetle_sid_prepare
 static inline int32_t beetle_sid_sample(uint8_t chip,uint32_t phase,uint32_t step,uint32_t *lfsr,
  int32_t *lp,int32_t *bp,uint8_t wave_a,uint8_t wave_b,uint8_t width,
  uint8_t width_b,uint8_t mix,uint8_t filter_cut,uint8_t resonance,uint8_t filter_mode){
- uint32_t last=phase-step;
- if(((last^phase)&phase&(1u<<27u))!=0u){
-  uint32_t fb=((*lfsr>>22u)^(*lfsr>>17u))&1u;
-  *lfsr=((*lfsr<<1u)|fb)&0x7fffffu;
-  if(!*lfsr)*lfsr=0x7ffff8u;
- }
- int32_t a=beetle_sid_wave(wave_a,phase,width,*lfsr);
- int32_t b=beetle_sid_wave(wave_b,phase,width_b,*lfsr);
- int32_t input=((a*(100-(int32_t)mix)+b*(int32_t)mix)/100-2048)*6;
- const uint8_t is8580=(chip==BEETLE_SID_8580||chip==BEETLE_SID_NOISE);
- if(!is8580) input=beetle_sid_6581_nonlinear(input);
- /* 6581: distinctly non-linear cutoff, darker at mid-settings; 8580:
-  * smooth, near-linear cutoff and cleaner resonance. Bound Q8 integrator
-  * coefficient below 128 at the maximum UI cutoff. */
- int32_t f=is8580 ? 12+(int32_t)filter_cut*84/125
-                   : 9+(int32_t)filter_cut*(int32_t)filter_cut*31/10000;
- if(f>124)f=124;
- int32_t damping=is8580 ? 227-(int32_t)resonance*152/100
-                        : 204-(int32_t)resonance*119/100;
- /* Keep the feedback bounded even with pathological knob positions. */
- if(damping<74)damping=74;
- int32_t hi=input-*lp-(int32_t)(((int64_t)*bp*damping)>>8u);
- hi=beetle_sid_clamp(hi,28000);
- int32_t next_bp=*bp+(int32_t)(((int64_t)hi*f)>>8u);
- next_bp=beetle_sid_clamp(next_bp,28000);
- int32_t next_lp=*lp+(int32_t)(((int64_t)next_bp*f)>>8u);
- next_lp=beetle_sid_clamp(next_lp,28000);
- *lp=next_lp;*bp=next_bp;
- int32_t output=filter_mode<34u?next_lp:(filter_mode<67u?next_bp:input-next_lp);
- /* Output coloration changes timbre, not merely loudness. 6581 asymmetry
-  * survives filtering; 8580 remains free of this additional saturation. */
- if(!is8580){
-  /* Compensate ~1.2 dB attenuation from the 6581 nonlinear stages so that
-   * a character change is not mistaken for a simple level change. */
-  output=(beetle_sid_6581_nonlinear(output)*115)/100;
- }
- return beetle_sid_clamp(output,16000);
+ struct beetle_sid_prepared x=beetle_sid_prepare(chip,wave_a,wave_b,width,width_b,
+                                                mix,filter_cut,resonance,filter_mode,0u,0u,0u);
+ return beetle_sid_sample_prepared(&x,phase,step,phase,lfsr,lp,bp);
 }
 #endif

@@ -391,8 +391,13 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
  }break;
  case TRACK_CHIP_SID_6581: case TRACK_CHIP_SID_8580:
  case TRACK_CHIP_SID_DIRTY: case TRACK_CHIP_SID_BASS: case TRACK_CHIP_SID_NOISE:{
+  /* The B oscillator is independent; no additional voice/RAM is needed. */
+  v->phase2+=step2;
+  /* SID hard sync: reset oscillator B on master A accumulator wrap.
+   * Disabled by default. Uses the existing SUB control in SID mode. */
+  if(sid_cfg->sync && v->phase<step)v->phase2=0u;
   uint8_t style=v->type;
-  level=beetle_sid_sample_prepared(sid_cfg,v->phase,step,&v->lfsr,
+  level=beetle_sid_sample_prepared(sid_cfg,v->phase,step,v->phase2,&v->lfsr,
                                   &v->lowpass,&v->sid_bandpass);
   /* Soft 6581-style asymmetric saturation. Character variations remain
    * bounded to avoid feeding huge peaks into MASTER dynamics. */
@@ -574,7 +579,7 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
   if(style==TRACK_CHIP_SID_BASS){wa=1u;wb=2u;mode=14u;cut=(uint8_t)(cut/2u+8u);}
   if(style==TRACK_CHIP_SID_NOISE){wa=3u;wb=2u;mix=20u;mode=80u;}
   sid_cache[vi]=beetle_sid_prepare(style,wa,wb,p->pulse_width,p->pulse_width_b,
-                                   mix,cut,reso,mode);
+                                   mix,cut,reso,mode,p->fm_depth,p->sub,p->noise);
  }
  /* The ISR owns these controls until this render chunk completes. The
   * LFO rate never needs to be re-decoded five times per audio sample. */

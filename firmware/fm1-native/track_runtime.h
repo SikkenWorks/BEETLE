@@ -33,6 +33,7 @@
 #include "beetle_reverse_key.h"
 #include "beetle_led_ripple.h"
 #include "track_drum.h"
+#include "beetle_menu_note_fence.h"
 #if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
 #include "beetle_bd4_live.h"
 #endif
@@ -50,6 +51,7 @@
 #include "beetle_help.h"
 #include "beetle_pattern_length_shortcut.h"
 #include "beetle_input_safety.h"
+#include "beetle_menu_note_fence.h"
 #include "beetle_punch_timing.h"
 #include "beetle_playhead_update.h"
 /* RC: relocate only the always-initialized sequencer state from the
@@ -235,6 +237,8 @@ static uint8_t track_dyn_focus; /* velocity=0, gate=1 */
 static uint8_t track_swing_pending_mask;
 static uint32_t track_swing_pending_at[TRACK_CHANNELS];
 static uint32_t track_boot_input_unlock_ms,track_last_encoder_ms;
+/* Menu key-downs are NEVER tracker key-downs, even if held across LOAD/NEW. */
+static uint32_t track_menu_note_blocked;
 static uint8_t track_last_encoder_id;
 static int32_t track_last_encoder_delta;
 static uint32_t track_recovered_state_faults;
@@ -899,7 +903,7 @@ static void track_fm1_boot(void){
  beetle_live_oneshots=beetle_staged.oneshots;
  track_drum_bind_oneshots(&track_drum,&beetle_live_oneshots);
 #endif
- track_old_note_mask=0;track_page=29u;track_boot_menu_choice=0u;track_load_from_boot=0u;track_save_return_page=0u;track_new_project_full=0u;track_preset_focus_valid=0u;track_rc_tab=0u;track_named=0u;
+ track_menu_note_blocked=0u;track_old_note_mask=0;track_page=29u;track_boot_menu_choice=0u;track_load_from_boot=0u;track_save_return_page=0u;track_new_project_full=0u;track_preset_focus_valid=0u;track_rc_tab=0u;track_named=0u;
  track_last_encoder_ms=0u;track_last_encoder_id=0u;track_last_encoder_delta=0;track_recovered_state_faults=0u;
  track_live_punch_mask=0u;track_replay_punch_mask=0u;track_punch_focus=255u;track_punch_held_count=0u;track_seq_since=0u;track_seq_fired=0u; /* lane clipboard persists after SEQ release */
  track_last_poll=0u;track_last_paint=0u;track_boot_input_unlock_ms=etch_ms+550u;track_home_since=0u;track_home_fired=0u;track_song_follow_active=0u;track_song_preplay_row=0u;
@@ -2123,7 +2127,7 @@ static void track_fm1_paint(void){
    static const char *const sidwaves[]={"SAW","TRIANGLE","PULSE","NOISE","PULSE"};
    static const char *const tuning[]={"SHAPE","COARSE","FINE","PWIDTH"};
    static const char *const combining[]={"DETUNE B","MIX A/B","MORPH","DRIVE","SUB OSC","NOISE","FM DEPTH"};
-   static const char *const sidcombine[]={"DETUNE B","MIX A/B","FILT MODE","RESONANCE","SUB OSC","NOISE","FM DEPTH"};
+   static const char *const sidcombine[]={"DETUNE B","MIX A/B","FILT MODE","RESONANCE","HARD SYNC","RING MOD","COMBINE"};
    const struct track_step *st=&track_state.active.ch[track_state.transport.edit_channel][track_state.transport.edit_step];
    const struct track_va_patch *p=&track_chip.patches[track_input_instrument[track_state.transport.edit_channel]&7u];
    const uint8_t sid_mode=(uint8_t)(track_chip.osc_type[track_input_instrument[track_state.transport.edit_channel]&7u]>=TRACK_CHIP_RESID_LITE && track_chip.osc_type[track_input_instrument[track_state.transport.edit_channel]&7u]<=TRACK_CHIP_SID_NOISE);
@@ -2722,6 +2726,12 @@ static void beetle_project_load_selected(void){
 /* Same translation unit: completed by beetle_sample_transfer.inc below. */
 static uint8_t beetle_sample_xfer_active;
 #endif
+/* The FM1 HAL queues note-on edges until explicitly consumed. Project
+ * dialogs have no musical keyboard and must fence held keys across the
+ * transition to the tracker, including a slow synchronous flash LOAD. */
+static inline uint32_t track_menu_fenced_edges(uint32_t edges,uint32_t held){
+ return beetle_menu_note_filter(&track_menu_note_blocked,held,edges);
+}
 static void track_fm1_poll(void){
 #if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
  /* Must run before the 18ms UI rate-limit; bounded background prefetch. */
@@ -2738,6 +2748,13 @@ static void track_fm1_poll(void){
  uint32_t now=etch_ms;
  if(now-track_last_poll<18u)return;
  track_last_poll=now;
+ /* NEW/LOAD and the project confirmation pages are non-musical. Drain the
+  * HAL event queue on EACH poll, and remember held keys until key-up. */
+ if(input_entry_page==29u || input_entry_page==14u || input_entry_page==13u ||
+    input_entry_page==15u || input_entry_page==18u){
+  beetle_menu_note_capture(&track_menu_note_blocked,fm1_in.notes);
+  (void)fm1_input_note_edges();
+ }
  uint32_t buttons=fm1_in.buttons, released=0;
  uint32_t pressed=fm1_input_edges(&released);
  int32_t k1=fm1_enc_take(2),k2=fm1_enc_take(3);
@@ -3603,6 +3620,7 @@ static void track_fm1_poll(void){
   track_scroll_preview_active=0u;fm1_irq_enable_all();
  }
  if(track_page==0u){
+   track_menu_note_blocked &= fm1_in.notes;
    if((pressed&(1u<<3)) && track_page==0u && !track_state.transport.playing){
     beetle_sel_defer=track_sel_tracker_ready;
     beetle_sel_was_range=0u;
@@ -3728,7 +3746,7 @@ static void track_fm1_poll(void){
    /* SEQ+OP1 copies, SEQ+OP2 pastes a full pattern lane, regardless of
     * selected editor column; no keyboard note gets accidentally entered. */
    if((buttons&(1u<<11))){
-    uint32_t combo_edges=fm1_input_note_edges();
+    uint32_t combo_edges=track_menu_fenced_edges(fm1_input_note_edges(),fm1_in.notes);
     if(beetle_clear_lane_chord((uint8_t)(track_page==0u),1u,
         track_state.transport.playing,0u,combo_edges)){
      beetle_clear_lane_yes=0u;track_page=37u;track_seq_fired=1u;
@@ -3785,7 +3803,7 @@ static void track_fm1_poll(void){
     }
    }
    if(!(buttons&(1u<<11))){
-    uint32_t keypressed=fm1_input_note_edges();
+    uint32_t keypressed=track_menu_fenced_edges(fm1_input_note_edges(),fm1_in.notes);
     if(buttons&(1u<<11))keypressed=0u; /* Chords handled at page level below. */
     for(uint8_t k=0u;k<27u;k++)if(keypressed&(1u<<k)){
      const uint8_t ch=track_state.transport.edit_channel;

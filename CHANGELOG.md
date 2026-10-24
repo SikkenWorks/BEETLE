@@ -1,10 +1,18 @@
-## V1.4.29 — RETRO PULSE sustain/DC correction (source-only candidate)
+## V1.4.30 — SID authenticity/performance + NEW/LOAD keyboard isolation (experimental)
+
+- SID A and B now use distinct oscillator phases and tunings, rather than using the same phase twice. Added optional A-master/B-slave Hard Sync, triangle Ring Mod and combined waveform DAC mode, mapped to previously unused SID SUB/NOISE/FM DEPTH parameters in the same stored patch schema.
+- Added separate ROM-based 6581/8580 filter response curves interpolated once per voice per render chunk. Three per-sample 64-bit SID state-variable filter multiplications use proven bounded 32-bit products; no new voice allocation or large DSP buffers.
+- Boot **NEW PROJECT**, **LOAD PROJECT**, and confirmation/loading dialogs drain queued FM1 note-on edges. Musical keys held while leaving these screens stay suppressed until released. No spurious note writing on entering tracker.
+- Added dedicated host regression for chip curves, sync/combined/ring, and project-menu key fencing. Existing BITCRUSH/RADIO, NOTE2 and RETRO PULSE regressions remain passing.
+- Unchanged project schema TRK1 V25, 13 global samples/NOTE2, six channels, USB multitrack and OTA asset lineage. New SID sound is an approximation, not chip-exact reSID. Physical FM1 performance, audio quality and OTA recovery are still unverified.
+
+## V1.4.29 — RETRO PULSE sustain/DC correction (experimental; FWSC separately built)
 
 - Removed 4-bit amplitude stepping from the ADSR that could sound like retriggers during sustain/decay/release. Preserved the DMG eight-step duty waveform.
 - Centered the duty waveform by its exact high-time fraction, avoiding the old slow per-voice DC correction that could contribute a low-frequency residual.
 - Reused existing per-voice DSP state, no additional audio buffers, unchanged project format or stored patches.
 - Host regression `tests/track/test_v1429_retro_sustain.c` verifies no new note-on serial, stable sustain, DC < 5% of absolute amplitude, and full release.
-- **Build packaging pending:** a new physical-device-flashable `.fwsc` for this change is not verified. Old V1.4.28 firmware must not be relabelled as V1.4.29.
+- Native V1.4.29 `.fwsc` was subsequently built with unchanged protected loader/header; it remains unverified on physical FM1 hardware.
 
 ## V1.4.28 — Global User-Sample Streaming & Loop Optimization (experimental)
 
