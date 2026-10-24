@@ -11,7 +11,7 @@
 #include "beetle_performance_snapshots.h"
 #include "beetle_mute_groups.h"
 #define TRACK_STORE_MAGIC 0x314B5254u /* little endian "TRK1" */
-#define TRACK_STORE_VERSION 24u
+#define TRACK_STORE_VERSION 25u
 #define TRACK_STORE_MAX 24576u /* include legacy V1-V3 decode capacity */
 #define TRACK_STORE_V4_MAX 12256u /* physical V4 payload budget */
 struct track_store_instrument {
@@ -41,7 +41,7 @@ struct track_store_project {
  struct track_drum_timbre drum[TRACK_DRUM_COUNT];
  struct beetle_oneshot_bank oneshots; /* V23 bounded project-owned µ-law bank */
  struct track_master_settings master;
- uint8_t punch_param[5]; /* Repeat, Ring Mod intensity, Filter, Tape, Stutter */
+ uint8_t punch_param[13]; /* Repeat, Ring Mod intensity, Filter, Tape, Stutter */
  char title[13];
  uint16_t bpm;
  uint8_t slot;

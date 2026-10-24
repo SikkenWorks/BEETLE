@@ -101,8 +101,8 @@ int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note){
  if(!e || e->transport.edit_channel!=TRACK_DRUM_CHANNEL ||
     e->transport.edit_column!=1u ||
     e->transport.edit_step>=TRACK_STEPS ||
-    drum_note>=TRACK_DRUM_COUNT)return -1;
- e->active.ch[TRACK_DRUM_CHANNEL][e->transport.edit_step].chord=(unsigned int)(drum_note+1u);
+    drum_note>=TRACK_DRUM_NOTE_COUNT)return -1;
+ track_note2_set(&e->active.ch[TRACK_DRUM_CHANNEL][e->transport.edit_step],drum_note);
  e->dirty=1u;
  return 0;
 }
@@ -206,7 +206,7 @@ uint8_t track_chord_keylocked(uint8_t root,uint8_t type,const struct track_harmo
  return count;
 }
 
-void track_punch(struct track_engine *e,uint8_t fx,uint8_t held){if(!e||fx>=TRACK_PUNCH_COUNT)return;if(held)e->punch_mask|=(uint8_t)(1u<<fx);else e->punch_mask&=(uint8_t)~(1u<<fx);}
+void track_punch(struct track_engine *e,uint8_t fx,uint8_t held){if(!e||fx>=TRACK_PUNCH_COUNT)return;if(held)e->punch_mask|=(uint16_t)(1u<<fx);else e->punch_mask&=(uint16_t)~(1u<<fx);}
 int track_is_lit(uint8_t button){return button>=2u&&button<14u&&button!=10u;}
 uint32_t track_home_action(uint32_t held_ms,uint8_t released){if(held_ms>=1500u)return 2u;return released?1u:0u;}
 /* TR version 2 includes dynamics explicitly. Original TR version 1 still
@@ -216,7 +216,7 @@ int track_pattern_encode(const struct track_pattern *p,uint8_t *dst,uint32_t cap
  dst[0]='T';dst[1]='R';dst[2]=4u;dst[3]=p->length;uint32_t at=4u;
  for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<16u;st++){
   const struct track_step *s=&p->ch[c][st];
-  if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>(c==TRACK_DRUM_CHANNEL?3u:7u)||
+  if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>7u||
      s->chord>=(c==TRACK_DRUM_CHANNEL?16u:TRACK_CHORD_COUNT)||s->effect>=TRACK_FX_COUNT||s->value>100u)return -1;
   dst[at++]=s->note;dst[at++]=(uint8_t)s->instrument;dst[at++]=(uint8_t)s->chord;
   dst[at++]=(uint8_t)s->effect;dst[at++]=(uint8_t)s->value;dst[at++]=(uint8_t)s->dynamics;dst[at++]=(uint8_t)s->groove;
@@ -236,7 +236,7 @@ int track_pattern_decode(struct track_pattern *p,const uint8_t *src,uint32_t len
   struct track_step *s=&next.ch[c][st];
   s->note=src[at++];s->instrument=src[at++];s->chord=src[at++];
   s->effect=src[at++];s->value=src[at++];s->dynamics=version>=2u?src[at++]:0u;s->groove=version>=3u?src[at++]:0u;
-  if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>(c==TRACK_DRUM_CHANNEL?3u:7u)||
+  if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>7u||
       s->chord>=(c==TRACK_DRUM_CHANNEL?16u:TRACK_CHORD_COUNT)||s->effect>=TRACK_FX_COUNT||s->value>100u)return -1;
  }
  for(unsigned st=0u;st<TRACK_STEPS;st++){

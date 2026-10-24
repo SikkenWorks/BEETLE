@@ -69,15 +69,20 @@ struct track_chip_engine {
  uint16_t release_left;
  int32_t prev_left,prev_right,tail_left,tail_right;
  /* Bounded, zero-allocation punch history; 512 stereo samples = 2 KiB. */
- int16_t punch_ring[512][2];
  uint16_t punch_write,punch_start,punch_tape_rate;
  int16_t punch_decimate_l,punch_decimate_r;uint8_t punch_decimate_phase;
  uint32_t punch_position,punch_age;
- uint8_t punch_previous,punch_wet,punch_filter_wet;
+ uint8_t punch_previous,punch_wet,punch_filter_wet,punch_focus;
+ uint32_t punch_fx_seed,punch_mod_phase,punch_pump_phase;
+ int32_t punch_phase_l[4],punch_phase_r[4],punch_radio_lp[2],punch_radio_hp[2],punch_iso_lp[2],punch_iso_hp[2];
  int8_t punch_octave; /* V0.83: temporary live octave, updates sustained voices */
  uint16_t punch_bpm; /* Updated per audio block; never read project flash in ISR. */
- uint8_t punch_param[8]; /* 0..100; ring modulation intensity and stutter are saved */
+ uint8_t punch_param[16]; /* 0..100; ring modulation intensity and stutter are saved */
  int32_t punch_hp_l,punch_hp_r,punch_bp_l,punch_bp_r;
+ /* FX 10: per-channel sample-and-hold for REAL downsampling plus bit-depth
+  * reduction. FX 15: click-safe high-pass + subtle hiss mix. No heap/buffer. */
+ int16_t punch_crush_hold_l,punch_crush_hold_r;
+ uint8_t punch_crush_count,punch_crush_wet,punch_radio_wet;
  int32_t punch_filter_l,punch_filter_r;
 };
 struct track_mixer;
@@ -86,7 +91,7 @@ void track_chip_fx_reset(void);
 void track_chip_begin_step(struct track_chip_engine *s);
 /* Apply FX to already-held voices without re-triggering the ADSR. */
 void track_chip_repitch_channel(struct track_chip_engine *s,uint8_t channel);
-void track_chip_set_punch_octave(struct track_chip_engine *s,uint8_t punch_mask);
+void track_chip_set_punch_octave(struct track_chip_engine *s,uint16_t punch_mask);
 /* Returns 1 when voice accepted, 0 when pool is at capacity. */
 int track_chip_note(struct track_chip_engine *s,uint8_t channel,uint8_t instrument,uint8_t note,uint8_t velocity);
 void track_chip_silence(struct track_chip_engine *s);
@@ -107,5 +112,5 @@ extern int16_t *beetle_stem_capture;
 extern uint32_t beetle_stem_offset;
 void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix,int16_t *stereo,uint32_t frames);
 /* Live global punch processing AFTER drums; octave pitch is applied to every synth oscillator voice before rendering. */
-void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *stereo,uint32_t frames);
+void track_chip_process_punch(struct track_chip_engine *s,uint16_t mask,int16_t *stereo,uint32_t frames);
 #endif

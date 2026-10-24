@@ -1,12 +1,12 @@
 {
-  "version": "BEETLE V1.4.24 \u2014 Project Manager Storage V2 Conversion",
+  "version": "BEETLE V1.4.26 NATIVE STORAGE V2 EXPERIMENTAL",
   "baseline": "BEETLE V1.4.5 package identity and protected loader",
   "identity": "FM-1_2123",
   "bytes": 610086,
-  "sha256": "f18f04100ae1e924af5f977166533ccfad24d8a499eb4397cb73364e807137ad",
+  "sha256": "8aec60050d87b7c6fcdbe4372c91422dfabf04c9ab7a2bd853535a2d2dd3f18c",
   "reference_sha256": "bcdd03c45e0bbd176448726ee3cc1ffb8d503cb51f31daecadb8e5b20b1c2b67",
-  "app_sha256": "470a057f55ef9ccbb76ecbac672ac47cf88d5ccc18117265fa454133ceb317fa",
-  "app_bytes": 505256,
+  "app_sha256": "b985d2e20d707af10c3c2f636a8053947fcb164579ec4bdffaedf0c37c8b0593",
+  "app_bytes": 508932,
   "reSID_native": false,
   "ymfm_native": false,
   "sustain_100_ui": "1.00",
@@ -30,14 +30,9 @@
   "supported_loader_family": "bounded FELUCCA-LOADER-1 + original SHA + pinned stock V15",
   "foreign_loader_authentication": "not provided; host trust required",
   "dpcm4_host_only": false,
-  "sample_project_schema_with_samples": 24,
+  "sample_project_schema_with_samples": 25,
   "sample_audio_format": "BD4S 22050Hz mono / 4-bit custom DPCM; experimental live CH6 U01-U13",
   "legacy_project_schema": 23,
   "real_hardware_tested": false,
-  "ota_recovery_proven": false,
-  "project_manager_v2_storage_migration_protocol": 5,
-  "migration_preflight": "0x5D: 12-slot fingerprint, no writes",
-  "migration_commit": "0x5E: confirmed BEETLE-only storage format (destructive, requires ZIP backup)",
-  "migration_restore": "project upload + schema V24 and CRC/read-back validation",
-  "hardware_tested": false
+  "ota_recovery_proven": false
 }

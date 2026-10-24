@@ -1,3 +1,44 @@
+### V1.4.27 — Punch-In BITCRUSH/RADIO DSP & CRY Renaming (experimental)
+
+- Renamed Punch-In FX 09 from SCRATCH to **CRY**, including native UI, Punch-In event editor, simulator and README. FX ID 8 (zero-based) and project schema **V25** remain unchanged.
+- BITCRUSH now combines 12–4-bit sample quantization with a continuous stateful sample-and-hold reducer (1–31 PCM frames at 44.1 kHz), preventing the formerly subtle bit-depth-only effect. Default K1 50 is approximately 8 bits at 2.76 kHz effective update rate.
+- RADIO now applies two cascaded highpass stages (bass/low-cut) with subtle independent stereo hiss; upper frequencies remain present and the dry signal is never replaced by hiss. Short fades tame key-on transients. No additional PCM history allocation.
+- Added native frequency-response, low-amplitude BITCRUSH and noise-level regression tests, with UndefinedBehaviorSanitizer; V1.4.26 NOTE2 and FX tests retained.
+- JieLi native USB / Storage V2 build succeeded. Package preserves the protected header, original OTA loader and `FM-1_2123` identity. Hardware playback and OTA/recovery validation remain outstanding.
+
+## V1.4.26 — Punch-In DSP Corrections, NOTE2 User Samples & Reduced Flash Traffic (experimental)
+
+- Reworked SCRATCH's short-buffer forward/reverse transport, improved BITCRUSH resolution, corrected 4-stage PHASER, tuned RADIO band-pass/hiss and DJ ISOLATOR bass/mid/treble cuts. Fixed recovery of all 16 Punch-In parameter values.
+- NOTE2 now supports all fourteen factory drums and thirteen user samples. A formerly unused bit in the drum KIT field extends NOTE2 IDs without adding bytes to TRK1 V25, changing NOTE1 or breaking legacy NOTE2 data. V1.4.25 will not load a project containing these new extended NOTE2 values; export before downgrading. Native runtime and WebSimulator use the same encoding.
+- Improved Storage V2 global sample streaming: skips redundant flash reads, reuses one verified sector across voices and maintains per-voice generation validation. Six-voice native host-streaming tests and 27-NOTE2-value project codec tests pass.
+- JieLi native build with UAC/Storage V2 passes, firmware container verified with protected header and OTA loader unchanged. **The physical FM1 DMA deadline, sound quality, USB recording and recovery have NOT been validated.** Back up project/sample data before upgrading.
+
+## V1.4.25 storage reserve and sample capacity readout (experimental patch)
+
+- Read-only sample-capacity query `0x76`/`0x7E` reports the verified active sample data size and available physically blank pages, counting both superblock generations and excluding dirty orphan sectors.
+- Sample uploads now preserve eight complete erased sectors (32 KiB) for future project writes **in addition to** the existing four-sector recovery guard. Upload preflight fails closed without writing flash on insufficient space. This does not guarantee an arbitrary number of large future project writes.
+- Project Manager FM1 SAMPLE SPACE bar displays reported capacity, the estimated remaining bytes and the reserved project and recovery space. Older firmware clearly reports NOT VERIFIED rather than fabricating a capacity percentage.
+- Sample-storage failures display `FM1 STORAGE FULL` and do not claim a refused upload succeeded. Source and browser tests do not establish physical FM1 reliability.
+
+## V1.4.25 — Project Manager sample reconnect / non-destructive sync hotfix (browser-only)
+
+- Fixed the root cause of user samples appearing empty after reconnect: the Project Manager now sends the existing read-only `0x70` INFO request for all 13 U01–U13 FM1 slots and displays **FM1 STORED** status independently of the PC-side WAV bank.
+- Uploading WAVs updates **only** occupied PC-bank entries requiring transfer; empty PC-bank entries never issue FM1 DELETE. Occupied device slots with different content are individually identified in a preflight plan and require explicit replacement confirmation.
+- Added an explicit per-slot **DELETE ON FM1** action with acknowledgment and a fresh fingerprint check; deleting a WAV from the PC bank never deletes the corresponding FM1 sample.
+- Enforced complete 13-slot scan before any writes, reject changed slot generation/checksum, and verify every untouched FM1 sample after an upload. Error/partial scans disable uploads.
+- Added **READ FM1 SAMPLE SLOTS** and clear device-versus-PC status for every entry, including after reconnect.
+- Original installed firmware V1.4.25 and TRK1 V25 project layout are unchanged. **No firmware flash required.** Existing native protocol exposes only sample occupancy/size/CRC/generation, not the original WAV or tracker label: users must retain their `.beetlebank` files.
+- Tested in Chromium with mocked FM1 USB-MIDI replies; physical-device validation remains outstanding.
+
+## V1.4.25 — Punch-In FX Page 2 and Global Sample Labels (experimental)
+
+- Added eight new effects: SCRATCH, BITCRUSH, PUMP, GLITCH, WOW, PHASER, RADIO, and DJ ISOLATOR. Existing eight effects remain.
+- Added automatic 1/2 or 2/2 Punch-In screen focus, with last-held-key priority on overlapping presses.
+- Expanded FX key and recording masks to 16 bits; new TRK1 V25 stores 16 IDs and 13 adjustable Punch-In parameters. Old V24 projects remain readable.
+- Kept 12 KiB shared Punch-In audio history; replaced 64-bit sample interpolation with signed 32-bit math.
+- Added Project Manager three-character user sample labels stored in backwards-compatible .beetlebank V2 files and written in a metadata footer alongside compressed sample data. Existing sample format and 13 global slots retained.
+- Native JieLi compilation is **not** physical hardware certification. Long-duration DMA, full-load DSP, USB multitrack, flashing and recovery tests remain necessary.
+
 ## BEETLE V1.4.24 — Project Manager Storage V2 conversion
 
 - Added read-only USB-MIDI migration preflight and guarded partition initialization (Project Transfer V5, commands `0x5D`/`0x5E`).

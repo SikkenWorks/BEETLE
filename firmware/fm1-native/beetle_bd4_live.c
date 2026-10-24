@@ -19,10 +19,11 @@ struct live_runtime {
  struct live_chunk chunks[BEETLE_BD4_STREAM_VOICES];
  struct live_note notes[BEETLE_BD4_STREAM_VOICES];
  struct beetle_v2_sample slots[BEETLE_BD4_STREAM_SLOTS];
+ char labels[BEETLE_BD4_STREAM_SLOTS][4];
  struct beetle_v2_device device;
  uint8_t index[4096];
  uint8_t chunk_scratch[4068];
- uint8_t valid,refresh;
+ uint8_t valid,refresh,cached_voice,cached_valid;
  uint32_t failed_reads;
 };
 static struct live_runtime *live_rt;
@@ -44,7 +45,11 @@ void beetle_bd4_live_bind(void *workspace,uint32_t bytes){
 void beetle_bd4_live_init(void){
  if(live_rt)beetle_bd4_live_bind(live_rt,sizeof(*live_rt));
 }
-void beetle_bd4_live_invalidate(void){if(live_rt){live_refresh=1u;live_valid=0u;}}
+void beetle_bd4_live_invalidate(void){if(live_rt){live_refresh=1u;live_valid=0u;live_rt->cached_valid=0u;
+  memset(live_chunks,0,sizeof(live_chunks));}}
+const char *beetle_bd4_live_label(uint8_t slot){
+ return live_rt&&slot<BEETLE_BD4_STREAM_SLOTS&&live_valid&&live_rt->labels[slot][0]?live_rt->labels[slot]:0;
+}
 int beetle_bd4_live_available(uint8_t slot){
  return live_rt&&slot<BEETLE_BD4_STREAM_SLOTS && live_valid && live_slots[slot].generation!=0u;
 }
@@ -98,14 +103,24 @@ static int live_read(void *unused,uint8_t voice,uint8_t slot,uint32_t generation
   uint16_t within=(uint16_t)(offset%BD4_CHUNK);
   uint16_t count=(uint16_t)(BD4_CHUNK-within);
   if(count>size)count=size;
-  if(!c->valid||c->part!=part||c->slot!=slot||c->generation!=generation){
-   c->valid=0u;
+  /* There is only ONE shared 4068-byte cache, not six independent sector
+   * buffers. Each voice does, however, remember which immutable, pinned
+   * sector was already CRC-verified. When switching between six samples,
+   * re-verifying entire sectors every 2.9ms starves audio prefetch. */
+  const uint8_t verified=(uint8_t)(c->valid && c->part==part &&
+                                   c->slot==slot && c->generation==generation);
+  uint8_t cached=(uint8_t)(verified && live_rt->cached_valid &&
+                            live_rt->cached_voice==voice);
+  if(!verified){
+   c->valid=0u;live_rt->cached_valid=0u;
    uint16_t verified_length=0u;
    if(beetle_v2_sample_chunk_read(&live_device,slot,&live_slots[slot],part,
-       live_chunk_scratch,&verified_length,live_index)){
+                                  live_chunk_scratch,&verified_length,live_index)){
     live_failed_reads++;return 0;
    }
    c->part=part;c->slot=slot;c->generation=generation;c->valid=1u;
+   live_rt->cached_voice=voice;live_rt->cached_valid=1u;
+   cached=1u;
   }
   uint32_t q=(uint32_t)live_slots[slot].index_offset+(uint32_t)part*12u;
   uint32_t rel=(uint32_t)live_index[q] | ((uint32_t)live_index[q+1]<<8) |
@@ -113,9 +128,20 @@ static int live_read(void *unused,uint8_t voice,uint8_t slot,uint32_t generation
   uint32_t bytes=(uint32_t)live_index[q+4] | ((uint32_t)live_index[q+5]<<8) |
                ((uint32_t)live_index[q+6]<<16)|((uint32_t)live_index[q+7]<<24);
   if(bytes>BD4_CHUNK||within>bytes||count>bytes-within||
-     rel<8192u||rel>BEETLE_V2_BYTES-24u-bytes||
-     live_device.read(live_device.context,BEETLE_V2_BASE+rel+24u+within,dst,count)){
-    c->valid=0u;return 0;
+     rel<8192u||rel>BEETLE_V2_BYTES-24u-bytes){
+    c->valid=0u;live_rt->cached_valid=0u;return 0;
+  }
+  if(cached){
+   /* Cache hit: absolutely no flash transfer or CRC work. */
+   memcpy(dst,live_chunk_scratch+within,count);
+  }else{
+   /* Different voice now owns shared cache. This sector was already
+    * verified under a PINNED generation; read only 6..134 encoded bytes.
+    * Transfers cannot mutate that generation while playback is active. */
+   if(live_device.read(live_device.context,BEETLE_V2_BASE+rel+24u+within,
+                       dst,count)){
+    c->valid=0u;live_failed_reads++;return 0;
+   }
   }
   offset+=count;dst+=count;size=(uint16_t)(size-count);
  }
@@ -127,13 +153,24 @@ void beetle_bd4_live_poll(beetle_v2_read read,void *ctx,void (*lock)(void),void 
  if(!read||!live_rt||!lock||!unlock)return;
  if(live_refresh){
   /* Installation/migration required: refuses the legacy layout. */
-  live_valid=0u;memset(live_slots,0,sizeof(live_slots));
+  live_valid=0u;live_rt->cached_valid=0u;memset(live_chunks,0,sizeof(live_chunks));memset(live_slots,0,sizeof(live_slots));memset(live_rt->labels,0,sizeof(live_rt->labels));
   if(beetle_v2_open(&live_device,read,ctx,live_index)==0){
    live_valid=1u;
    for(uint8_t i=0;i<13u;i++){
     struct beetle_v2_sample info;
-    if(beetle_v2_sample_info(&live_device,i,&info,live_index)==1)
+    if(beetle_v2_sample_info(&live_device,i,&info,live_index)==1){
      live_slots[i]=info;
+     if(info.byte_length>=30u){
+      uint8_t footer[8];
+      if(beetle_v2_sample_read(&live_device,i,info.byte_length-8u,footer,8u,live_index)==0 &&
+         footer[0]=='B'&&footer[1]=='N'&&footer[2]=='M'&&footer[3]=='1'&&
+         (uint8_t)(footer[4]^footer[5]^footer[6]^0xA5u)==footer[7]){
+       uint8_t good=1u;
+       for(unsigned j=0;j<3u;j++)if(footer[4u+j]<32u||footer[4u+j]>126u)good=0u;
+       if(good){for(unsigned j=0;j<3u;j++)live_rt->labels[i][j]=(char)footer[4u+j];live_rt->labels[i][3]=0;}
+      }
+     }
+    }
    }
   }
   live_refresh=0u;
@@ -144,7 +181,7 @@ void beetle_bd4_live_poll(beetle_v2_read read,void *ctx,void (*lock)(void),void 
   if(n->pending){
    uint32_t seq=n->serial;uint8_t slot=n->slot;
    n->pending=0u;
-   live_chunks[i].valid=0u;
+   live_chunks[i].valid=0u;live_rt->cached_valid=0u;
    if(!beetle_bd4_live_available(slot)){
     n->starting=0u;n->serial=0u;continue;
    }

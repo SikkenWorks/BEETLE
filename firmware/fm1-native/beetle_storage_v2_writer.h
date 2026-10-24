@@ -9,6 +9,11 @@
 #define BEETLE_V2_PAGE 256u
 #define BEETLE_V2_SECTOR 4096u
 #define BEETLE_V2_GUARD_SECTORS 4u
+/* Beyond the four crash-recovery sectors, leave space for further project
+ * journal commits. One 12 KiB project write may need four erased sectors.
+ * This is a MINIMUM project-write allowance, not a guarantee that twelve
+ * arbitrarily large project revisions can all fit in shared flash. */
+#define BEETLE_V2_PROJECT_RESERVE_SECTORS 8u
 /* Callbacks accept physical absolute flash addresses, 0 on success. */
 typedef int (*beetle_v2_program)(void *ctx,uint32_t address,const uint8_t *src,uint32_t length);
 typedef int (*beetle_v2_erase)(void *ctx,uint32_t sector_address);
@@ -68,4 +73,15 @@ void beetle_v2_sample_upload_abort(struct beetle_v2_sample_upload *u);
  * Never erases sector 0/1, firmware, OTA, or legacy marker sector.
  */
 int beetle_v2_collect(struct beetle_v2_writer *w,uint8_t *index,uint8_t *other_index);
+/* Read-only capacity estimate derived from BOTH verified metadata generations
+ * and physically erased pages. Does not change NOR. Amounts are estimates:
+ * fragmented pages and transaction metadata affect fit. Actual uploads are
+ * authoritatively checked by sample_upload_begin before ANY NOR write. */
+struct beetle_v2_sample_capacity {
+ uint32_t current_sample_bytes,estimated_additional_bytes;
+ uint16_t erased_free_sectors,sample_blank_pages;
+};
+int beetle_v2_get_sample_capacity(struct beetle_v2_writer *w,
+ const uint8_t *newest_index,uint8_t page[256],
+ struct beetle_v2_sample_capacity *out);
 #endif
