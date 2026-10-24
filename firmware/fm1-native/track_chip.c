@@ -397,7 +397,8 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
    * Disabled by default. Uses the existing SUB control in SID mode. */
   if(sid_cfg->sync && v->phase<step)v->phase2=0u;
   uint8_t style=v->type;
-  level=beetle_sid_sample_prepared(sid_cfg,v->phase,step,v->phase2,&v->lfsr,
+  level=beetle_sid_sample_prepared(sid_cfg,v->phase,step,
+                                  sid_cfg->phase_lock?v->phase:v->phase2,&v->lfsr,
                                   &v->lowpass,&v->sid_bandpass);
   /* Soft 6581-style asymmetric saturation. Character variations remain
    * bounded to avoid feeding huge peaks into MASTER dynamics. */
@@ -580,6 +581,18 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
   if(style==TRACK_CHIP_SID_NOISE){wa=3u;wb=2u;mix=20u;mode=80u;}
   sid_cache[vi]=beetle_sid_prepare(style,wa,wb,p->pulse_width,p->pulse_width_b,
                                    mix,cut,reso,mode,p->fm_depth,p->sub,p->noise);
+  /* V1.4.31 legacy SID neutrality: the common saved factory detune=12
+   * came from the VA oscillator but was inaudible before V1.4.30, since
+   * both SID waveforms then shared oscillator A's phase. Activating that
+   * dormant detune added a slow wah-like beat on 6581/DIRTY/BASS patches.
+   * Keep those old unmodified patches phase coherent. A genuine custom
+   * coarse/fine/detune (not 0/12), hard sync or ring modulation still
+   * enables oscillator B's independent phase and pitch. Leave 8580 and
+   * NOISE untouched so their V1.4.30 sound does not change. */
+  if(style!=TRACK_CHIP_SID_8580 && style!=TRACK_CHIP_SID_NOISE &&
+     p->coarse_b==0 && p->fine_b==0 && (p->detune==12u||p->detune==0u) &&
+     !p->sub && !p->noise)
+   sid_cache[vi].phase_lock=1u;
  }
  /* The ISR owns these controls until this render chunk completes. The
   * LFO rate never needs to be re-decoded five times per audio sample. */

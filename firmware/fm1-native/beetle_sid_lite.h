@@ -64,7 +64,7 @@ struct beetle_sid_prepared {
  uint8_t mix;
  uint16_t threshold_a,threshold_b;
  int32_t filter_coefficient,damping;
- uint8_t combine,sync,ring;
+ uint8_t combine,sync,ring,phase_lock;
 };
 static inline struct beetle_sid_prepared beetle_sid_prepare(uint8_t chip,
  uint8_t wave_a,uint8_t wave_b,uint8_t width_a,uint8_t width_b,
@@ -72,24 +72,32 @@ static inline struct beetle_sid_prepared beetle_sid_prepare(uint8_t chip,
  uint8_t combine,uint8_t sync,uint8_t ring){
  struct beetle_sid_prepared x;
  x.shape_a=wave_a;x.shape_b=wave_b;x.chip=chip;x.mode=filter_mode;
- x.mix=mix;x.combine=combine;x.sync=sync;x.ring=ring;x.threshold_a=(uint16_t)((uint32_t)width_a*4095u/100u);
+ x.mix=mix;x.combine=combine;x.sync=sync;x.ring=ring;x.phase_lock=0u;x.threshold_a=(uint16_t)((uint32_t)width_a*4095u/100u);
  x.threshold_b=(uint16_t)((uint32_t)width_b*4095u/100u);
  x.is8580=(uint8_t)(chip==BEETLE_SID_8580||chip==BEETLE_SID_NOISE);
- /* 17-point ROM-only cutoff curves; precomputed ONCE per voice/chunk.
-  * The 6581 has a low-cutoff plateau and rises later, while the 8580
-  * tracks much more evenly. Approximation, not a calibration claim. */
- static const uint8_t curve6581[17]={5,6,7,8,10,12,16,21,28,37,47,56,65,75,85,94,102};
- static const uint8_t curve8580[17]={7,12,17,22,27,32,37,42,47,53,59,65,71,78,86,95,105};
- const uint8_t *curve=x.is8580?curve8580:curve6581;
- if(filter_cut>100u)filter_cut=100u;
- uint32_t idx=(uint32_t)filter_cut*16u;
- uint32_t cell=idx/100u,frac=idx%100u;
- x.filter_coefficient=(int32_t)curve[cell];
- if(cell<16u)x.filter_coefficient+=(int32_t)(((uint32_t)(curve[cell+1u]-curve[cell])*frac+50u)/100u);
- /* Q8 feedback: bounded at maximum resonance on both chip families. */
- x.damping=x.is8580 ? 228-(int32_t)resonance*135/100
-                       : 212-(int32_t)resonance*128/100;
- if(x.damping<80)x.damping=80;
+ /* V1.4.31: The experimental 6581 curve introduced in V1.4.30
+  * drove the stock cutoff 96 to coefficient ~97 instead of ~37, making
+  * 6581/DIRTY/BASS much too resonant/phasey on older saved patches.
+  * Restore the stable, nonlinear 6581 mapping from V1.4.29. This is done
+  * once per render chunk; no additional per-sample DSP cost. The clean 8580
+  * curve is retained as it sounded in V1.4.30. Cutoff may exceed 100 in
+  * legacy projects and is deliberately not truncated for 6581. */
+ if(!x.is8580){
+  int32_t c=(int32_t)filter_cut;
+  x.filter_coefficient=9+(c*c*31)/10000;
+  if(x.filter_coefficient>124)x.filter_coefficient=124;
+  x.damping=204-(int32_t)resonance*119/100;
+  if(x.damping<74)x.damping=74;
+ }else{
+  static const uint8_t curve8580[17]={7,12,17,22,27,32,37,42,47,53,59,65,71,78,86,95,105};
+  if(filter_cut>100u)filter_cut=100u;
+  uint32_t idx=(uint32_t)filter_cut*16u;
+  uint32_t cell=idx/100u,frac=idx%100u;
+  x.filter_coefficient=(int32_t)curve8580[cell];
+  if(cell<16u)x.filter_coefficient+=(int32_t)(((uint32_t)(curve8580[cell+1u]-curve8580[cell])*frac+50u)/100u);
+  x.damping=228-(int32_t)resonance*135/100;
+  if(x.damping<80)x.damping=80;
+ }
  return x;
 }
 static inline int32_t beetle_sid_cached_wave(uint8_t shape,uint32_t phase,

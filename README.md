@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.4.30 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.4.31 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
   <br>
   <b>The user sample feature is still experimental!</b>
 </p>
@@ -42,6 +42,14 @@
 Read [Global User Samples & Storage V2](#global-user-samples--storage-v2-v1424-experimental) and [USB-C audio capture](#usb-c-audio-capture-stereo-or-six-track-mode-experimental) for setup, limitations and safety information.
 
 ---
+
+## New in V1.4.31: SID Wah / Beating Regression Fix
+
+The V1.4.30 SID upgrade unintentionally made factory-style **SID 6581, SID DIRTY and SID BASS** patches sound as if a wah/filter sweep were running, even with no modulation enabled. It activated a pre-existing **12-cent VA default detune** on oscillator B, which previously shared the same oscillator phase; meanwhile the replacement 6581 cutoff mapping raised the usual cutoff setting of 96 from approximately 37 to approximately 97 (Q8 filter coefficient). **V1.4.31 corrects both.**
+
+For those three 6581-derived variants, neutral oscillator B settings (`coarse B = 0`, `fine B = 0`, `detune = 12` from older defaults, or `0`) now keep the two phases coherent. Deliberate B tuning, Hard Sync or Ring Mod still use the independent B oscillator. The earlier V1.4.29 **6581 cutoff/resonance mapping** is restored, preserving older patches' tonal balance. **SID 8580 and SID NOISE remain unchanged** relative to V1.4.30. Combined waveforms, Hard Sync, Ring Mod and the faster 32-bit filter implementation remain available.
+
+No project migration, additional audiobuffer or permanent RAM allocation is required. This is a source/host-validated correction; the result still needs listening tests and sustained stress testing on a physical FM1 before the firmware can be considered reliable.
 
 ## New in V1.4.30: SID Character & Boot Keyboard Isolation
 

@@ -1,3 +1,11 @@
+## V1.4.31 — SID wah / default-detune regression correction
+
+- Restored the V1.4.29 6581/DIRTY/BASS filter coefficient and resonance mapping. The V1.4.30 experimental curve overly boosted the default cutoff (96 → ~97 rather than ~37), potentially altering the audio character and accentuating phasey sweeps.
+- For those three SID types, neutral legacy oscillator B settings use oscillator A's phase to avoid the new involuntary 12-cent detune beating. Independently tuned B, Sync, Ring and combined-wave features remain available.
+- SID 8580 and SID NOISE DSP are unchanged compared with V1.4.30.
+- Regression: four-second sustained notes check amplitude stability and custom-detune variation; filter mapping checked across original cutoff range. Physical FM1 testing and OTA recovery remain unverified.
+- All previously implemented features, project format V25, sample storage, USB and boot-menu key isolation retained. Only the current release is shipped in the cleaned ZIP.
+
 ## V1.4.30 — SID authenticity/performance + NEW/LOAD keyboard isolation (experimental)
 
 - SID A and B now use distinct oscillator phases and tunings, rather than using the same phase twice. Added optional A-master/B-slave Hard Sync, triangle Ring Mod and combined waveform DAC mode, mapped to previously unused SID SUB/NOISE/FM DEPTH parameters in the same stored patch schema.

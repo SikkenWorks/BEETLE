@@ -1,12 +1,12 @@
 {
-  "version": "V1.4.30",
-  "baseline": "BEETLE V1.4.29 package identity and protected loader",
+  "version": "BEETLE V1.4.31",
+  "baseline": "BEETLE V1.4.30 package identity and protected loader",
   "identity": "FM-1_2123",
   "bytes": 610086,
-  "sha256": "ac8ae1c3b8ed354633c0c18270730dba92dbc194b9bc20278cf3d6bdfbb77dc3",
-  "reference_sha256": "09a8b0fcbb1cc46150264451a3368fd16a2778afd13dc931ab7f3c344ba48cc5",
-  "app_sha256": "99f977c3dbeae342427ffc9a5885429fe49546d547aeae1af73267da74b877a9",
-  "app_bytes": 509388,
+  "sha256": "a918648680519796cb339090b11de96bb55675f8e7379840d46d402b8930b6f9",
+  "reference_sha256": "ac8ae1c3b8ed354633c0c18270730dba92dbc194b9bc20278cf3d6bdfbb77dc3",
+  "app_sha256": "41995871a2d5a1ae4a3071b93fefa0cfefd7463e2e74bf8c7bf750e8b19c8c03",
+  "app_bytes": 509548,
   "reSID_native": false,
   "ymfm_native": false,
   "sustain_100_ui": "1.00",
@@ -35,13 +35,8 @@
   "legacy_project_schema": 23,
   "real_hardware_tested": false,
   "ota_recovery_proven": false,
-  "sid_changes": [
-    "independent oscillator B phase",
-    "optional hard sync, triangle ring and combined wave",
-    "ROM 6581/8580 filter curves",
-    "3 filter products changed to 32-bit"
-  ],
-  "boot_project_key_guard": "FM1 queued note edges drained and held keys suppressed until physical release",
-  "webinstaller_embeds_firmware_sha256": "ac8ae1c3b8ed354633c0c18270730dba92dbc194b9bc20278cf3d6bdfbb77dc3",
+  "sid_regression_fix": "SID 6581/DIRTY/BASS neutral B phase lock + V1.4.29 cutoff/damping; deliberate B detune still works",
+  "sid_8580_noise_code_untouched": true,
+  "webinstaller_embeds_firmware_sha256": "a918648680519796cb339090b11de96bb55675f8e7379840d46d402b8930b6f9",
   "hardware_validated": false
 }
