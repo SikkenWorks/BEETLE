@@ -131,7 +131,8 @@ static int32_t va_shape(uint8_t wave,uint32_t phase,uint8_t tier,uint8_t width){
 void track_chip_init(struct track_chip_engine *s){
  if(!s)return;
  memset(s,0,sizeof(*s));s->health_cookie=TRACK_CHIP_COOKIE;s->phrase_div_q8=256u;s->punch_bpm=120u;s->realtime_voice_budget=TRACK_CHIP_VOICES;
- for(unsigned i=0;i<8;i++)s->punch_param[i]=50u;
+ for(unsigned i=0;i<16;i++)s->punch_param[i]=50u;
+ s->punch_fx_seed=0xA718934Fu;s->punch_focus=255u;
  s->punch_param[1]=20u;s->punch_param[2]=0u;s->punch_param[4]=50u;
  for(unsigned i=0;i<TRACK_CHANNELS;i++){s->step_gain[i]=100u;s->fx_type[i]=0u;s->fx_value[i]=50u;s->duty[i]=2u;s->cutoff[i]=96u;s->cut_after[i]=0xFFFFFFFFu;}
  for(unsigned i=0;i<TRACK_CHIP_SLOTS;i++){s->osc_type[i]=(uint8_t)(i==4u?TRACK_CHIP_VA_OSC:i==5u?TRACK_CHIP_VA_OSC2:i==6u?TRACK_CHIP_SID_6581:i==7u?TRACK_CHIP_NES_PULSE:i);track_va_patch_factory((uint8_t)i,&s->patches[i]);
@@ -156,7 +157,7 @@ void track_chip_recover(struct track_chip_engine *s){
  if(!s)return;
  /* Keep oscillator settings, restart only damaged DSP state and its history. */
  uint8_t duty[TRACK_CHANNELS],cutoff[TRACK_CHANNELS],drive[TRACK_CHANNELS],types[TRACK_CHIP_SLOTS],step_gain[TRACK_CHANNELS],fx_type[TRACK_CHANNELS],fx_value[TRACK_CHANNELS],mono=s->mono;
- uint8_t ea[TRACK_CHIP_SLOTS],ed[TRACK_CHIP_SLOTS],es[TRACK_CHIP_SLOTS],er[TRACK_CHIP_SLOTS],punch_params[5];
+ uint8_t ea[TRACK_CHIP_SLOTS],ed[TRACK_CHIP_SLOTS],es[TRACK_CHIP_SLOTS],er[TRACK_CHIP_SLOTS],punch_params[16];
  memcpy(punch_params,s->punch_param,sizeof(punch_params));
  memcpy(ea,s->env_attack,sizeof(ea));memcpy(ed,s->env_decay,sizeof(ed));memcpy(es,s->env_sustain,sizeof(es));memcpy(er,s->env_release,sizeof(er));
  struct track_va_patch patches[TRACK_CHIP_SLOTS];memcpy(patches,s->patches,sizeof(patches));
@@ -237,7 +238,7 @@ static void track_chip_tune_voice(struct track_chip_voice *v,const struct track_
 /* Punch octave is a live pitch transformation, not a transposition of
  * stored notes. Changes also retune sustained/held voices immediately.
  * One shared path handles all 12 oscillator types, including NES NOISE. */
-void track_chip_set_punch_octave(struct track_chip_engine *s,uint8_t mask){
+void track_chip_set_punch_octave(struct track_chip_engine *s,uint16_t mask){
  if(!s)return;
  const int8_t semitones=(int8_t)(((mask&(1u<<5))?12:0)-((mask&(1u<<6))?12:0));
  if(s->punch_octave==semitones)return;
@@ -694,16 +695,25 @@ static inline uint32_t punch_ring(uint32_t x){while(x>=BEETLE_PUNCH_FRAMES)x-=BE
 static int16_t beetle_punch_history[BEETLE_PUNCH_FRAMES][2]
  __attribute__((section(".beetle_song"),aligned(16)));
 static int32_t punch_lerp(int32_t a,int32_t b,uint32_t fraction){
- return a+(int32_t)(((int64_t)(b-a)*(int32_t)fraction)>>8u);
+ return a+(int32_t)(((b-a)*(int32_t)fraction)>>8u);
 }
 static int32_t punch_clip(int32_t value){return bound(value,-32768,32767);}
 static uint16_t punch_sample(uint16_t start,uint32_t offset){
  return (uint16_t)punch_ring((uint32_t)start+offset);
 }
-void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *dst,uint32_t frames){
+void track_chip_process_punch(struct track_chip_engine *s,uint16_t mask,int16_t *dst,uint32_t frames){
  if(!s||!dst)return;
  /* Priority only among tape/snapshot FX; FILTER and mute remain independent. */
- const uint8_t mode=(mask&1u)?1u:(mask&2u)?2u:(mask&8u)?4u:(mask&16u)?5u:0u;
+ /* Snapshot readers share one immutable 12KiB history. A single voice owns
+  * playback while independent lightweight FX remain freely stackable. */
+ uint8_t mode=0u;
+ const uint16_t snapshots=(uint16_t)(mask&((1u<<0)|(1u<<3)|(1u<<8)|(1u<<11)));
+ if(snapshots){
+  uint8_t choice=255u;
+  if(s->punch_focus<16u&&(snapshots&(1u<<s->punch_focus)))choice=s->punch_focus;
+  else for(uint8_t i=0u;i<16u;i++)if(snapshots&(1u<<i))choice=i;
+  mode=choice==0u?1u:choice==3u?4u:choice==8u?6u:choice==11u?7u:0u;
+ }else mode=(mask&2u)?2u:(mask&16u)?5u:0u;
  if(mode!=s->punch_previous){
   s->punch_previous=mode;
   s->punch_start=(uint16_t)punch_ring((uint32_t)s->punch_write+BEETLE_PUNCH_FRAMES-BEETLE_PUNCH_CAPTURE);
@@ -719,6 +729,14 @@ void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *
  const uint32_t stutter_half=beetle_stutter_half_frames(s->punch_bpm,s->punch_param[4]);
  const uint32_t stutter_edge=stutter_half<512u?32u:128u;
  const uint32_t tape_duration=8820u+((100u-s->punch_param[3])*79380u)/100u; /* 0.2..2 seconds */
+ const uint32_t pump_bpm=s->punch_bpm?s->punch_bpm:120u;
+ const uint32_t pump_beat=2646000u/pump_bpm; /* once per BLOCK, not per sample */
+ const uint32_t pump_period=pump_beat/(1u+(uint32_t)(s->punch_param[10]/17u));
+ /* Precompute integer ramp coefficient per audio block. The audio ISR must
+  * not pay a variable 32-bit integer division for each PCM sample. */
+ const uint32_t pump_low=(pump_period/5u)?pump_period/5u:1u;
+ const uint32_t pump_rise=(pump_period>pump_low)?pump_period-pump_low:1u;
+ const uint32_t pump_slope=(192u<<12u)/pump_rise;
  for(uint32_t f=0u;f<frames;f++){
   const int32_t dry_l=dst[f*2u],dry_r=dst[f*2u+1u];
   int32_t l=dry_l,r=dry_r,wet_l=l,wet_r=r;
@@ -775,6 +793,40 @@ void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *
    wet_l=(wet_l*(int32_t)rate)>>8u;
    wet_r=(wet_r*(int32_t)rate)>>8u;
    s->punch_position+=rate;
+  }else if(mode==6u){
+   /* SCRATCH: a stationary stereo vinyl slice with a physically reversing
+    * read head. Accelerate through the middle and brake at both turnarounds;
+    * transport speed changes BOTH pitch and time, not just amplitude.  The
+    * complete 12KiB shared history is reused, never allocated anew. */
+   const uint32_t length=BEETLE_PUNCH_CAPTURE-64u;
+   const uint32_t half=(length-1u)*256u,cycle=half*2u;
+   const uint32_t cursor=s->punch_position%cycle;
+   const uint32_t q8=cursor<=half?cursor:cycle-cursor;
+   const uint32_t pos=q8>>8u,frac=q8&255u;
+   const uint16_t ai=punch_sample(s->punch_start,pos);
+   const uint16_t bi=punch_sample(s->punch_start,pos+1u);
+   wet_l=punch_lerp(beetle_punch_history[ai][0],beetle_punch_history[bi][0],frac);
+   wet_r=punch_lerp(beetle_punch_history[ai][1],beetle_punch_history[bi][1],frac);
+   /* 0.5x..~6x vinyl velocity (44.1k playback vs 22.05k capture).
+    * The 128-frame soft braking window removes artificial hard clicks. */
+   uint32_t speed=160u+(uint32_t)s->punch_param[8]*15u;
+   uint32_t edge=q8<32768u?q8:half-q8;
+   if(edge<32768u)speed=(speed*(64u+((edge*192u)>>15u)))>>8u;
+   s->punch_position=(cursor+speed)%cycle;
+  }else if(mode==7u){
+   /* GLITCH: small immutable fragments, deterministic pseudo-random jumps,
+    * each with a short zero-cross-compatible amplitude taper. */
+   const uint32_t len=48u+(uint32_t)(100u-s->punch_param[11])*3u;
+   const uint32_t phase=s->punch_position%len;
+   if(!phase){uint32_t v=s->punch_fx_seed;v^=v<<13;v^=v>>17;v^=v<<5;s->punch_fx_seed=v?v:0xB142C23Du;
+     s->punch_start=(uint16_t)punch_ring((uint32_t)s->punch_write+BEETLE_PUNCH_FRAMES-BEETLE_PUNCH_CAPTURE+(s->punch_fx_seed%(BEETLE_PUNCH_CAPTURE-384u)));}
+   uint16_t ai=punch_sample(s->punch_start,phase);
+   int32_t taper=256;
+   if(phase<12u)taper=(int32_t)phase*256/12;
+   else if(phase+12u>=len)taper=(int32_t)(len-phase)*256/12;
+   wet_l=beetle_punch_history[ai][0]*taper/256;
+   wet_r=beetle_punch_history[ai][1]*taper/256;
+   s->punch_position++;
   }else if(mode==5u){
    /* Stutter is a LIVE bipolar amplitude gate, always locked to BPM. */
    uint32_t phase=s->punch_position;
@@ -815,12 +867,89 @@ void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *
   const int32_t fw=s->punch_filter_wet;
   l=(base_l*(256-fw)+l*fw)>>8u;
   r=(base_r*(256-fw)+r*fw)>>8u;
+  /* Page 2: all heavy modulation uses fixed point, bounded CPU and the
+   * existing shared PCM history, with no allocation or per-frame division. */
+  if(mask&(1u<<9)){ /* BITCRUSH: audible 4..12-bit quantization */
+   const uint8_t bits=(uint8_t)(4u+(uint32_t)s->punch_param[9]*8u/100u);
+   const int32_t quantum=(int32_t)(1u<<(16u-bits));
+   /* Signed division rather than left shifting negatives (undefined in C).
+    * Round in the correct polarity so +x/-x have symmetric steps. */
+   l=((l>=0?l+quantum/2:l-quantum/2)/quantum)*quantum;
+   r=((r>=0?r+quantum/2:r-quantum/2)/quantum)*quantum;
+  }
+  if(mask&(1u<<10)){ /* PUMP: tempo locked duck/recovery envelope */
+   uint32_t period=pump_period?pump_period:1u;
+   uint32_t ph=s->punch_pump_phase;
+   if(ph>=period)ph=0u;
+   uint32_t g=ph<pump_low?64u:(64u+(((ph-pump_low)*pump_slope)>>12u));
+   if(g>256u)g=256u;
+   l=(l*(int32_t)g)>>8u;r=(r*(int32_t)g)>>8u;
+   s->punch_pump_phase=ph+1u;
+  }else s->punch_pump_phase=0u;
+  if(mask&(1u<<12)){ /* WOW: continuously written tape head and slow delay modulation */
+   uint8_t idx=(uint8_t)(s->punch_mod_phase>>24u);
+   int32_t mod=((int32_t)track_va_sine[idx]*(int32_t)s->punch_param[12])>>16u;
+   uint32_t behind=(uint32_t)(96+mod);
+   if(behind<2u)behind=2u;
+   uint16_t pos=(uint16_t)punch_ring((uint32_t)s->punch_write+BEETLE_PUNCH_FRAMES-behind);
+   l=(l+(int32_t)beetle_punch_history[pos][0])/2;
+   r=(r+(int32_t)beetle_punch_history[pos][1])/2;
+  }
+  if(mask&(1u<<13)){ /* PHASER: four *cascaded* time-varying allpass stages */
+   const int32_t phase=(int32_t)track_va_sine[(uint8_t)(s->punch_mod_phase>>24u)];
+   const int32_t a=40+(((phase+32768)*148)>>16u); /* Q8 .16.. .73 */
+   int32_t pl=l,pr=r;
+   for(unsigned j=0;j<4u;j++){
+    const int32_t yl=s->punch_phase_l[j]-((pl*a)>>8u);
+    const int32_t yr=s->punch_phase_r[j]-((pr*a)>>8u);
+    s->punch_phase_l[j]=pl+((yl*a)>>8u);
+    s->punch_phase_r[j]=pr+((yr*a)>>8u);
+    pl=yl;pr=yr;
+   }
+   /* Dry+wet recombination generates the classic moving phaser notches.
+    * Never mix each stage back into dry: that kills the cascading effect. */
+   l=(l+pl)/2;r=(r+pr)/2;
+  }
+  if(mask&(1u<<14)){ /* RADIO: telephone-like 350 Hz high pass + 3k low pass */
+   int32_t in[2]={l,r};
+   for(unsigned ch=0;ch<2u;ch++){
+    const int32_t x=in[ch];
+    s->punch_radio_lp[ch]+=((x-s->punch_radio_lp[ch])*90)>>8u;
+    s->punch_radio_hp[ch]+=((x-s->punch_radio_hp[ch])*12)>>8u;
+    int32_t band=(s->punch_radio_lp[ch]-s->punch_radio_hp[ch])*2;
+    /* Gently saturate the small speaker band, no noise-only signal. */
+    if(band>12000)band=12000+(band-12000)/4;
+    if(band< -12000)band=-12000+(band+12000)/4;
+    if(ch==0u)l=band;else r=band;
+   }
+   s->punch_fx_seed^=s->punch_fx_seed<<13u;s->punch_fx_seed^=s->punch_fx_seed>>17u;
+   s->punch_fx_seed^=s->punch_fx_seed<<5u;
+   const int32_t hiss=(((int32_t)(s->punch_fx_seed>>24u)&255)-128)*
+                          (int32_t)s->punch_param[14]/200;
+   l+=hiss;r+=hiss;
+  }
+  if(mask&(1u<<15)){ /* DJ ISOLATOR: real three-way crossovers + band kill */
+   uint8_t kind=(uint8_t)(1u+s->punch_param[15]/15u);
+   if(kind>7u)kind=7u;
+   int32_t in[2]={l,r};
+   for(unsigned ch=0;ch<2u;ch++){
+    const int32_t x=in[ch];
+    /* ~400Hz low crossover and ~3kHz high crossover at 44.1kHz */
+    s->punch_iso_lp[ch]+=((x-s->punch_iso_lp[ch])*14)>>8u;
+    s->punch_iso_hp[ch]+=((x-s->punch_iso_hp[ch])*86)>>8u;
+    const int32_t bass=s->punch_iso_lp[ch];
+    const int32_t mid=s->punch_iso_hp[ch]-bass;
+    const int32_t high=x-s->punch_iso_hp[ch];
+    const int32_t out=((kind&1u)?0:bass)+((kind&2u)?0:mid)+((kind&4u)?0:high);
+    if(ch==0u)l=out;else r=out;
+   }
+  }
   if(mask&128u){l=0;r=0;}
   dst[f*2u]=(int16_t)punch_clip(l);
   dst[f*2u+1u]=(int16_t)punch_clip(r);
   /* Freeze capture only for REPEAT / TAPE. Ring Mod and STUTTER
    * always process fresh live audio, including drum-only playback. */
-  if(mode!=1u&&mode!=4u){
+  if(mode!=1u&&mode!=4u&&mode!=6u&&mode!=7u){
    if(!s->punch_decimate_phase){
     s->punch_decimate_l=(int16_t)dry_l;
     s->punch_decimate_r=(int16_t)dry_r;
@@ -832,6 +961,10 @@ void track_chip_process_punch(struct track_chip_engine *s,uint8_t mask,int16_t *
     s->punch_write=(uint16_t)punch_ring((uint32_t)w+1u);
     s->punch_decimate_phase=0u;
    }
+  }
+  if(mask&((1u<<12)|(1u<<13))){
+   const uint8_t speed=(mask&(1u<<13))?s->punch_param[13]:s->punch_param[12];
+   s->punch_mod_phase+=25000u+(uint32_t)speed*15000u;
   }
   if(s->punch_age<0xFFFFFFFEu)s->punch_age++;
  }

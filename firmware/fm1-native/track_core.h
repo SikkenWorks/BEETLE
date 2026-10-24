@@ -19,7 +19,7 @@
 #define TRACK_NOTE_EMPTY 255u
 #define TRACK_FX_VOLUME 10u
 #define TRACK_CHORD_COUNT 12u
-#define TRACK_PUNCH_COUNT 8u
+#define TRACK_PUNCH_COUNT 16u
 /* Sparse pattern backing store: an inactive pattern may be loaded on demand. */
 /* A 5-byte packed step: 8 NOTE + 3 INST + 4 CHORD + 4 FX + 7 VALUE
  * + 8 dynamics bits. Keeps the 48-pattern bank the SAME RAM size.
@@ -64,15 +64,30 @@ static inline uint8_t track_extra_key(uint8_t lane,uint8_t row,uint8_t note2){
 }
 struct track_harmony {uint8_t root,mode,keylock;};
 struct track_transport {uint16_t bpm;uint8_t playing,play_step,edit_step,edit_column,edit_channel,stop_step;uint32_t tick_remainder;};
-struct track_engine {struct track_pattern active;struct track_harmony harmony;struct track_transport transport;uint8_t project_slot,pattern_slot,record_armed,punch_mask,dirty;};
+struct track_engine {struct track_pattern active;struct track_harmony harmony;struct track_transport transport;uint8_t project_slot,pattern_slot,record_armed,dirty;uint16_t punch_mask;};
 /* MIDI 0..127 notes, 254 STP and 255 ---; no sentinels ever reach DSP pitch arrays. */
 uint8_t track_note_scroll(uint8_t value,int32_t detents,uint8_t drum);
 /* LOCK scrolls only through the selected scale; OFF/GUIDE preserve chromatic editing. */
 uint8_t track_note_scroll_keylocked(uint8_t value,int32_t detents,uint8_t drum,const struct track_harmony *h);
 void track_init(struct track_engine *e);
 int track_enter_note(struct track_engine *e,uint8_t note);
-/* Drum NOTE2 uses chord encoding: 0=empty, 1..14=pad, 15=STP.
- * Entry does not alter NOTE1, selected row or non-note fields. */
+/* Drum NOTE2: 4-bit chord holds empty/STOP and pad 1..14. The normally
+ * 0..3 drum KIT field has a reserved bit 2 (0x4): when set, NOTE2 chord
+ * 1..13 addresses user samples U01..U13. No new project bytes required.
+ * The lower KIT bits and NOTE1 are untouched by NOTE2 selection. */
+static inline uint8_t track_note2_id(const struct track_step *s){
+ if(!s||!s->chord||s->chord==15u)return TRACK_NOTE_EMPTY;
+ if(s->instrument&4u)return s->chord<=13u?(uint8_t)(13u+s->chord):TRACK_NOTE_EMPTY;
+ return (uint8_t)(s->chord-1u);
+}
+static inline void track_note2_set(struct track_step *s,uint8_t id){
+ if(!s)return;
+ if(id==TRACK_NOTE_STOP){s->chord=15u;s->instrument&=3u;}
+ else if(id==TRACK_NOTE_EMPTY){s->chord=0u;s->instrument&=3u;}
+ else if(id>=14u&&id<=26u){s->chord=(uint8_t)(id-13u);s->instrument|=4u;}
+ else if(id<14u){s->chord=(uint8_t)(id+1u);s->instrument&=3u;}
+}
+/* Entry does not alter NOTE1, cursor, drum KIT (low 2 bits) or step FX. */
 int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note);
 int track_set_note(struct track_engine *e,uint8_t channel,uint8_t step,uint8_t note);
 int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step);
