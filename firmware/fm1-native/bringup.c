@@ -1944,7 +1944,7 @@ static void screen_render(void){
    label(uac.alt?(uac.flowing?"UAC STREAM":"UAC WAIT HOST"):"UAC IDLE",10,128,0xffff);
    label("UND",10,146,0x7bef);number(uac.underruns,50,146);
    label("OVER",125,146,0x7bef);number(uac.overruns,175,146);
-   label("MISS",10,165,0x7bef);number(uac.missed,60,165);
+   label("RECOV",10,165,0x7bef);number(uac.recoveries,75,165);
    label("STALL",125,165,0x7bef);number(uac.stalls,182,165);
 #else
    label("UAC DISABLED",10,142,0xfda0);

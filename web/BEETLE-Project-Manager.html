@@ -47,7 +47,7 @@ body.migration-running .app button,body.migration-running .app input,body.migrat
 </head>
 <body>
 <main class="app">
-<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.4.25 · TOOL V2.3</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
+<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.4.35 · TOOL V2.4</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
 <section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites and true slot deletion. Storage V2 migration is available with compatible V1.4.24 firmware. Only the dedicated BEETLE project/sample partition is reformatted after an explicit backup.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
 <section class="box" aria-label="USB-MIDI connection">
 <div class="box-title">01 / DEVICE CONNECTION <small>USB · WEB MIDI SYSEX</small></div>
@@ -71,6 +71,9 @@ body.migration-running .app button,body.migration-running .app input,body.migrat
 <div>
 <section class="box"><div class="box-title">02 / DEVICE PROJECTS <small>12 FLASH SLOTS · A/B JOURNAL</small></div>
 <div class="bar"><span class="legend"><b id="used">—</b> / 12 OCCUPIED</span><button class="button quiet" id="refresh" disabled>↻ REFRESH SLOTS</button></div>
+<div class="bar" style="margin:14px 0 3px;gap:8px;flex-wrap:wrap"><button class="button primary" id="exportAll" disabled>↓ EXPORT PROJECTS ZIP</button><button class="button" id="importAll" disabled>↑ IMPORT PROJECTS ZIP</button></div>
+<div class="help">Backup all occupied slots as encrypted .beetle files in one .zip, or import them back into their ORIGINAL numbered slots. Individual IMPORT/EXPORT remains available. ZIP import checks all entries before any transfer and never silently erases missing slots.</div>
+<input id="allProjectsFile" type="file" accept=".zip,application/zip" hidden>
 <div id="slots" class="slots" aria-label="Project slot grid"></div>
 <div class="progress-panel" id="progressPanel" hidden><div class="progress-heading"><span id="progressText">TRANSFER</span><span id="progressCount">0%</span></div><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div></div>
 </section>
@@ -193,7 +196,7 @@ async function query(cmd,args=[],expected,timeout=4500,retries=1){if(!portOut||!
 function log(msg,error=false){$('activity').className='activity'+(error?' error':'');$('activity').lastElementChild.textContent=msg;}
 function setProgress(label,fraction){$('progressPanel').hidden=false;$('progressText').textContent=label;let pct=Math.max(0,Math.min(100,Math.round(fraction*100)));$('progressCount').textContent=pct+'%';$('progressFill').style.width=pct+'%';}
 function hideProgress(){$('progressPanel').hidden=true;}
-function setBusy(value){busy=Boolean(value||migrationInProgress);value=busy;const bankTransfer=document.getElementById('bankTransfer');if(bankTransfer)bankTransfer.disabled=value||!connected||!deviceGlobalSamples||!window.BeetleSampleDevice?.canUpload();const bankRefresh=document.getElementById('bankDeviceRefresh');if(bankRefresh)bankRefresh.disabled=value||!connected||!deviceGlobalSamples;$('connect').disabled=value;const c=$('convertStorageV2');if(c)c.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='legacy';const r=$('restoreStorageV2');if(r)r.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='v2';$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('upgradeLegacy').disabled=value||!connected||legacySlots().length===0;$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('recover').disabled=value||!connected||deviceProtocol<3||!['bad','used'].includes(slots[selected].state);$('diagnoseMarker').disabled=value||!connected||deviceProtocol<4;$('repairMarker').disabled=value||!connected||deviceProtocol<4||markerStatus!==1;$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
+function setBusy(value){busy=Boolean(value||migrationInProgress);value=busy;const bankTransfer=document.getElementById('bankTransfer');if(bankTransfer)bankTransfer.disabled=value||!connected||!deviceGlobalSamples||!window.BeetleSampleDevice?.canUpload();const bankRefresh=document.getElementById('bankDeviceRefresh');if(bankRefresh)bankRefresh.disabled=value||!connected||!deviceGlobalSamples;$('connect').disabled=value;const c=$('convertStorageV2');if(c)c.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='legacy';const r=$('restoreStorageV2');if(r)r.disabled=value||!connected||deviceProtocol<5||storageMigrationMode!=='v2';$('refresh').disabled=value||!connected;$('export').disabled=value||!connected||slots[selected].state!=='used';$('exportAll').disabled=value||!connected||!slots.some(x=>x.state==='used');$('importAll').disabled=value||!connected;$('import').disabled=value||!connected||slots[selected].state==='bad'||slots[selected].state==='unknown';$('upgradeLegacy').disabled=value||!connected||legacySlots().length===0;$('clear').disabled=value||!connected||deviceProtocol<2||slots[selected].state!=='used';$('recover').disabled=value||!connected||deviceProtocol<3||!['bad','used'].includes(slots[selected].state);$('diagnoseMarker').disabled=value||!connected||deviceProtocol<4;$('repairMarker').disabled=value||!connected||deviceProtocol<4||markerStatus!==1;$('inPort').disabled=value||connected;$('outPort').disabled=value||connected;document.querySelectorAll('.slot').forEach(e=>e.disabled=value);}
 function draw(){const root=$('slots');root.textContent='';let count=0;for(let k=0;k<12;k++){
  const s=slots[k];if(s.state==='used')count++;const b=document.createElement('button');b.type='button';b.className='slot '+(k===selected?'selected ':'')+(s.state==='empty'?'empty ':s.state==='bad'?'unavailable':'');b.setAttribute('aria-pressed',String(k===selected));
  const head=document.createElement('div');head.className='slot-head';const num=document.createElement('span');num.className='slot-number';num.textContent='SLOT '+String(k+1).padStart(2,'0');const status=document.createElement('span');status.className='slot-state';status.textContent=s.state==='used'?(Number.isInteger(s.version)&&s.version<deviceSchema?'↻ LEGACY':'● SAVED'):s.state==='empty'?'○ EMPTY':s.state==='bad'?'! ERROR':'— UNKNOWN';head.append(num,status);
@@ -405,7 +408,7 @@ function parseV2MigrationBackup(bytes){
   const name=decoder.decode(bytes.subarray(i+30,i+30+nameLength));
   if(!name||name.includes('/')||name.includes('\\')||files.has(name)||crc32(bytes.subarray(start,end))!==fileCrc)
    throw Error('Backup ZIP has a duplicate, unsafe name or CRC failure.');
-  files.set(name,bytes.slice(start,end));i=end;
+  files.set(name,bytes.slice(start,end));locals.set(name,{offset:i,size,crc:storedCrc,flags});i=end;
  }
  if(!files.has('MIGRATION-MANIFEST.json'))throw Error('Not a BEETLE Storage V2 migration ZIP.');
  let manifest;
@@ -822,18 +825,171 @@ function makeBackupZip(files){
  blocks.push(Uint8Array.from([...long(0x06054b50),...short(0),...short(0),...short(files.length),...short(files.length),...long(at-centralAt),...long(centralAt),...short(0)]));
  const result=new Uint8Array(at+22);let pos=0;for(const b of blocks){result.set(b,pos);pos+=b.length;}return result;
 }
+
+/* BEETLE V1.4.35: standalone bulk ZIP, NOT a Storage V2 migration.
+ * No storage formatting, deletion or sample writes. An encrypted project
+ * stays assigned to its original slot; all entries are authenticated and
+ * preflighted before the first USB flash write. */
+const BULK_FORMAT='BEETLE-PROJECTS-BULK-1';
+function parseBulkProjectsZip(bytes){
+ if(!(bytes instanceof Uint8Array)||bytes.length<22||bytes.length>4*1024*1024)
+  throw Error('Bulk ZIP is missing, damaged or larger than 4 MiB.');
+ const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),files=new Map(),locals=new Map(),decoder=new TextDecoder();
+ let i=0;
+ while(i+4<=bytes.length&&v.getUint32(i,true)===0x04034b50){
+  if(i+30>bytes.length)throw Error('Truncated ZIP local header.');
+  const flags=v.getUint16(i+6,true),method=v.getUint16(i+8,true),storedCrc=v.getUint32(i+14,true),
+        size=v.getUint32(i+18,true),plain=v.getUint32(i+22,true),nl=v.getUint16(i+26,true),ex=v.getUint16(i+28,true);
+  const start=i+30+nl+ex,end=start+size;
+  if(method!==0||(flags&9)||plain!==size||nl<1||nl>160||end>bytes.length||i+30+nl>bytes.length)
+   throw Error('Unsupported, compressed or corrupt bulk ZIP entry. Use BEETLE Manager export.');
+  const name=decoder.decode(bytes.subarray(i+30,i+30+nl));
+  if(!/^[A-Za-z0-9_.-]+$/.test(name)||files.has(name)||crc32(bytes.subarray(start,end))!==storedCrc)
+   throw Error('Unsafe filename, duplicate file, or CRC failure in bulk ZIP.');
+  files.set(name,bytes.slice(start,end));locals.set(name,{offset:i,size,crc:storedCrc,flags});i=end;
+  if(files.size>13)throw Error('Too many entries in bulk ZIP.');
+ }
+ /* Enforce the central directory and end-of-central record as well as
+  * each local header; a truncated ZIP must never be interpreted as backup. */
+ const eocd=bytes.length-22;
+ if(i+46>eocd||v.getUint32(eocd,true)!==0x06054b50||
+    v.getUint16(eocd+4,true)!==0||v.getUint16(eocd+6,true)!==0||
+    v.getUint16(eocd+8,true)!==files.size||v.getUint16(eocd+10,true)!==files.size||
+    v.getUint16(eocd+20,true)!==0||v.getUint32(eocd+16,true)!==i||
+    v.getUint32(eocd+12,true)!==eocd-i)
+  throw Error('Bulk ZIP central directory or footer is missing or inconsistent.');
+ let central=i;
+ const centralNames=new Set();
+ for(let n=0;n<files.size;n++){
+  if(central+46>eocd||v.getUint32(central,true)!==0x02014b50)throw Error('Invalid central ZIP entry.');
+  const flags=v.getUint16(central+8,true),method=v.getUint16(central+10,true),
+    crc=v.getUint32(central+16,true),size=v.getUint32(central+20,true),
+    original=v.getUint32(central+24,true),nl=v.getUint16(central+28,true),
+    extra=v.getUint16(central+30,true),comment=v.getUint16(central+32,true),
+    disk=v.getUint16(central+34,true),offset=v.getUint32(central+42,true);
+  if(nl<1||nl>160||central+46+nl+extra+comment>eocd||disk!==0||method!==0||(flags&9)||original!==size)
+   throw Error('Unsupported or invalid bulk ZIP central entry.');
+  const name=decoder.decode(bytes.subarray(central+46,central+46+nl));
+  const local=locals.get(name);
+  if(!local||centralNames.has(name)||local.offset!==offset||local.size!==size||
+     local.crc!==crc||local.flags!==flags)
+   throw Error('Bulk ZIP central entry does not match its data.');
+  centralNames.add(name);
+  central+=46+nl+extra+comment;
+ }
+ if(central!==eocd)throw Error('Bulk ZIP has unexpected central-directory bytes.');
+ const record=files.get('PROJECTS-MANIFEST.json');
+ if(!record)throw Error('This is not a BEETLE bulk projects ZIP.');
+ let manifest;try{manifest=JSON.parse(decoder.decode(record));}catch{throw Error('Invalid bulk manifest JSON.');}
+ if(manifest.format!==BULK_FORMAT||!Array.isArray(manifest.projects)||manifest.projects.length<1||manifest.projects.length>12||files.size!==manifest.projects.length+1)
+  throw Error('Bulk manifest or project count is invalid.');
+ const slotsSeen=new Set(),namesSeen=new Set();
+ for(const entry of manifest.projects){
+  if(!Number.isInteger(entry.slot)||entry.slot<0||entry.slot>11||slotsSeen.has(entry.slot)||
+    typeof entry.file!=='string'||!/\.beetle$/i.test(entry.file)||namesSeen.has(entry.file)||
+    !Number.isInteger(entry.rawCrc)||!Number.isInteger(entry.encryptedCrc)||
+    !Number.isInteger(entry.rawSize)||entry.rawSize<42||entry.rawSize>MAX_PROJECT)
+   throw Error('Invalid slot assignment or duplicate project in ZIP.');
+  const contents=files.get(entry.file);
+  if(!contents||crc32(contents)!==entry.encryptedCrc)
+   throw Error('Missing or corrupt encrypted project in ZIP: '+entry.file);
+  slotsSeen.add(entry.slot);namesSeen.add(entry.file);
+ }
+ return {files,projects:manifest.projects};
+}
+async function exportProjectsZip(){
+ if(!connected)throw Error('Connect FM1 first.');
+ if(slots.some(s=>s.state==='unknown'||s.state==='bad'))
+  throw Error('Refresh/repair unreadable slots first. Bulk backup will not silently skip them.');
+ const occupied=slots.map((s,i)=>s.state==='used'?i:-1).filter(i=>i>=0);
+ if(!occupied.length)throw Error('No stored projects to export.');
+ setBusy(true);const files=[],manifest=[];
+ try{
+  for(const slot of occupied){
+   const {raw,info}=await readProjectFromSlot(slot);
+   if(info.name!==slots[slot].name)throw Error('SLOT '+(slot+1)+' changed during ZIP export.');
+   const blob=await encryptProject(raw),contents=new Uint8Array(await blob.arrayBuffer());
+   const file=filename(info.name,slot);
+   files.push({name:file,bytes:contents});
+   manifest.push({slot,file,name:info.name,version:info.version,rawSize:raw.length,rawCrc:crc32(raw),encryptedCrc:crc32(contents)});
+  }
+  const meta=enc.encode(JSON.stringify({format:BULK_FORMAT,created:new Date().toISOString(),projects:manifest},null,2));
+  files.unshift({name:'PROJECTS-MANIFEST.json',bytes:meta});
+  const zip=makeBackupZip(files);
+  download(new Blob([zip],{type:'application/zip'}),'BEETLE-PROJECTS-BACKUP.zip');
+  log('ZIP backup generated for '+occupied.length+' verified projects. Confirm the ZIP was saved to your computer.');
+ }finally{hideProgress();setBusy(false);}
+}
+async function importProjectsZip(file){
+ if(!connected)throw Error('Connect the FM1 before importing the ZIP.');
+ if(file.size>4*1024*1024)throw Error('ZIP exceeds 4 MiB limit.');
+ const pack=parseBulkProjectsZip(new Uint8Array(await file.arrayBuffer()));
+ const projects=[];
+ /* Preflight EVERY member, decrypt/authenticate and validate payload and
+  * slot binding before asking for overwrite approval or writing flash. */
+ setBusy(true);
+ try{
+  for(const entry of pack.projects){
+   const item=new File([pack.files.get(entry.file)],entry.file,{type:'application/octet-stream'});
+   const raw=await decryptProject(item),info=validateProject(raw);
+   if(info.slot!==entry.slot||info.name!==entry.name||info.version!==entry.version||
+      crc32(raw)!==entry.rawCrc||raw.length!==entry.rawSize)
+    throw Error('ZIP manifest does not match project contents in SLOT '+(entry.slot+1)+'.');
+   const status=slots[entry.slot];
+   if(status.state==='bad'||status.state==='unknown')throw Error('Destination SLOT '+(entry.slot+1)+' must be scanned and readable.');
+   projects.push({slot:entry.slot,raw,info,oldState:status.state,oldName:status.name});
+  }
+ }finally{setBusy(false);}
+ const used=projects.filter(x=>x.oldState==='used');
+ const legacy=projects.filter(x=>x.info.version<deviceSchema);
+ const summary=projects.map(x=>'SLOT '+String(x.slot+1).padStart(2,'0')+': '+x.info.name+' → '+(x.oldState==='used'?'REPLACE '+x.oldName:'EMPTY')).join('\n');
+ const choice=await modal('IMPORT '+projects.length+' PROJECTS · BULK ZIP',
+  'Projects will be restored to their ORIGINAL slot numbers; no other slots are deleted.\n\n'+summary+
+  '\n\n'+used.length+' occupied slots will be overwritten, and '+legacy.length+' legacy projects converted. No multi-slot transaction or automatic rollback is available. Back up the current FM1 first.',
+  [{label:'CANCEL',value:'no'},{label:'CONTINUE TO CONFIRMATION',value:'yes'}]);
+ if(choice!=='yes')return;
+ const okay=await modal('FINAL BULK IMPORT CONFIRMATION',
+  'Save your current projects to another ZIP BEFORE continuing. A USB interruption could leave some slots imported and others unchanged. The manager will recheck each destination before writing and verify each successful import.',
+  [{label:'CANCEL',value:'no'},{label:'IMPORT '+projects.length+' PROJECTS',kind:'danger',value:'yes',confirm:true}],
+  'I have backed up the destination FM1 and accept replacement of the listed occupied slots.');
+ if(okay!=='yes')return;
+ let finished=0;
+ try{
+  for(const item of projects){
+   const scan=await query(0x51,[item.slot],0x61,7000,1);
+   if(scan.length<14||scan[0]!==item.slot||
+      (scan[1]===1?'used':scan[1]===0?'empty':'bad')!==item.oldState||
+      (item.oldState==='used'&&ascii(scan.slice(2,14))!==item.oldName))
+    throw Error('Destination SLOT '+(item.slot+1)+' changed; bulk import stopped.');
+   await uploadProject(item.slot,item.raw,item.oldState==='used','BULK IMPORT',false);
+   const result=await readProjectFromSlot(item.slot);
+   if(result.info.slot!==item.slot||result.info.name!==item.info.name||
+     (item.info.version===deviceSchema&&crc32(result.raw)!==crc32(item.raw))||
+     (item.info.version<deviceSchema&&result.info.version!==deviceSchema))
+    throw Error('Readback verification failed for SLOT '+(item.slot+1)+'.');
+   finished++;
+  }
+  await refresh();log('Bulk import completed. '+finished+' projects verified from FM1.');
+ }catch(err){
+  await refresh().catch(()=>{});
+  throw Error('Bulk import stopped after '+finished+'/'+projects.length+' completed slots. '+err.message+' Retain both backup ZIPs.');
+ }
+}
 $('connect').onclick=()=>safe(async()=>{setBusy(true);try{await connect();}finally{setBusy(false);}});
 $('upgradeLegacy').onclick=()=>safe(offerLegacyConversion);
 $('convertStorageV2').onclick=()=>safe(convertStorageV2);
 $('restoreStorageV2').onclick=()=>{if(!busy){$('migrationBackupFile').value='';$('migrationBackupFile').click();}};
 $('migrationBackupFile').onchange=()=>{const f=$('migrationBackupFile').files?.[0];if(f)safe(()=>restoreV2FromZip(f));};
 $('copyDiagnostics').onclick=async()=>{
- const report='BEETLE V1.4.24 PROJECT MANAGER · STORAGE MIGRATION\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
+ const report='BEETLE V1.4.35 PROJECT MANAGER · STORAGE MIGRATION\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
  try{await navigator.clipboard.writeText(report);log('Connection report copied.');}
  catch{log('Could not copy automatically. Select an HTTPS/localhost page and try again.',true);}
 };
 $('refresh').onclick=()=>safe(async()=>{await refresh();if(deviceGlobalSamples&&window.BeetleSampleDevice)await window.BeetleSampleDevice.refresh();log('FM1 project and sample slots refreshed.');});
 $('export').onclick=()=>safe(async()=>{await exportSlot(selected);});
+$('exportAll').onclick=()=>safe(exportProjectsZip);
+$('importAll').onclick=()=>{if(!busy){$('allProjectsFile').value='';$('allProjectsFile').click();}};
+$('allProjectsFile').onchange=()=>{const f=$('allProjectsFile').files?.[0];if(f)safe(()=>importProjectsZip(f));};
 $('clear').onclick=()=>safe(clearSlotWithPrompt);
 $('recover').onclick=()=>safe(recoverCorruptSlot);
 $('diagnoseMarker').onclick=()=>safe(diagnoseStorageMarker);

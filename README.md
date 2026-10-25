@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.4.31 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.4.35 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
   <br>
   <b>The user sample feature is still experimental!</b>
 </p>
@@ -42,6 +42,104 @@
 Read [Global User Samples & Storage V2](#global-user-samples--storage-v2-v1424-experimental) and [USB-C audio capture](#usb-c-audio-capture-stereo-or-six-track-mode-experimental) for setup, limitations and safety information.
 
 ---
+
+## New in V1.4.35: Punch-In Page Lights, SONG Loop Hold & Bulk Project ZIP
+
+**Punch-In FX keys light up for the active Punch-In FX page.** The FM1 keyboard LEDs show all eight white keys corresponding to the eight effects visible on the currently selected Punch-In page, and the WebSimulator highlights that same bank. Changing from FX page 1 to page 2 changes the eight illuminated keys. Pressed keys remain visible, and the existing FX trigger, K1 parameter, multi-hold priority and paging rules are unchanged.
+
+**In SONG CHAINS, hold SEL for at least 650 ms to toggle SONG LOOP ON/OFF.** The loop state is indicated by the existing SONG ON/OFF LOOP ON/OFF label. A short SEL press still clears the selected song range (or switches SONG ON/OFF if no range exists). Holding SEL while turning K1 still selects a song range and **does not toggle** the loop setting. The V1.4.34 rule remains: PLAY with a selected range loops *that selection*, independently of ordinary SONG LOOP; full-song playback follows the SONG LOOP switch.
+
+**The Project Manager adds EXPORT PROJECTS ZIP and IMPORT PROJECTS ZIP**, alongside the original per-slot encrypted `.beetle` import/export. Bulk export reads and validates **all occupied project slots (maximum 12)**, encrypts their data into individual `.beetle` entries and writes a `PROJECTS-MANIFEST.json` with source slot, name, version, sizes and checksums. ZIP import validates the complete archive, header/central directory, manifest, duplicate/unsafe names, checksums, decrypts every project, checks each project's internal CRC and assigned slot and asks for **two separate confirmations before replacing stored projects**. It restores to the recorded slot numbers; entries absent from ZIP are untouched. Imports are sequential, verified by readback after each commit and **not atomic**; unplugging the FM1 partway through may leave a partial import. This ZIP contains *projects only*, **not global U01–U13 sample audio**: back up your user-sample bank separately with the existing sample-bank workflow. ZIPs are exported uncompressed (store-only) for predictable validation; other ZIP generators' compressed archives are not currently supported. Existing individual import/export functionality remains available.
+
+**Legacy V23 migration regression test corrected:** the older test previously mislabeled V25 project bytes as V23 without removing eight later-added Punch-In settings. It now constructs a structurally valid V23 test project and tests that the current project decoder reads it. The production decoder and project schema **TRK1 V25** were not modified. The separate old PCM-reference checksum regression was already failing on the V1.4.34 baseline and is documented separately; it is not reported as passed.
+
+Host tests confirm native SONG selection, V23 readback, ZIP round-trip and malformed-ZIP rejection, while the native JieLi app and FM1 `.fwsc` package verify. **No physical FM1 keyboard, MIDI, USB or OTA flashing test has been performed.** Back up projects and samples and use only a confirmed recovery route.
+
+## New in V1.4.34: SONG Pattern Selection & Range Loop
+
+In **SONG CHAINS**, navigate with **K1** (song row), **K2** (channel / repeats) and **K3** (pattern / repeat value). To select a passage, hold **SEL** and rotate **K1**: the anchor is the row at the moment SEL was pressed, and the selected inclusive range is displayed with the **same filled magenta strip and pink active-cell outline as tracker step selection**. Release SEL to leave the range highlighted. **PLAY immediately starts on the first selected row, and loops exactly those selected song rows until STOP**, even if the ordinary SONG LOOP switch is off. Every row's existing `REP` count is respected. The visible playback position follows the selected rows. This also works when selecting backwards and for a single-row range. If SONG was off, selection+PLAY activates it to perform the selected-song loop.
+
+**SEL alone** clears an existing range without toggling SONG. When no range is present, SEL continues to toggle SONG ON/OFF. **SEQ+OP1/2** still copy/paste selected song rows, and **OCT+/-** insert/delete rows (doing so clears the transient selection to avoid stale positions). During PLAY the song-chain rows cannot be edited or inserted/deleted, avoiding races with the realtime audio engine. **Without a selected range, PLAY preserves normal full-song mode and its existing global LOOP setting.** The range is a temporary UI/playback state, not a saved song arrangement change.
+
+The standalone WebSimulator and the All-in-One Manager mirror the same range playback and selection highlighting. No changes to `.beetle` serialization (**TRK1 V25**), channel routing, Punch-In, usersamples, NOTE2, SID, USB stereo/multitrack, or OTA loader. Host range-loop tests, native JieLi build and firmware/embedded-content integrity checks passed; hardware flashing and real-time playback are still experimental. Back up projects and samples before attempting OTA.
+
+## New in V1.4.33: Live CHD Chord Audition
+
+On the **TRACKER** screen, enter a note on a synth channel (CH1–CH5), select **CHD** using K2, then rotate **K3**. Every change now plays the saved note as the currently selected chord **immediately**, without needing PLAY or a separate key press. This previews all twelve chord choices, from a single note (`---`) to five-note `MIN9`, with the step's saved instrument and current keylock voicing. Turning K3 again releases the prior chord before starting the next; the audition automatically releases after approximately 240 ms.
+
+**Non-destructive:** the audition never adds tracker notes, changes any other step, advances the playhead or alters recording state. It stays silent for EMPTY/STP notes, CH6 drums and when the transport is running. The existing global **MONO** mode permits only its normal single-voice preview; use POLY to hear all notes simultaneously. The user's currently selected CHD value is, of course, saved normally just as before. Normal NOTE scrolling continues to preview one note.
+
+**Compatibility:** no new project fields, flash sectors, MIDI messages or USB buffers. TRK1 V25 projects, user samples, NOTE2, stereo/multitrack recording, SID upgrades and protected OTA assets are retained. Native build and host chord-policy tests pass, and firmware packaging was checked against V1.4.32. Physical FM1 audio/OTA flashing remains unverified.
+
+## New in V1.4.32: USB-C Audio Capture Stability (experimental)
+
+**Both stereo USB recording and the six-track multitrack stream** now use a larger *time reserve* in the same 512-frame capture ring. Priming increases from 104 to **224 samples at 44.1 kHz**, providing more time for an occasional late DMA render without allocating extra PCM RAM. The nominal USB capture delay rises by approximately **2.72 ms**. The optional, experimental 48 kHz stereo path uses a corresponding 244-frame reserve.
+
+The former stereo clock controller (up to ±0.6% and comparatively rapid retuning) has been replaced with the slower bounded controller already used for multitrack (up to ±0.098% nominal rate correction), measured once per native audio render. Both modes continue transmitting their correct 44/45 frames per USB millisecond and use one shared sample clock across all six stems.
+
+**Error recovery is explicit:** a true underrun tapers the final audible PCM values towards silence within the affected packet, then requests a fresh ring prime at the next DMA boundary, resetting fractional-read state and SRC control. An overrun also requests this bounded restart, instead of silently dropping successive full audio blocks and retaining stale read positions. A 24-frame fade-in avoids a large discontinuity where the priming silence meets resumed audio. Writer free-space checks explicitly reject impossible read/write distances. The **RECOV** counter on SYSTEM → USB AUDIO reports these restarts, alongside UND / OVER / STALL. The hardware ISR, USB endpoint and actual worst-case latency have **not** been validated on a physical FM1.
+
+**What has not changed:** all BEETLE synths/SID fixes, patches, Punch-In FX, project and sample formats, user samples, NOTE2, six stems, protected OTA boot sections and stored projects. This release does not increase the number of voices or blindly remove overload safeguards. If the underlying audio renderer misses its deadline repeatedly, the recorder can still contain audible gaps; the new logic avoids indefinite holds and repeated stale-buffer processing but cannot reconstruct missing audio.
+
+Validation: 10-minute steady-state stereo and multitrack host clocks without loss; six-minute simulated DMA delays and USB host-read interruptions, with recovery; signed PCM16 fades, overflow guards, existing DSP/NOTE2 regressions, native JieLi compilation, firmware asset checks. These are **software tests**, not physical USB recording proof.
+
+## New in V1.4.31: SID Wah / Beating Regression Fix
+
+The V1.4.30 SID upgrade unintentionally made factory-style **SID 6581, SID DIRTY and SID BASS** patches sound as if a wah/filter sweep were running, even with no modulation enabled. It activated a pre-existing **12-cent VA default detune** on oscillator B, which previously shared the same oscillator phase; meanwhile the replacement 6581 cutoff mapping raised the usual cutoff setting of 96 from approximately 37 to approximately 97 (Q8 filter coefficient). **V1.4.31 corrects both.**
+
+For those three 6581-derived variants, neutral oscillator B settings (`coarse B = 0`, `fine B = 0`, `detune = 12` from older defaults, or `0`) now keep the two phases coherent. Deliberate B tuning, Hard Sync or Ring Mod still use the independent B oscillator. The earlier V1.4.29 **6581 cutoff/resonance mapping** is restored, preserving older patches' tonal balance. **SID 8580 and SID NOISE remain unchanged** relative to V1.4.30. Combined waveforms, Hard Sync, Ring Mod and the faster 32-bit filter implementation remain available.
+
+No project migration, additional audiobuffer or permanent RAM allocation is required. This is a source/host-validated correction; the result still needs listening tests and sustained stress testing on a physical FM1 before the firmware can be considered reliable.
+
+## New in V1.4.30: SID Character & Boot Keyboard Isolation
+
+**SID 6581 / SID 8580:** separate 17-point ROM cutoff curves, safer 32-bit fixed-point filter processing (three former 64-bit multiplications per SID sample removed), and **two independently running A/B oscillator phases**. This adds useful tonal and filter differences while keeping the existing eight shared synthvoices and project file format **TRK1 V25**.
+
+In **EDIT → OSC → Bank 3**, SID patches now reuse three previously SID-inactive parameters: **HARD SYNC** (the former SUB OSC knob), **RING MOD** (formerly NOISE, active when oscillator A is TRIANGLE), and **COMBINE** (formerly FM DEPTH, 0–100%). COMBINE blends a SID-inspired masked A/B waveform with the normal linear mix. All default to OFF on unchanged presets. These are lightweight **SID-inspired models**, not a cycle-accurate original MOS 6581/8580 or reSID. The browser simulator only approximates the native audio implementation.
+
+**Boot project keyboard fix:** musical key presses while **NEW PROJECT / LOAD PROJECT** and related modal confirmation/loading screens are open are discarded; keys held across the exit are ignored until released. They can no longer unexpectedly insert notes or trigger SEQ musical-key shortcuts on returning to the tracker. Freshly pressed keys in the tracker still work normally.
+
+**Compatibility & safety:** existing projects, the instrument library, 13 global user-sample slots, NOTE2, Punch-In FX, USB capture, sample capacity protections, and retained OTA loader/header are unchanged. The new SID filter curves intentionally change the audio timbre of existing SID patches. JieLi builds and host tests are software-only; hardware stability and OTA recovery remain unverified. Make independent project/sample backups and confirm a working recovery path before flashing experimental firmware.
+
+## New in V1.4.28: User-Sample Streaming Optimization
+
+**Faster, lower-overhead global user-sample playback.** The native 22,050 Hz BD4S streamer now reuses the source sample pair across each two 44,100 Hz output frames instead of repeating PCM-window searches on both frames. Full 256-frame encoded blocks are obtained with a single bounded background flash read, instead of a separate six-byte header read and second full-block fetch. Short final blocks remain bounds-checked. The six-channel drum mixer also bypasses unnecessary factory-ROM 64-bit interpolation for global user samples, which are already resampled in the BD4S engine.
+
+**No new sample storage format, no new flash partition, no extra drum voices, and no changes to user sample labels or NOTE2 mapping.** All 13 global user samples, six drum voices, Punch-In FX, USB stereo/multitrack, Storage V2 safety margins and project schema **TRK1 V25** are preserved. Existing `.beetlebank` and `.beetle` files remain in their existing formats.
+
+**Software validation:** 64 consecutive pattern-loop retriggers across six independent sample voices, exact PCM comparison, long six-voice playback, underrun/recovery tests, and live Storage V2 stream tests pass on the host. The native JieLi/USB/Storage V2 build and firmware packaging have passed software checks. **This does not yet demonstrate that physical FM1 looping glitches, CPU/DMA overload or USB recording issues have been resolved**; test on real hardware with backed-up projects and a known-working recovery path.
+
+## New in V1.4.27: CRY, Audible BITCRUSH & RADIO Low-Cut
+
+**CRY** is the new name for the former **SCRATCH** Punch-In effect (FX 09). Its effect ID, held-key mapping, captured performance automation and parameters are unchanged. It is still short-buffer, bidirectional scratch playback rather than a long, full reverse track. The firmware Punch-In pages, recorded FX event editor and WebSimulator display **CRY**.
+
+**BITCRUSH (FX 10)** now combines real **12-to-4-bit quantization** with **sample-rate reduction (44.1 kHz down to approximately 1.4 kHz at maximum)**. Hold its white key and turn **K1**: at 50 the native engine produces roughly **8-bit / 2.76 kHz** processing, deliberately more audible on quiet patches and drums than the previous amplitude-only version. State persists across DMA blocks, while short wet/dry fades avoid abrupt clicks. This is deliberately aggressive digital degradation at higher settings.
+
+**RADIO (FX 15)** now uses **two high-pass stages** for a clearly audible low-cut, preserving upper frequencies without a telephone-style low-pass. K1 raises the bass cutoff and gradually increases a small stereo hiss component. The source music is retained; this is **not** noise-only playback. A short transition fades the effect in/out.
+
+**Verification:** a new host-native DSP regression checks quiet-signal BITCRUSH, 200 Hz vs 3 kHz RADIO attenuation, and that idle hiss remains low. It also checks NOTE2 / sample compatibility from V1.4.26. **The physical FM1, live CPU deadline, USB audio and OTA recovery still need real-device validation**. Back up before flashing; a successful native build does not certify the hardware.
+
+## New in V1.4.26: Punch-In DSP, User Sample Looping & NOTE2
+
+**Audio effects corrected:** CRY now makes a fast back-and-forth movement through the existing short stereo history, with forward and reverse playback speed controlled by K1. BITCRUSH always reduces the effective bit depth rather than reaching an inaudible 16-bit setting. PHASER now cascades four all-pass stages and mixes wet/dry for moving phase notches. RADIO applies a distinct voice-band EQ with subdued noise, and DJ ISOLATOR uses separate bass, mid and treble components for audible band kills. The other Punch-In FX, both pages and automatic last-held-key focus remain intact.
+
+**Global U01–U13 samples on CH6 NOTE2:** NOTE2 now accepts **all 14 factory drums plus all 13 user samples**, just like NOTE1. Use **K2** to focus NOTE2 and **K3** to scroll through factory and U01–U13 choices, or press a drum key with Tracker REC armed to write into NOTE2. NOTE1 remains unaffected. NOTE2 keeps separate step FX. Existing NOTE2 factory hits and STOP commands continue to decode, and the project schema remains TRK1 **V25**. **Compatibility warning:** V1.4.25 firmware rejects a saved project containing the new U01–U13 NOTE2 encoding, despite sharing the V25 schema. Back up the project and remove or replace those NOTE2 hits before downgrading. This does not affect projects using only the original factory NOTE2 hits.
+
+**Looping sample stability:** the native Storage V2 BD4S streamer now reuses previously verified sectors and avoids redundant flash reads when up to six drumvoices retrigger in short patterns. This reduces unnecessary flash traffic without increasing audio buffer size, changing the 22,050 Hz / 4-bit sample format, or reducing synth polyphony. The WebSimulator reflects NOTE2 editing but does not have direct access to global samples stored on a physical FM1.
+
+**Firmware safety:** see [`docs/V1426-PUNCH-FX-NOTE2-SAMPLE-STABILITY.md`](docs/V1426-PUNCH-FX-NOTE2-SAMPLE-STABILITY.md) for the fix details and real-hardware test procedure. This is an experimental source and software-tested firmware update. The protected 16 KiB header, original OTA loader, device identity `FM-1_2123`, Storage V2 protocol and sample/project reserve are retained. **Actual FM1 sound, USB multitrack stability, sustained DSP load, flash update success and hardware recovery are not yet validated.** Export project/sample backups before any update.
+
+## New in V1.4.25: Sixteen Punch-In FX & Custom Sample Labels
+
+**PUNCH-IN FX now has two pages with 16 playable white-key effects.** Page 1 retains REPEAT, RING MOD, FILTER, TAPE STOP, STUTTER, OCT UP, OCT DOWN and MUTE. Page 2 adds **CRY, BITCRUSH, PUMP, GLITCH, WOW, PHASER, RADIO and DJ ISOLATOR**. Press **FX** to cycle through Per-Step FX, Punch-In 1/2 and Punch-In 2/2. The display **automatically jumps to the page of the most recently pressed Punch-In key**, regardless of the currently shown page. If that key is released while another remains held, the display switches back to the most recently held effect. Hold a parameterized key and turn **K1** to adjust its live setting. Existing REVERSE is *not* reintroduced: CRY uses bounded bidirectional movement through a short shared audio buffer rather than promising full-length reverse playback.
+
+**GLOBAL SAMPLE LIBRARY labels are now editable in the Project Manager**. Each U01–U13 slot can have its own **three-character tracker label**, such as `KIK`, `SN2` or `!FX`. These labels are saved to `.beetlebank` V2 with backward-compatible loading of V1 banks, and are transferred alongside sample data to compatible Storage V2 firmware. Labels are global, not stored separately in each project; the default labels remain U01–U13. The short name is distinct from the full PC-side WAV filename/sample name. Samples must be uploaded again for edited labels to appear on the FM1.
+
+**Project format:** TRK1 **V25** stores the additional Punch-In parameters and full sixteen-effect event IDs. Supported older projects, including V24, remain readable, but older firmware cannot read newly saved V25 projects. Back up projects before upgrading or downgrading. The updated 32-bit Punch-In interpolation avoids the former 64-bit per-sample multiply without reducing interpolation precision. The existing shared audio history is retained rather than enlarging RAM buffers.
+
+**Development warning:** native compilation and software tests are not physical FM1 performance measurements. Simultaneous heavy FX, user samples, USB multitrack, timing and OTA recovery remain hardware-unverified. Storage V2 migration is destructive and requires independent verified backups.
+
+**V1.4.29 RETRO PULSE sustain correction (source patch):** Removed the 4-bit quantization of the ADSR envelope, which could cause audible stepped amplitude during sustained notes. The original eight-step Game Boy-style duty oscillator is preserved, but its known duty cycle is now centered directly instead of relying on a slow DC tracking filter. A small voice-local smoothing stage reduces high-frequency edge harshness without allocating any new audio buffer. An automated host PCM test confirms stable voice identity, sustained output, negligible DC and note-off release. Physical FM1 listening and timing tests are still required. **No new flashable firmware has been validated in this source-only build.**
 
 ## What is BEETLE?
 

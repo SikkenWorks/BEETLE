@@ -108,9 +108,11 @@ static void track_song_compose(struct track_song_bank *b,struct track_engine *e)
  if(e->transport.edit_step>=length)e->transport.edit_step=(uint8_t)(length-1u);
 }
 void track_song_restore(struct track_song_bank *b,struct track_engine *e){
- if(!b||!e||!b->composite_active)return;
- if(e->pattern_slot<TRACK_PATTERNS)e->active=b->patterns[e->pattern_slot];
+ if(!b||!e)return;
+ if(b->composite_active && e->pattern_slot<TRACK_PATTERNS)
+  e->active=b->patterns[e->pattern_slot];
  b->composite_active=0u;
+ b->play_range_active=0u; /* never carry a PLAY selection into a later transport start */
 }
 uint8_t track_song_punch_pattern(const struct track_song_bank *b,const struct track_engine *e){
  if(b&&b->enabled&&b->composite_active&&b->position<b->count){
@@ -119,12 +121,24 @@ uint8_t track_song_punch_pattern(const struct track_song_bank *b,const struct tr
  }
  return e?e->pattern_slot:TRACK_PATTERNS;
 }
-void track_song_start(struct track_song_bank *b,struct track_engine *e){
+void track_song_start_range(struct track_song_bank *b,struct track_engine *e,
+                            uint8_t first,uint8_t last){
  if(!b||!e||!b->enabled||!b->count)return;
  track_song_restore(b,e);
  track_song_capture(b,e);
- b->position=0u;b->repeat_index=0u;b->composite_active=1u;
+ if(first>last){uint8_t tmp=first;first=last;last=tmp;}
+ if(first>=b->count)first=(uint8_t)(b->count-1u);
+ if(last>=b->count)last=(uint8_t)(b->count-1u);
+ b->play_range_first=first;
+ b->play_range_last=last;
+ b->play_range_active=1u;
+ b->position=first;b->repeat_index=0u;b->composite_active=1u;
  track_song_compose(b,e);
+}
+void track_song_start(struct track_song_bank *b,struct track_engine *e){
+ if(!b||!e||!b->enabled||!b->count)return;
+ track_song_start_range(b,e,0u,(uint8_t)(b->count-1u));
+ b->play_range_active=0u; /* regular full-song transport keeps global LOOP */
 }
 int track_song_on_wrap(struct track_song_bank *b,struct track_engine *e){
  if(!b||!e||!b->enabled||!b->count)return 0;
@@ -132,9 +146,15 @@ int track_song_on_wrap(struct track_song_bank *b,struct track_engine *e){
  const struct track_song_entry *entry=&b->chain[b->position];
  if(b->repeat_index+1u<entry->repeats){b->repeat_index++;return 0;}
  b->repeat_index=0u;
- if(b->position+1u>=b->count){
-  if(!b->loop){track_stop(e);track_song_restore(b,e);return -1;}
-  b->position=0u;
+ /* Selection always takes precedence over the global song loop setting. */
+ uint8_t last=b->play_range_active?b->play_range_last:(uint8_t)(b->count-1u);
+ if(last>=b->count)last=(uint8_t)(b->count-1u);
+ if(b->position>=last){
+  if(!b->play_range_active && !b->loop){
+   track_stop(e);track_song_restore(b,e);return -1;
+  }
+  b->position=b->play_range_active?b->play_range_first:0u;
+  if(b->position>=b->count)b->position=0u;
  }else b->position++;
  track_song_compose(b,e);return 1;
 }

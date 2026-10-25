@@ -17,7 +17,7 @@ static void init(void){
  memcpy(p.title,"CHAINS TEST ",12);
 }
 int main(void){
- struct track_engine e;track_init(&e);init();
+ struct track_engine e;track_init(&e);init();for(unsigned i=0;i<13;i++)p.punch_param[i]=(uint8_t)(20u+i);
  assert(p.song.chain[0].pattern==0u&&p.song.chain[0].lane[5]==TRACK_SONG_AUTO_BASE);
  assert(track_song_insert(&p.song,0)==0);
  assert(p.song.chain[1].pattern==0u&&p.song.chain[1].repeats==1u);
@@ -49,27 +49,36 @@ int main(void){
  assert(q.song.chain[0].lane[0]==2u&&q.song.chain[0].lane[5]==3u);
  assert(q.song.chain[1].lane[0]==255u&&q.song.chain[1].repeats==4u);
  assert(q.song.patterns[3].note2_fx[0].value==73u);
- /* V23 compatibility: its song lane layout has the same eight bytes per row,
-  * but cannot encode new automatic (128+) lane references. Convert those
-  * newly introduced references to their old explicit pattern numbers, then
-  * create a versioned CRC-valid V23 fixture and verify backward read support.
-  * Actual older V18 fixtures are covered by the older fixture suite. */
- memcpy(old,wire,n);
+ /* V23 compatibility: V25 persists 13 Punch-In settings, whereas V23
+  * persisted exactly five. A V25 wire file with only a rewritten version
+  * byte is not a valid legacy fixture! Remove the eight V25-only settings
+  * first. This test intentionally has no recorded Punch-In events, since
+  * V25 introduced a separate down/status byte for those events. */
+ uint32_t punch_at=0u;
+ for(uint32_t i=24u;i+13u<=n;i++){
+  unsigned match=1u;for(unsigned j=0u;j<13u;j++)if(wire[i+j]!=20u+j){match=0u;break;}
+  if(match){assert(punch_at==0u);punch_at=i;}
+ }
+ assert(punch_at>24u);
+ uint32_t legacy_n=n-8u;
+ memcpy(old,wire,punch_at+5u);
+ memcpy(old+punch_at+5u,wire+punch_at+13u,n-(punch_at+13u));
+ /* Before V24, auto (128+) lane references did not exist. */
  uint32_t head=24+12+1+3+2;
  assert(old[head]==2u);
  uint32_t songat=head+3u;
  for(unsigned row=0;row<p.song.count;row++)for(unsigned ch=0;ch<6;ch++){
   uint32_t pos=songat+8u*row+2u+ch;
   if(old[pos]>=TRACK_SONG_AUTO_BASE&&old[pos]<TRACK_SONG_AUTO_BASE+TRACK_PATTERNS)
-    old[pos]=(uint8_t)(old[pos]-TRACK_SONG_AUTO_BASE);
+   old[pos]=(uint8_t)(old[pos]-TRACK_SONG_AUTO_BASE);
  }
  old[4]=23u;
- /* V23 always appended a 13-entry legacy one-shot index and B1OS trailer. */
- uint32_t oldn=n+BEETLE_ONESHOT_NOTES*10u+6u;
+ /* V23 includes an indexed legacy one-shot table and B1OS trailer. */
+ uint32_t oldn=legacy_n+BEETLE_ONESHOT_NOTES*10u+6u;
  assert(oldn<=sizeof old);
- memset(old+n,0,BEETLE_ONESHOT_NOTES*10u);
- old[oldn-6u]=(uint8_t)n;
- old[oldn-5u]=(uint8_t)(n>>8u);
+ memset(old+legacy_n,0,BEETLE_ONESHOT_NOTES*10u);
+ old[oldn-6u]=(uint8_t)legacy_n;
+ old[oldn-5u]=(uint8_t)(legacy_n>>8u);
  memcpy(old+oldn-4u,"B1OS",4u);
  for(unsigned j=0;j<4;j++)old[8+j]=(uint8_t)(oldn>>(j*8));
  uint32_t c=track_store_crc32(old+24,oldn-24);

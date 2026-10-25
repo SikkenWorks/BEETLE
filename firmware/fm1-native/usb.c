@@ -66,6 +66,7 @@ static struct {
 #if FELUCCA_UAC
 #include "beetle_usb_capture_src.h"
 #include "beetle_usb_multitrack.h"
+#include "beetle_usb_capture_recovery.h"
 /* USB audio input. The I2S clock is not locked to USB (about 44,117.6 Hz against the host's 44,100):
  * the endpoint is asynchronous, so each 1 ms packet carries what the ring holds, 44 or 45 frames
  * (the 44.1 pattern); fractional resampling absorbs independent oscillator drift.
@@ -76,15 +77,15 @@ static struct {
  * 48..119 with no glitch; one render was once seen 29 frames under the floor: a packet (46) must
  * still be in hand then. */
 #define UA_N 512u                /* ring, frames (16-bit L | R << 16); a power of two */
-#define UA_PRIME 104u            /* silence ahead of the first rendered frame */
-#define UA_LO 80u                /* a render may start late: keep a packet and more in hand */
-#define UA_HI 128u
+#define UA_PRIME BEETLE_UAC_PRIME_44100 /* tolerate a late render, ~5ms capture latency */
+#define UA_LO 160u               /* diagnostic band after increased deadline reserve */
+#define UA_HI 256u
 #define UAC_RATE 44100u
 #if FELUCCA_UAC_48K
 /* 48 kHz: the same times in 48 kHz frames (x 160 / 147); a render of HALF_FRAMES gives 139..140 frames */
-#define UA_PRIME48 113u
-#define UA_LO48 87u
-#define UA_HI48 139u
+#define UA_PRIME48 BEETLE_UAC_PRIME_48000
+#define UA_LO48 174u
+#define UA_HI48 278u
 #define UA_REND48 ((HALF_FRAMES * 160u + 146u) / 147u)
 #define UA_MAXF 49u              /* frames in the largest packet: 48 + 1 */
 _Static_assert(UA_HI48 + UA_REND48 + UA_MAXF < UA_N, "the ring holds the band, a render and a packet (48 kHz)");
@@ -126,6 +127,8 @@ static struct {
     uint32_t adj_up, adj_down;                   /* packets one frame longer / shorter than the pattern */
     uint32_t fill_lo, fill_hi;                   /* range of fill_min since the stream started */
     uint32_t rate_sets;                          /* SET_CUR sampling frequency requests */
+    uint32_t recoveries;                         /* re-primes after genuine starvation/overflow */
+    uint8_t fade_in_left;                        /* ramp from silence on a repaired stream */
 } uac __attribute__((section(".usb_audio_ram"))); /* boot-zeroed dedicated UAC SRAM */
 #if FELUCCA_UAC_48K
 #include "uac_fir.h"
@@ -508,6 +511,7 @@ static void uac_stream(uint32_t alt)                    /* SET_INTERFACE, config
     uac.alt = (uint8_t)alt;
     uac.acc = 0;
     uac.last = 0;
+    uac.fade_in_left = 0;
     uac.src_step = BEETLE_UAC_SRC_ONE;
     uac.src_fraction = 0u;
     uac.mt_fill_q8 = (int32_t)UA_PRIME*256;
@@ -1111,6 +1115,9 @@ static __attribute__((noinline)) void uac_render_start(void)   /* audio ISR, bef
         RING_PUBLISH();
         ua_w = r + prime;
         uac.fill_min = prime;
+        uac.last = 0;
+        for (uint32_t c=0;c<BEETLE_USB_STEMS;c++) ua_stem_last[c]=0;
+        uac.fade_in_left = BEETLE_UAC_FADE_FRAMES;
         uac.src_step = BEETLE_UAC_SRC_ONE;
         uac.src_fraction = 0u;
         uac.mt_fill_q8 = (int32_t)prime*256;
@@ -1119,6 +1126,13 @@ static __attribute__((noinline)) void uac_render_start(void)   /* audio ISR, bef
         return;
     }
     fill = ua_w - ua_r;
+    if (fill > UA_N) {
+        uac.overruns++;
+        uac.recoveries++;
+        uac.go = 0;
+        uac.feed = 0;
+        return;
+    }
     uac.fill_min = fill;
     /* Multitrack's clock controller observes ONE coherent fill level per
      * native render, never the same short-term jitter three times per USB ms. */
@@ -1128,12 +1142,8 @@ static __attribute__((noinline)) void uac_render_start(void)   /* audio ISR, bef
      * filtered ring fill also makes the stereo path deterministic. */
     if(fill<=UA_N){
         uac.mt_fill_q8=beetle_uac_mt_filter_fill(uac.mt_fill_q8,fill);
-        if(uac_multitrack)
+        if (uac_multitrack || !uac.ring48)
             uac.src_step=beetle_uac_mt_next_step(uac.src_step,uac.mt_fill_q8,UA_PRIME);
-        else if(!uac.ring48){
-            uint32_t smoothed=(uint32_t)(uac.mt_fill_q8+128)>>8u;
-            uac.src_step=beetle_usb_src_next_step(uac.src_step,smoothed,UA_PRIME);
-        }
     }
     if (fill < uac.fill_lo)
         uac.fill_lo = fill;
@@ -1141,6 +1151,27 @@ static __attribute__((noinline)) void uac_render_start(void)   /* audio ISR, bef
         uac.fill_hi = fill;
 }
 
+/* The producer never overwrites unread USB frames. A full ring must be
+ * repaired at the NEXT DMA boundary; silently dropping whole render blocks
+ * left the SRC following an arbitrary, increasingly stale audio timeline. */
+static inline int uac_write_guard(uint32_t w,uint32_t n){
+    if (beetle_uac_can_write(w,ua_r,n,UA_N)) return 1;
+    uac.overruns++;
+    uac.recoveries++;
+    uac.go = 0;
+    uac.feed = 0;
+    return 0;
+}
+static inline uint32_t uac_start_fade_stereo(uint32_t packed){
+    if (uac.fade_in_left){
+        uint32_t done=BEETLE_UAC_FADE_FRAMES-uac.fade_in_left;
+        int16_t l=beetle_uac_fade_in((int16_t)(packed&65535u),done);
+        int16_t r=beetle_uac_fade_in((int16_t)(packed>>16u),done);
+        uac.fade_in_left--;
+        return (uint32_t)(uint16_t)l|((uint32_t)(uint16_t)r<<16u);
+    }
+    return packed;
+}
 static inline int32_t uac_s16(int32_t v)
 {
     return v > 32767 ? 32767 : v < -32768 ? -32768 : v;
@@ -1153,10 +1184,7 @@ static inline int32_t uac_s16(int32_t v)
 static __attribute__((noinline)) void uac_tap48(const int32_t *out, uint32_t n)
 {
     uint32_t w = ua_w, i, j, k = 0, h = rs.w, ph = rs.ph;
-    if (UA_N - (w - ua_r) < n + n / 8u + 2u) {         /* nobody reads: drop the block (<= n * 160 / 147 + 1) */
-        uac.overruns++;
-        return;
-    }
+    if (!uac_write_guard(w,n+n/8u+2u)) return;  /* FIR can expand the frame count */
     for (i = 0; i < n; i++) {
         uint32_t s = h & (RS_H - 1u);
         int16_t l = (int16_t)uac_s16(out[2u * i]), r = (int16_t)uac_s16(out[2u * i + 1u]);
@@ -1193,7 +1221,7 @@ static __attribute__((noinline)) void uac_tap48(const int32_t *out, uint32_t n)
                 yr = (int32_t)q2 * 1000 - 25000;
             }
 #endif
-            ua_ring[(w + k++) & (UA_N - 1u)] = (uint32_t)(uint16_t)yl | (uint32_t)(uint16_t)yr << 16;
+            ua_ring[(w + k++) & (UA_N - 1u)] = uac_start_fade_stereo((uint32_t)(uint16_t)yl | (uint32_t)(uint16_t)yr << 16);
             ph += UAC_FIR_M;
         } while (ph < UAC_FIR_L);
         ph -= UAC_FIR_L;
@@ -1216,25 +1244,22 @@ static __attribute__((noinline)) void uac_tap(const int32_t *out, uint32_t n)   
         return;
     }
 #endif
-    if (UA_N - (w - ua_r) < n) {                        /* nobody reads: drop the block */
-        uac.overruns++;
-        return;
-    }
+    if (!uac_write_guard(w,n)) return;
 #if FELUCCA_UAC_TONE
     {   /* bench: triangles of period 100 frames instead of the music (L, R in antiphase): every
          * recorded frame must follow the one before, so a lost or repeated frame shows exactly */
         static uint32_t ph;
         for (i = 0; i < n; i++, ph = ph == 99u ? 0u : ph + 1u) {
             uint32_t q = ph < 50u ? ph : 100u - ph, q2 = ph < 50u ? 50u - ph : ph - 50u;
-            ua_ring[(w + i) & (UA_N - 1u)] = (uint32_t)(uint16_t)(int16_t)((int32_t)q * 1000 - 25000) |
-                                             (uint32_t)(uint16_t)(int16_t)((int32_t)q2 * 1000 - 25000) << 16;
+            ua_ring[(w + i) & (UA_N - 1u)] = uac_start_fade_stereo((uint32_t)(uint16_t)(int16_t)((int32_t)q * 1000 - 25000) |
+                                             (uint32_t)(uint16_t)(int16_t)((int32_t)q2 * 1000 - 25000) << 16);
         }
         (void)out;
     }
 #else
     for (i = 0; i < n; i++)
-        ua_ring[(w + i) & (UA_N - 1u)] = (uint32_t)(uint16_t)uac_s16(out[2u * i]) |
-                                         (uint32_t)(uint16_t)uac_s16(out[2u * i + 1u]) << 16;
+        ua_ring[(w + i) & (UA_N - 1u)] = uac_start_fade_stereo((uint32_t)(uint16_t)uac_s16(out[2u * i]) |
+                                         (uint32_t)(uint16_t)uac_s16(out[2u * i + 1u]) << 16);
 #endif
     RING_PUBLISH();
     ua_w = w + n;
@@ -1245,9 +1270,15 @@ static __attribute__((noinline)) void uac_tap(const int32_t *out, uint32_t n)   
 static __attribute__((noinline)) void uac_tap_stems(const int16_t *stems,uint32_t n){
  if(!uac.feed || !uac_multitrack || !stems)return;
  uint32_t w=ua_w;
- if(UA_N-(w-ua_r)<n){uac.overruns++;return;}
- for(uint32_t i=0;i<n;i++)for(uint32_t c=0;c<BEETLE_USB_STEMS;c++)
-    ua_stem_ring[(w+i)&(UA_N-1u)][c]=stems[i*BEETLE_USB_STEMS+c];
+ if(!uac_write_guard(w,n))return;
+ for(uint32_t i=0;i<n;i++){
+  uint32_t ramp=uac.fade_in_left ? BEETLE_UAC_FADE_FRAMES-uac.fade_in_left : BEETLE_UAC_FADE_FRAMES;
+  for(uint32_t c=0;c<BEETLE_USB_STEMS;c++){
+   int16_t v=stems[i*BEETLE_USB_STEMS+c];
+   ua_stem_ring[(w+i)&(UA_N-1u)][c]=beetle_uac_fade_in(v,ramp);
+  }
+  if(uac.fade_in_left)uac.fade_in_left--;
+ }
  RING_PUBLISH();ua_w=w+n;
 }
 /* USB packet: 6 discrete mono channels CH1..CH6, 44/45 frames per ms.
@@ -1261,12 +1292,16 @@ static __attribute__((noinline)) uint32_t uac_packet_stems(uint32_t *dst){
  /* src_step is adjusted once per DMA block by uac_render_start().
   * Do not retune during each USB packet: that modulated note pitch. */
  uint32_t r=ua_r,fill=ua_w-r,pos=uac.src_fraction,step=uac.src_step;
+ uint8_t starved=0;
  RING_PUBLISH();
  for(uint32_t i=0;i<n;i++){
   uint32_t src=pos>>16u;
   if(src+1u>=fill){
    uac.underruns++;
-   for(;i<n;i++)for(uint32_t c=0;c<BEETLE_USB_STEMS;c++)out[i*BEETLE_USB_STEMS+c]=ua_stem_last[c];
+   starved=1;
+   uint32_t missing=n-i;
+   for(uint32_t j=0;j<missing;j++)for(uint32_t c=0;c<BEETLE_USB_STEMS;c++)
+    out[(i+j)*BEETLE_USB_STEMS+c]=beetle_uac_fade_tail(ua_stem_last[c],missing-j-1u,missing);
    break;
   }
   const int16_t *a=ua_stem_ring[(r+src)&(UA_N-1u)];
@@ -1281,6 +1316,10 @@ static __attribute__((noinline)) uint32_t uac_packet_stems(uint32_t *dst){
  }
  uint32_t k=pos>>16u;if(k>fill-(fill?1u:0u))k=fill-(fill?1u:0u);
  uac.src_fraction=(uint16_t)pos;RING_PUBLISH();ua_r=r+k;
+ if(starved){
+  uac.go=0;uac.recoveries++;uac.src_fraction=0;
+  for(uint32_t c=0;c<BEETLE_USB_STEMS;c++)ua_stem_last[c]=0;
+ }
  uac.pkts++;uac.frames+=n;return n;
 }
 
@@ -1315,9 +1354,11 @@ static uint32_t uac_packet(uint32_t *d)
         if (k < n) {
             uint32_t last = k ? d[k - 1u] : uac.last;
             uac.underruns++;
-            for (; i < n; i++)d[i] = last;
+            uint32_t missing=n-k;
+            for (uint32_t j=0;j<missing;j++) d[k+j]=beetle_uac_fade_stereo(last,missing-j-1u,missing);
+            uac.go=0;uac.recoveries++;
         }
-        uac.last = d[n - 1u];RING_PUBLISH();ua_r = r + k;
+        uac.last = (k<n)?0:d[n - 1u];RING_PUBLISH();ua_r = r + k;
         uac.pkts++;uac.frames += n;
         return n;
     }
@@ -1335,13 +1376,16 @@ static uint32_t uac_packet(uint32_t *d)
     uint32_t pos = uac.src_fraction;
     uint32_t step = uac.src_step;
     uint32_t last = uac.last;
+    uint8_t starved = 0;
     for (i = 0; i < n; i++) {
         uint32_t src = pos >> 16u;
         if (src + 1u >= fill) {
             /* An actual DMA/USB starvation is diagnosed and held only until
              * the next real block. Never consume uninitialized buffer data. */
             uac.underruns++;
-            for (; i < n; i++) d[i] = last;
+            starved=1;
+            uint32_t missing=n-i;
+            for (uint32_t j=0;j<missing;j++)d[i+j]=beetle_uac_fade_stereo(last,missing-j-1u,missing);
             break;
         }
         d[i] = last = beetle_usb_src_lerp(ua_ring[(r + src) & (UA_N - 1u)],
@@ -1351,9 +1395,10 @@ static uint32_t uac_packet(uint32_t *d)
     k = pos >> 16u;
     if (k > fill - (fill ? 1u : 0u)) k = fill - (fill ? 1u : 0u);
     uac.src_fraction = (uint16_t)pos;
-    uac.last = last;
+    uac.last = starved?0:last;
     RING_PUBLISH();
     ua_r = r + k;
+    if(starved){uac.go=0;uac.src_fraction=0;uac.recoveries++;}
     uac.pkts++;
     uac.frames += n;
     return n;

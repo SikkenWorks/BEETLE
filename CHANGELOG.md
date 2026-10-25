@@ -1,3 +1,45 @@
+## V1.4.35 — Punch-In FX bank LEDs, SONG SEL long hold, secure projects bulk ZIP and V23 fixture fix (experimental)
+
+- Eight physical FM1 white-key LEDs display the eight effects of the current Punch-In page. Existing held keys and Punch-In performance behavior preserved. WebSimulator mirrors page illumination.
+- Hold SEL >=650ms in SONG CHAINS to toggle SONG LOOP. A short SEL retains V1.4.34 range clear / SONG toggle behavior; SEL+K1 always remains range selection; selected-row PLAY loops its own range regardless of global loop status.
+- Project Manager supports EXPORT PROJECTS ZIP and IMPORT PROJECTS ZIP in addition to individual encrypted `.beetle` operations. Only occupied project slots are exported; original slot numbers and checksums included in manifest; contents authenticated and verified before write; explicit two-step confirmation required for replacements; no implicit deletion of absent slots. Bulk import is sequential, not atomic. **Global U01–U13 samplebank is not included.**
+- Corrected V23 test fixture instead of loosening production decoder. The test now removes later V25-only punch settings and creates an authentic V23 byte layout before roundtrip migration assertions. No project storage-format change.
+- Tests: native JieLi build; V23 song migration; V1.4.34 range looping; ZIP roundtrip and hostile ZIP rejects; JS syntax; package roundtrip and first 16 KiB/OTA loader identity. Physical hardware/OTA tests not yet performed.
+- Separate old `test_rc1011b_pcm_compat.c` checksum in `run_rc1011b_audio_stability.sh` also fails on identical V1.4.34 baseline (`dd0f3681` measured vs stale expected `43c0f1f6`); not modified or counted as a pass.
+- Project release remains clean: one current `.fwsc`, current HTML tools, source, tests, docs, and licenses; no old generated releases.
+
+## V1.4.34 — SONG selection, range looping and UI/transport race fixes (experimental)
+
+- SONG row selection is now a persistent transient inclusive range: SEL+K1 anchors correctly, works forward/backward and across screen pages, and uses the tracker-selection magenta fill and cursor outline.
+- PLAY from SONG CHAINS with a range starts at the first selected row and loops back exactly after its last row, regardless of ordinary Song Loop. REP per song row, lane-to-pattern composition and 64-row bounds are retained. Starting PLAY without a range retains the full song semantics.
+- Single tap of SEL clears a song range instead of accidentally toggling SONG mode. A fresh SEL tap without a selection still enables/disables SONG normally.
+- SONG row editing, insert and delete are blocked during PLAY to prevent concurrent ISR/ringbuffer corruption; stopped structural editing invalidates the old transient range.
+- On STOP, return to pre-play cursor; range remains selected for replay until the user clears or replaces it. Range is not serialized, keeping TRK1 V25 project compatibility.
+- WebSimulator's WebAudio scheduler now starts and wraps inside the exact same range; UI highlighting and pointer/shift selection updated. Current tools embedded into the standalone installer and All-in-One Manager.
+- Added `tests/track/test_v1434_song_selection_loop.c`: forward/reversed/single-row/repeat/global-loop tests and unchanged row-memory assertions. Pre-existing V23 test fixture regression in `run_rc1011_song_chains.sh` still fails in V1.4.33 baseline; documented separately rather than reported as passing.
+- Experimental native JieLi build (USB 44.1kHz, V2 storage), protected OTA asset and package equality audit pass; physical FM1 audio and flash safety not verified.
+- Clean release contains only current firmware and web files, full source/tests/docs/licenses, retaining original README styling and credits.
+
+## V1.4.33 — Tracker chord scrolling audition (experimental)
+
+- On TRACKER CHD (CH1–CH5), K3 now auditions the saved root note using the newly selected chord type. All 12 chords, up to five simultaneous voices, use `track_chord_keylocked()` and the existing stored synth instrument.
+- Uses one transient multi-note preview record: K3 changes stop all former preview tones first, and K1/K2 movement, page changes, PLAY and the preview timeout release the audition. No new notes are recorded, no extra project fields, no new flash writes or changes to saved note/chord encoding.
+- EMPTY/STP root, drum lane and running transport never produce an unwanted chord audition. Mono voice mode intentionally respects its single-voice limit.
+- WebSimulator now auditions the same chord shapes via WebAudio, separately from pattern playback and project serialization.
+- Native JieLi 44.1 kHz USB/Storage V2 build, chord policy host regression, JavaScript checks and fwsc protected-asset validations pass. Physical FM1 audio/flash/OTA remains untested.
+- Clean source ZIP per release-hygiene rule; README GitHub banner/shields/credits layout preserved.
+
+## V1.4.32 — USB-C stereo/multitrack capture recovery and late-DMA margin (experimental)
+
+- Increased 44.1 kHz UAC ring priming from 104 to 224 frames, with the existing 512-frame stereo/multitrack rings unchanged. Optional 48 kHz stereo priming grows from 113 to 244 frames. This intentionally adds about 2.72 ms to startup capture latency to tolerate late 128-frame renders.
+- Stereo now uses the slowly filtered, bounded shared per-DMA SRC controller used by six-stem USB recording. No packet-by-packet pitch retuning.
+- Explicit bounded recovery when USB runs dry or its ring becomes full: fade the remaining packet to silence on starvation, mark for reprime, restart SRC/phase at the next audio render, and fade in the first 24 frames of fresh PCM. Never fill the packet indefinitely with the previous sample.
+- Added safe ring-capacity checks against unsigned subtraction underflow; overrun never silently drops successive blocks while keeping stale read positions.
+- SYSTEM → USB AUDIO now displays RECOV for stream re-prime events, retaining UND/OVER/STALL. Other USB diagnostic counters remain in the native source.
+- New six-minute injected DMA/host-pause simulation, 10-minute nominal stereo/multitrack clock tests, and fade/free-space helper tests under undefined-behavior sanitizers; original SID, RETRO PULSE, FX, NOTE2 code and project format retained.
+- Fully cleaned release output each iteration; no old FWSC/HTML duplicates inside the complete source ZIP.
+- Caveat: physical FM1 USB-C capture, USB ISR load, recovery after real host stalls and OTA flashing are **not** verified.
+
 ## V1.4.31 — SID wah / default-detune regression correction
 
 - Restored the V1.4.29 6581/DIRTY/BASS filter coefficient and resonance mapping. The V1.4.30 experimental curve overly boosted the default cutoff (96 → ~97 rather than ~37), potentially altering the audio character and accentuating phasey sweeps.
