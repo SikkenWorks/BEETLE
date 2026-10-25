@@ -65,7 +65,14 @@ int beetle_bd4_live_next(uint8_t voice,uint32_t serial,int16_t *sample){
  struct live_note *n=&live_notes[voice];
  if(n->serial!=serial)return -1;
  if(n->pending||n->starting)return 0;
- if(!live_stream.voices[voice].playing)return -1;
+ /* V1.5: the old first-step fix only held BEFORE stream_start().
+  * The very next 64-frame PCM window can still arrive too late on flash;
+  * rendering a missing frame would advance output_frames and discard the
+  * initial portion of the sample. Return PENDING so the drum renderer also
+  * holds its phase/age/envelope. Retry the exact source frame after refill. */
+ int ready=beetle_bd4_stream_ready_now(&live_stream,voice);
+ if(ready<0)return -1;
+ if(!ready)return 0;
  beetle_bd4_stream_render(&live_stream,voice,sample,1u);
  return 1;
 }
@@ -82,6 +89,14 @@ void beetle_bd4_live_choke_all(void){
   live_notes[i].pending=0u;live_notes[i].starting=0u;
   beetle_bd4_stream_choke_voice(&live_stream,i);
  }
+}
+uint8_t beetle_bd4_live_start_pending(void){
+ if(!live_rt)return 0u;
+ for(unsigned i=0u;i<BEETLE_BD4_STREAM_VOICES;i++){
+  const struct live_note *n=&live_notes[i];
+  if(n->serial && (n->pending||n->starting))return 1u;
+ }
+ return 0u;
 }
 uint32_t beetle_bd4_live_underruns(void){
  if(!live_rt)return 0u;
@@ -201,6 +216,10 @@ void beetle_bd4_live_poll(beetle_v2_read read,void *ctx,void (*lock)(void),void 
   if(n->starting&&!n->pending){
    lock();
    if(beetle_bd4_stream_start(&live_stream,i))n->starting=0u;
+   else if(!live_stream.voices[i].configured || live_stream.voices[i].invalid_blocks){
+    /* Malformed/replaced samples must not hold transport start forever. */
+    n->starting=0u;n->serial=0u;
+   }
    unlock();
   }
  }

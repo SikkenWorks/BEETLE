@@ -11,8 +11,8 @@ import base64,re,sys,hashlib
 if len(sys.argv)!=6:
  raise SystemExit('usage: build_all_in_one_manager.py TEMPLATE.html SIMULATOR.html PROJECT_MANAGER.html WEBINSTALLER.html OUTPUT.html')
 template,sim,projects,installer,out=map(Path,sys.argv[1:])
-version=next((m.group(0) for name in (sim.name,installer.name) if (m:=re.search(r'V\d+\.\d+\.\d+',name))),None)
-if not version:raise SystemExit('Use a versioned simulator or installer filename like BEETLE-V1.3.9-simulator.html')
+version=next((m.group(0) for name in (sim.name,installer.name) if (m:=re.search(r'V\d+(?:\.\d+){1,2}',name))),None)
+if not version:raise SystemExit('Use a versioned simulator or installer filename like BEETLE-V1.5-WebSimulator.html')
 html=template.read_text(encoding='utf-8')
 if 'frame.srcdoc=base64ToUtf8' not in html or 'frame.src=documentUrl(id)' in html:raise SystemExit('Unsafe/outdated template: srcdoc is required for embedded MIDI tools')
 for label,path in [('emulator',sim),('projectmanager',projects),('installer',installer)]:
@@ -23,6 +23,6 @@ for label,path in [('emulator',sim),('projectmanager',projects),('installer',ins
  assert base64.b64decode(re.search(pattern,html).group(0).split('>',1)[1].split('</script>',1)[0])==path.read_bytes()
  print(f'{label}: {len(path.read_bytes())} bytes; SHA-256 {hashlib.sha256(path.read_bytes()).hexdigest()}')
 # Only replace version labels in outer document; base64 is unchanged.
-html=re.sub(r'V\d+\.\d+\.\d+',version,html)
+html=re.sub(r'V\d+(?:\.\d+){1,2}',version,html)
 out.write_text(html,encoding='utf-8')
 print('Built',out,version,len(html))

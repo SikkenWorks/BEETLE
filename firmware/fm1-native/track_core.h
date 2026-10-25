@@ -58,7 +58,8 @@ struct track_note2_fx {uint8_t effect,value;};
 /* Global sparse FX pool is attached to song bank, not the 48 patterns.
  * Pool lives once per project rather than multiplying every undo snapshot. */
 struct track_pattern {struct track_step ch[TRACK_CHANNELS][TRACK_STEPS];uint8_t length;
- struct track_note2_fx note2_fx[TRACK_STEPS];};
+ struct track_note2_fx note2_fx[TRACK_STEPS];
+ uint8_t note3[TRACK_STEPS]; /* CH6 independent third drum hit, 255=EMPTY 254=STP */};
 static inline uint8_t track_extra_key(uint8_t lane,uint8_t row,uint8_t note2){
  return (uint8_t)(lane*TRACK_STEPS+row+(note2?128u:0u));
 }
@@ -89,6 +90,7 @@ static inline void track_note2_set(struct track_step *s,uint8_t id){
 }
 /* Entry does not alter NOTE1, cursor, drum KIT (low 2 bits) or step FX. */
 int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note);
+int track_enter_drum_note3(struct track_engine *e,uint8_t drum_note);
 int track_set_note(struct track_engine *e,uint8_t channel,uint8_t step,uint8_t note);
 int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step);
 int track_clear_step_range(struct track_engine *e,uint8_t channel,uint8_t first,uint8_t last);
@@ -116,7 +118,8 @@ int track_is_lit(uint8_t button); /* FN indices 2..13; ARP=10 remains off */
 uint32_t track_home_action(uint32_t held_ms,uint8_t released); /* 1 HOME short, 2 GUIDE long */
 /* Pure endian-defined codec: fixed 324-byte pattern, no flash access. */
 #define TRACK_PATTERN_V3_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*7u)
-#define TRACK_PATTERN_BYTES (TRACK_PATTERN_V3_BYTES+TRACK_STEPS*2u)
+#define TRACK_PATTERN_V4_BYTES (TRACK_PATTERN_V3_BYTES+TRACK_STEPS*2u)
+#define TRACK_PATTERN_BYTES (TRACK_PATTERN_V4_BYTES+TRACK_STEPS)
 #define TRACK_PATTERN_V2_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*6u)
 #define TRACK_PATTERN_LEGACY_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*5u)
 int track_pattern_encode(const struct track_pattern *pattern,uint8_t *dst,uint32_t cap);

@@ -19,5 +19,9 @@ void beetle_bd4_live_request(uint8_t voice,uint8_t slot,uint32_t serial);
 int beetle_bd4_live_next(uint8_t voice,uint32_t serial,int16_t *sample);
 void beetle_bd4_live_stop(uint8_t voice);
 void beetle_bd4_live_choke_all(void);
+/* IRQ-safe, RAM-only: are triggered global samples still preparing their
+ * initial decoded window? Used ONLY to hold the very first transport DMA
+ * frames until NOTE1/NOTE2/NOTE3 samples are ready together. */
+uint8_t beetle_bd4_live_start_pending(void);
 uint32_t beetle_bd4_live_underruns(void);
 #endif

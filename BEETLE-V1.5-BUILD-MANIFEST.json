@@ -1,12 +1,12 @@
 {
-  "version": "BEETLE V1.4.31",
-  "baseline": "BEETLE V1.4.30 package identity and protected loader",
+  "version": "V1.5",
+  "baseline": "BEETLE V1.4.33 package identity and protected loader",
   "identity": "FM-1_2123",
   "bytes": 610086,
-  "sha256": "a918648680519796cb339090b11de96bb55675f8e7379840d46d402b8930b6f9",
-  "reference_sha256": "ac8ae1c3b8ed354633c0c18270730dba92dbc194b9bc20278cf3d6bdfbb77dc3",
-  "app_sha256": "41995871a2d5a1ae4a3071b93fefa0cfefd7463e2e74bf8c7bf750e8b19c8c03",
-  "app_bytes": 509548,
+  "sha256": "e90a44326e950b7eb113499435981a6f2f7e86786a08e4f6e7ec50df4ddc454d",
+  "reference_sha256": "f3d74418becc330b5b71621cb0d53d0f4c48d0098dc245dbf948509605651a42",
+  "app_sha256": "74899fbf8f4a0b9b5641358f74514b56af5cf510fe3069bd497df8cbb5675288",
+  "app_bytes": 515180,
   "reSID_native": false,
   "ymfm_native": false,
   "sustain_100_ui": "1.00",
@@ -35,8 +35,20 @@
   "legacy_project_schema": 23,
   "real_hardware_tested": false,
   "ota_recovery_proven": false,
-  "sid_regression_fix": "SID 6581/DIRTY/BASS neutral B phase lock + V1.4.29 cutoff/damping; deliberate B detune still works",
-  "sid_8580_noise_code_untouched": true,
-  "webinstaller_embeds_firmware_sha256": "a918648680519796cb339090b11de96bb55675f8e7379840d46d402b8930b6f9",
-  "hardware_validated": false
+  "project_schema": "TRK1 V26",
+  "hardware_tested": false,
+  "features": [
+    "browser-based user sample auto-conversion to 22050 mono PCM16",
+    "hold BD4S playback on every missing PCM window",
+    "minimal BEETLE WebInstaller UI"
+  ],
+  "embedded_firmware_sha256": "e90a44326e950b7eb113499435981a6f2f7e86786a08e4f6e7ec50df4ddc454d",
+  "webtools_verified": true,
+  "help_firmware_simulator_parity": true,
+  "source_cleaned": true,
+  "real_fm1_hardware_tested": false,
+  "firmware_filename": "BEETLE-V1.5-SAMPLE-NOTE3-WEB-EXPERIMENTAL.fwsc",
+  "release_type": "VERSION CORRECTION — firmware payload identical to preceding mislabeled V1.4.4 build",
+  "version_correction_from": "V1.4.4 (release label typo)",
+  "firmware_recompiled_for_version_change": false
 }

@@ -13,7 +13,7 @@ static const uint8_t chord[TRACK_CHORD_COUNT][6]={
  {3,0,5,7},{4,0,4,7,11},{4,0,3,7,10},{4,0,4,7,10},
  {4,0,4,7,14},{5,0,3,7,10,14}};
 static uint8_t bounded(uint8_t n,uint8_t cap){return n<cap?n:(uint8_t)(cap-1u);}
-void track_init(struct track_engine *e){if(!e)return;memset(e,0,sizeof(*e));e->transport.bpm=120u;e->active.length=16u;for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<TRACK_STEPS;st++){e->active.ch[c][st].note=255u;e->active.ch[c][st].instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:c);e->active.ch[c][st].value=50u;}}
+void track_init(struct track_engine *e){if(!e)return;memset(e,0,sizeof(*e));e->transport.bpm=120u;e->active.length=16u;for(unsigned st=0;st<TRACK_STEPS;st++)e->active.note3[st]=TRACK_NOTE_EMPTY;for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<TRACK_STEPS;st++){e->active.ch[c][st].note=255u;e->active.ch[c][st].instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:c);e->active.ch[c][st].value=50u;}}
 /* Scroll order: note 0..last, EMPTY, STP, then loop. Cope with stale data. */
 uint8_t track_note_scroll(uint8_t note,int32_t delta,uint8_t drum){
  const int32_t count=drum?TRACK_DRUM_NOTE_COUNT:128;
@@ -27,7 +27,8 @@ uint8_t track_lane_has_data(const struct track_pattern *pattern,uint8_t channel)
  for(uint8_t row=0u;row<TRACK_STEPS;row++){
   const struct track_step *step=&pattern->ch[channel][row];
   /* STP is meaningful data. FX and drum NOTE2/chord count even without NOTE. */
-  if(step->note!=TRACK_NOTE_EMPTY||step->chord!=0u||step->effect!=0u)return 1u;
+  if(step->note!=TRACK_NOTE_EMPTY||step->chord!=0u||step->effect!=0u ||
+     (channel==TRACK_DRUM_CHANNEL && pattern->note3[row]!=TRACK_NOTE_EMPTY))return 1u;
  }
  return 0u;
 }
@@ -39,6 +40,7 @@ int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step){
  struct track_step *s=&e->active.ch[channel][step];
  s->note=TRACK_NOTE_EMPTY;s->instrument=(uint8_t)(channel==TRACK_DRUM_CHANNEL?3u:channel);
  s->chord=0u;s->effect=0u;s->value=50u;s->dynamics=0u;s->groove=0u;
+ if(channel==TRACK_DRUM_CHANNEL)e->active.note3[step]=TRACK_NOTE_EMPTY;
   e->dirty=1u;return 0;
 }
 /* V1.3.3: commit block changes as one history action in the caller.
@@ -66,6 +68,7 @@ int track_clear_step_range(struct track_engine *e,uint8_t channel,uint8_t first,
   (void)track_clear_step(e,channel,i);
   if(channel==TRACK_DRUM_CHANNEL){
    e->active.note2_fx[i].effect=0u;e->active.note2_fx[i].value=0u;
+   e->active.note3[i]=TRACK_NOTE_EMPTY;
   }
   count++;
  }
@@ -80,20 +83,21 @@ int track_clear_lane(struct track_engine *e,uint8_t channel){
   if(channel==TRACK_DRUM_CHANNEL){
    e->active.note2_fx[row].effect=0u;
    e->active.note2_fx[row].value=0u;
+   e->active.note3[row]=TRACK_NOTE_EMPTY;
   }
  }
  e->dirty=1u;
  return 0;
 }
 /* Hardware keyboard note entry ALWAYS targets NOTE, regardless of the selected
- * INST/CHD/FX edit column, preserving those other cell values. Advance once
- * per accepted note; on the last active row wrap to 00. */
+ * INST/CHD/FX edit column, preserving those other cell values. Do not advance
+ * the tracker cursor when entering NOTE, even on the last row. */
 int track_enter_note(struct track_engine *e,uint8_t note){
  if(!e || e->transport.edit_channel>=TRACK_CHANNELS ||
     e->transport.edit_step>=TRACK_STEPS)return -1;
  if(e->transport.edit_channel==TRACK_DRUM_CHANNEL && note>=TRACK_DRUM_NOTE_COUNT && note!=TRACK_NOTE_STOP && note!=TRACK_NOTE_EMPTY)return -1;
  if(track_set_note(e,e->transport.edit_channel,e->transport.edit_step,note)!=0)return -1;
- e->transport.edit_step=(uint8_t)((e->transport.edit_step+1u)%(e->active.length>=1u&&e->active.length<=TRACK_STEPS?e->active.length:TRACK_STEPS));
+ /* NOTE entry does not move the edit cursor; row navigation remains K1. */
  return 0;
 }
 /* Dedicated CH6 NOTE2 keyboard input; NOTE1 and the step cursor stay unchanged. */
@@ -105,6 +109,11 @@ int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note){
  track_note2_set(&e->active.ch[TRACK_DRUM_CHANNEL][e->transport.edit_step],drum_note);
  e->dirty=1u;
  return 0;
+}
+int track_enter_drum_note3(struct track_engine *e,uint8_t drum_note){
+ if(!e||e->transport.edit_channel!=TRACK_DRUM_CHANNEL||e->transport.edit_column!=2u||
+    e->transport.edit_step>=TRACK_STEPS||drum_note>=TRACK_DRUM_NOTE_COUNT)return -1;
+ e->active.note3[e->transport.edit_step]=drum_note;e->dirty=1u;return 0;
 }
 /* A held SEL range and a single focused note use the exact same atomic
  * transposition path. One semitone delta is applied to EACH stored root note.
@@ -213,7 +222,7 @@ uint32_t track_home_action(uint32_t held_ms,uint8_t released){if(held_ms>=1500u)
  * decodes with default velocity and legato gate. No architecture byte copies. */
 int track_pattern_encode(const struct track_pattern *p,uint8_t *dst,uint32_t cap){
  if(!p||!dst||cap<TRACK_PATTERN_BYTES||p->length<1u||p->length>TRACK_STEPS)return -1;
- dst[0]='T';dst[1]='R';dst[2]=4u;dst[3]=p->length;uint32_t at=4u;
+ dst[0]='T';dst[1]='R';dst[2]=5u;dst[3]=p->length;uint32_t at=4u;
  for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<16u;st++){
   const struct track_step *s=&p->ch[c][st];
   if((s->note>127u&&s->note!=TRACK_NOTE_STOP&&s->note!=TRACK_NOTE_EMPTY)||s->instrument>7u||
@@ -225,12 +234,16 @@ int track_pattern_encode(const struct track_pattern *p,uint8_t *dst,uint32_t cap
   if(p->note2_fx[st].effect>=TRACK_FX_COUNT||p->note2_fx[st].value>100u)return -1;
   dst[at++]=p->note2_fx[st].effect;dst[at++]=p->note2_fx[st].value;
  }
+ for(unsigned st=0u;st<TRACK_STEPS;st++){
+  if(p->note3[st]>=TRACK_DRUM_NOTE_COUNT && p->note3[st]!=TRACK_NOTE_EMPTY && p->note3[st]!=TRACK_NOTE_STOP)return -1;
+  dst[at++]=p->note3[st];
+ }
  return (int)at;
 }
 int track_pattern_decode(struct track_pattern *p,const uint8_t *src,uint32_t len){
  if(!p||!src||len<4u||src[0]!='T'||src[1]!='R'||(src[3]<1u||src[3]>TRACK_STEPS))return -1;
  uint8_t version=src[2];
- if((version<1u||version>4u)||len!=(version==1u?TRACK_PATTERN_LEGACY_BYTES:version==2u?TRACK_PATTERN_V2_BYTES:version==3u?TRACK_PATTERN_V3_BYTES:TRACK_PATTERN_BYTES))return -1;
+ if((version<1u||version>5u)||len!=(version==1u?TRACK_PATTERN_LEGACY_BYTES:version==2u?TRACK_PATTERN_V2_BYTES:version==3u?TRACK_PATTERN_V3_BYTES:version==4u?TRACK_PATTERN_V4_BYTES:TRACK_PATTERN_BYTES))return -1;
  struct track_pattern next={0};next.length=src[3];uint32_t at=4u;
  for(unsigned c=0;c<TRACK_CHANNELS;c++)for(unsigned st=0;st<16u;st++){
   struct track_step *s=&next.ch[c][st];
@@ -244,6 +257,10 @@ int track_pattern_decode(struct track_pattern *p,const uint8_t *src,uint32_t len
   next.note2_fx[st].effect=version>=4u?src[at]:0u;
   if(version>=4u)at+=2u;
   if(next.note2_fx[st].effect>=TRACK_FX_COUNT||next.note2_fx[st].value>100u)return -1;
+ }
+ for(unsigned st=0u;st<TRACK_STEPS;st++){
+  next.note3[st]=version>=5u?src[at++]:TRACK_NOTE_EMPTY;
+  if(next.note3[st]>=TRACK_DRUM_NOTE_COUNT&&next.note3[st]!=TRACK_NOTE_EMPTY&&next.note3[st]!=TRACK_NOTE_STOP)return -1;
  }
  memcpy(p,&next,sizeof(next));return 0;
 }

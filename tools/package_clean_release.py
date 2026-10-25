@@ -12,6 +12,12 @@ assert re.fullmatch(r'V[0-9]+(?:\.[0-9]+)+',a.version),a.version
 required=('README.md','CHANGELOG.md','LICENSE','BEETLE-MANAGER.html',
           'BEETLE-Project-Manager.html','WebInstaller.html','simulator.html')
 for file in required:assert (r/file).is_file(),file
+# Mandatory firmware on-device HELP must be synchronized with browser HELP.
+import subprocess, sys
+subprocess.run([sys.executable,str(r/'tests/track/test_help_contract.py')],check=True)
+# Documentation contract: version-by-version narratives belong only in CHANGELOG.md.
+readme=(r/'README.md').read_text(encoding='utf-8')
+assert not re.search(r'^#{1,6}\s*(?:New in\s+V\d|V\d+(?:\.\d+){2,}\s*(?:—|[-:]))',readme,re.I|re.M), 'README includes version release notes; move them to CHANGELOG.md'
 fw=list(r.glob(f'BEETLE-{a.version}-*.fwsc'))
 assert len(fw)==1,fw
 manifest=r/f'BEETLE-{a.version}-BUILD-MANIFEST.json'

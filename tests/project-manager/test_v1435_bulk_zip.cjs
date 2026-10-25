@@ -8,7 +8,7 @@ const src=fs.readFileSync(path.join(__dirname,'../../BEETLE-Project-Manager.html
 function grab(a,b){const i=src.indexOf(a);assert(i>=0,`missing ${a}`);const j=src.indexOf(b,i);assert(j>i,`missing bound ${b}`);return src.slice(i,j);}
 const pure=[
  grab('function crc32(', 'function frame('),
- grab('function makeBackupZip(', '/* BEETLE V1.4.35:'),
+ grab('function makeBackupZip(', '/* BEETLE V1.4.36:'),
  grab("const BULK_FORMAT='BEETLE-PROJECTS-BULK-1';", 'async function exportProjectsZip('),
 ].join('\n');
 const test=`

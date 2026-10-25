@@ -47,7 +47,7 @@ body.migration-running .app button,body.migration-running .app input,body.migrat
 </head>
 <body>
 <main class="app">
-<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.4.35 · TOOL V2.4</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
+<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.5 · TOOL V2.4</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
 <section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites and true slot deletion. Storage V2 migration is available with compatible V1.4.24 firmware. Only the dedicated BEETLE project/sample partition is reformatted after an explicit backup.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
 <section class="box" aria-label="USB-MIDI connection">
 <div class="box-title">01 / DEVICE CONNECTION <small>USB · WEB MIDI SYSEX</small></div>
@@ -93,7 +93,7 @@ body.migration-running .app button,body.migration-running .app input,body.migrat
 </section>
 <section class="box" style="margin-top:18px" aria-label="Shared sample library">
 <div class="box-title">05 / GLOBAL SAMPLE LIBRARY <small>U01–U13 · GLOBAL FM1 SAMPLE LIBRARY</small></div>
-<div class="note"><strong>STORAGE STATUS:</strong> This portable PC-side sample library is independent of any .beetle project and can be synchronized to migrated BEETLE Storage V2. It supports full WAV files, replacement and deletion. <strong>FM1 device-global transfer:</strong> requires a migrated Storage V2 volume and BEETLE V1.4.22 sample transfer firmware. The FM1 and PC sample bank are separate. On connect, the FM1 sample inventory is read and displayed below; stored FM1 samples are NEVER treated as empty just because their original PC WAV is not open. This tool validates PCM/float WAV structure, preserves the original bytes, and lets you export individual WAVs. WAV is converted to 22.05 kHz mono 4-bit BD4S for device transfer; the original WAV stays unchanged on your computer. U01–U13 are shared across all twelve projects once synchronized to a Storage V2-equipped FM1. On-device playback remains hardware-unverified. Save the original WAVs in a .beetlebank backup: the existing firmware provides sample-slot metadata, not raw WAV download. UPLOAD never deletes unspecified FM1 slots; device deletion is a separate confirmed action. The SAMPLE SPACE meter displays device-reported storage when supported; sample uploads on newer firmware protect extra capacity for project saves. Older firmware cannot report or enforce that reserve.</div>
+<div class="note"><strong>STORAGE STATUS:</strong> This portable PC-side sample library is independent of any .beetle project and can be synchronized to migrated BEETLE Storage V2. It supports full WAV files, replacement and deletion. <strong>FM1 device-global transfer:</strong> requires a migrated Storage V2 volume and BEETLE V1.4.22 sample transfer firmware. The FM1 and PC sample bank are separate. On connect, the FM1 sample inventory is read and displayed below; stored FM1 samples are NEVER treated as empty just because their original PC WAV is not open. Import WAV, MP3, FLAC or other browser-decodable audio: the Project Manager converts unsupported channel, sample-rate and bit-depth combinations to 22.05 kHz mono PCM16 WAV, then encodes BD4S for FM1. Long clips require confirmation before retaining the first 20 seconds. The original source file on your computer is never modified. U01–U13 are shared across all twelve projects once synchronized to a Storage V2-equipped FM1. On-device playback remains hardware-unverified. Save the original WAVs in a .beetlebank backup: the existing firmware provides sample-slot metadata, not raw WAV download. UPLOAD never deletes unspecified FM1 slots; device deletion is a separate confirmed action. The SAMPLE SPACE meter displays device-reported storage when supported; sample uploads on newer firmware protect extra capacity for project saves. Older firmware cannot report or enforce that reserve.</div>
 <div class="bar" style="margin-top:16px"><button type="button" class="button primary" id="bankOpen">OPEN .BEETLEBANK</button><button type="button" class="button" id="bankSave">↓ SAVE GLOBAL LIBRARY</button><button type="button" class="button quiet" id="bankNew">NEW EMPTY BANK</button><span class="legend" id="bankStats">0 / 13 SLOTS · 0 BYTES</span></div>
 <div class="sample-capacity" role="group" aria-label="FM1 global sample storage capacity">
   <div class="capacity-title"><span>FM1 SAMPLE SPACE</span><span id="sampleCapacityPercent">NOT VERIFIED</span></div>
@@ -106,7 +106,7 @@ body.migration-running .app button,body.migration-running .app input,body.migrat
 <div class="note" id="bankDeviceStatus" role="status" aria-live="polite">FM1 SAMPLES: NOT CONNECTED. PC WAV list below is separate from device storage.</div>
 <div class="help">A stored FM1 sample may display as STORED ON FM1 even when this browser has no WAV loaded for that slot. The installed firmware reports slot occupancy, size, checksum and generation but cannot send back the original WAV or its 3-character display label. Keep your .beetlebank backup. Uploads change only slots containing PC WAVs, never delete empty PC slots. Deleting an FM1 sample always requires an explicit, separate confirmation. Note: flash capacity is shared and the bar represents an estimate, not a promise that every future 12 KiB project or sample will fit.</div>
 <input id="bankFile" type="file" accept=".beetlebank,application/octet-stream" hidden>
-<input id="bankWav" type="file" accept=".wav,audio/wav,audio/x-wav" hidden>
+<input id="bankWav" type="file" accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.m4a" hidden>
 </section>
 <section class="box" style="margin-top:18px;display:none" aria-label="Legacy V23 sample editor">
 <div class="box-title">05 / USER ONE-SHOTS <small>U01–U13 · PROJECT-OWNED µ-LAW BANK</small></div>
@@ -116,7 +116,7 @@ body.migration-running .app button,body.migration-running .app input,body.migrat
 <div class="bar" style="flex-wrap:wrap"><button class="button primary" id="sampleExport" disabled>↓ SAVE PROJECT WITH SAMPLES</button><button class="button" id="sampleUpload" disabled>↑ TRANSFER PROJECT + SAMPLES TO FM1</button><button class="button quiet" id="sampleLegacy" disabled>↓ EXPORT V22 · REMOVE SAMPLES</button></div>
 <div class="help">Load an exported .beetle backup, assign WAV one-shots to U01–U13, and save a new encrypted .beetle. Import it using the normal Project Manager workflow, or connect the FM1 to transfer here. Old V22 projects remain readable; projects containing samples use V23. Use EXPORT V22 to create a sample-free copy before downgrading to V1.3.8. The FM1 has to run the matching V1.4.1 firmware. This browser cannot increase physical flash capacity.</div>
 <input id="sampleFile" type="file" accept=".beetle" hidden>
-<input id="sampleWave" type="file" accept=".wav,audio/wav,audio/x-wav" hidden>
+<input id="sampleWave" type="file" accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.m4a" hidden>
 </section>
 <footer><span>BEETLE · <strong>BORN OUT OF PASSION.</strong></span><span>BY SIKKENWORKS · LOCAL BROWSER TOOL · STORAGE MIGRATION REQUIRES CONFIRMATION</span></footer>
 </main>
@@ -826,7 +826,7 @@ function makeBackupZip(files){
  const result=new Uint8Array(at+22);let pos=0;for(const b of blocks){result.set(b,pos);pos+=b.length;}return result;
 }
 
-/* BEETLE V1.4.35: standalone bulk ZIP, NOT a Storage V2 migration.
+/* BEETLE V1.4.37: standalone bulk ZIP, NOT a Storage V2 migration.
  * No storage formatting, deletion or sample writes. An encrypted project
  * stays assigned to its original slot; all entries are authenticated and
  * preflighted before the first USB flash write. */
@@ -981,7 +981,7 @@ $('convertStorageV2').onclick=()=>safe(convertStorageV2);
 $('restoreStorageV2').onclick=()=>{if(!busy){$('migrationBackupFile').value='';$('migrationBackupFile').click();}};
 $('migrationBackupFile').onchange=()=>{const f=$('migrationBackupFile').files?.[0];if(f)safe(()=>restoreV2FromZip(f));};
 $('copyDiagnostics').onclick=async()=>{
- const report='BEETLE V1.4.35 PROJECT MANAGER · STORAGE MIGRATION\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
+ const report='BEETLE V1.5 PROJECT MANAGER · STORAGE MIGRATION\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
  try{await navigator.clipboard.writeText(report);log('Connection report copied.');}
  catch{log('Could not copy automatically. Select an HTTPS/localhost page and try again.',true);}
 };
@@ -1007,7 +1007,7 @@ function samplePut16(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;}
 function samplePut32(a,o,v){a[o]=v&255;a[o+1]=(v>>>8)&255;a[o+2]=(v>>>16)&255;a[o+3]=(v>>>24)&255;}
 function sampleRawCheck(raw){
  if(raw.length<42||raw.length>MAX_PROJECT||ascii(raw.subarray(0,4))!=='TRK1')throw Error('Not a BEETLE raw project.');
- const v=u16(raw,4);if(v!==22&&v!==23&&v!==24&&v!==25)throw Error('One-shot editor supports V22–V25 projects; got V'+v+'.');
+ const v=u16(raw,4);if(v!==22&&v!==23&&v!==24&&v!==25&&v!==26)throw Error('One-shot editor supports V22–V26 projects; got V'+v+'.');
  if(u32(raw,8)!==raw.length||u32(raw,16)!==crc32(raw.subarray(0,16))||u32(raw,12)!==crc32(raw.subarray(24)))throw Error('Project CRC or size mismatch.');
  return v;
 }
@@ -1205,6 +1205,59 @@ draw();
  return Object.freeze({SLOTS,MAX_FILE,empty,encode,decode,used,crc32,wavValid,wavInfo});
 });
 
+/* Device audio normalization runs entirely in the browser. The PC library
+ * keeps canonical, PCM16 mono 22050Hz WAV, while FM1 upload still uses the
+ * existing, checksum-verified BD4S encoder. Unsupported decoder formats are
+ * rejected BEFORE altering a sample slot or contacting the device. */
+const BeetleSampleConvert=(()=>{
+ const RATE=22050,MAX_SECONDS=20,MAX_FRAMES=RATE*MAX_SECONDS;
+ function wavFromMono(mono){
+  const count=mono.length,out=new Uint8Array(44+count*2),v=new DataView(out.buffer);
+  const text=(p,t)=>{for(let i=0;i<t.length;i++)out[p+i]=t.charCodeAt(i);};
+  text(0,'RIFF');v.setUint32(4,36+count*2,true);text(8,'WAVE');text(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,RATE,true);v.setUint32(28,RATE*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  text(36,'data');v.setUint32(40,count*2,true);
+  for(let i=0;i<count;i++){
+   const x=Math.max(-1,Math.min(1,mono[i]||0));
+   v.setInt16(44+i*2,x<0?Math.max(-32768,Math.round(x*32768)):Math.min(32767,Math.round(x*32767)),true);
+  }
+  return out;
+ }
+ async function normalizeBytes(raw){
+  const original=raw instanceof Uint8Array?raw:new Uint8Array(raw);
+  if(original.length<16||original.length>32*1024*1024)throw Error('Audio file must be below 32 MiB.');
+  try{
+   const info=BeetleGlobalBank.wavInfo(original);
+   if(info.format==='PCM'&&info.channels===1&&info.bitsPerSample===16&&info.sampleRate===RATE&&info.frames<=MAX_FRAMES)
+    return {data:original,converted:false,trimmed:false};
+  }catch{ /* decode other browser-supported audio formats */ }
+  const C=window.AudioContext||window.webkitAudioContext;
+  const O=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  if(!C||!O)throw Error('This browser cannot decode/resample audio; use current Chrome or Edge.');
+  const ctx=new C();let decoded;
+  try{decoded=await ctx.decodeAudioData(original.buffer.slice(original.byteOffset,original.byteOffset+original.byteLength));}
+  catch(err){throw Error('This audio codec cannot be decoded by the browser: '+(err.message||String(err)));}
+  finally{await ctx.close();}
+  if(!decoded||!decoded.length||!decoded.sampleRate)throw Error('Audio contains no playable samples.');
+  const trimmed=decoded.duration>MAX_SECONDS;
+  const seconds=Math.min(MAX_SECONDS,decoded.duration);
+  const frames=Math.max(1,Math.min(MAX_FRAMES,Math.ceil(seconds*RATE)));
+  // Downmix explicitly: OfflineAudioContext channel interpretation can
+  // otherwise give different results for multichannel samples.
+  const offline=new O(1,frames,RATE);
+  const mix=offline.createBuffer(1,Math.min(decoded.length,Math.ceil(seconds*decoded.sampleRate)),decoded.sampleRate);
+  const samples=mix.getChannelData(0);
+  for(let c=0;c<decoded.numberOfChannels;c++){
+   const source=decoded.getChannelData(c);
+   for(let i=0;i<samples.length;i++)samples[i]+=source[i]/decoded.numberOfChannels;
+  }
+  const node=offline.createBufferSource();node.buffer=mix;node.connect(offline.destination);node.start(0);
+  const rendered=await offline.startRendering();
+  return {data:wavFromMono(rendered.getChannelData(0)),converted:true,trimmed};
+ }
+ return Object.freeze({normalizeBytes,MAX_SECONDS});
+})();
 /* BEETLE original BD4S 4-bit codec, ported from tools/dpcm4/beetle_dpcm4.py.
  * Conversion affects only FM1 copy; PC .beetlebank WAV stays intact. */
 const BeetleDeviceCodec=(()=>{
@@ -1391,15 +1444,27 @@ const BeetleDeviceCodec=(()=>{
   if(!deviceSlots||deviceSlots.length!==13)throw Error('FM1 sample scan incomplete. No changes were made.');
   const snapshot=deviceSlots.map(v=>({...v}));
   const initialCapacity=deviceCapacity?{...deviceCapacity}:null;
-  const encoded=entries.map((e,i)=>{
-   if(!e.data.length)return null; // PC EMPTY means KEEP the device slot, NEVER DELETE.
-   const pcm=BeetleDeviceCodec.encode(e.data),packet=new Uint8Array(pcm.length+8);
+  const encoded=[];
+  for(let i=0;i<entries.length;i++){
+   const e=entries[i];
+   if(!e.data.length){encoded.push(null);continue;} // PC EMPTY = KEEP device slot
+   /* Convert legacy high-rate/float/stereo WAVs as well, before writing ANY
+    * FM1 bytes; the original bank stays untouched until explicitly saved. */
+   const normalized=await BeetleSampleConvert.normalizeBytes(e.data);
+   if(normalized.trimmed){
+    const ok=await modal('LONG SAMPLE — 20 SECOND LIMIT',
+     'U'+(i+1)+' is over 20 seconds. Upload only the first 20 seconds of this sample? No FM1 sample has been written yet.',
+     [{label:'CANCEL UPLOAD',value:'no'},{label:'USE FIRST 20S',value:'yes'}]);
+    if(ok!=='yes')return;
+   }
+   const pcm=BeetleDeviceCodec.encode(normalized.data),packet=new Uint8Array(pcm.length+8);
    packet.set(pcm);packet.set([66,78,77,49],pcm.length);
    const label=shortName(e.label,i).padEnd(3,' ');
    for(let j=0;j<3;j++)packet[pcm.length+4+j]=label.charCodeAt(j);
    packet[pcm.length+7]=packet[pcm.length+4]^packet[pcm.length+5]^packet[pcm.length+6]^0xA5;
-   return packet;
-  });
+   encoded.push(packet);
+   if(normalized.converted)log('U'+(i+1)+': converted for FM1 (22.05 kHz / mono / PCM16).'+(normalized.trimmed?' FIRST 20 SECONDS ONLY.':''));
+  }
   const total=encoded.reduce((n,b)=>n+(b?b.length:0),0);
   if(total>250000)throw Error('The PC samples exceed the 250 KB transfer limit. No changes were made.');
   const plan=[];
@@ -1477,7 +1542,7 @@ const BeetleDeviceCodec=(()=>{
      labelWrap.append(labelInput);
      const name=document.createElement('input');name.className='field';name.style.cssText='max-width:125px';name.maxLength=12;name.placeholder='SAMPLE NAME';name.value=e.name;name.disabled=!e.data.length;
      name.onchange=()=>{const old=e.name;e.name=safeName(name.value);try{check();dirty=true;}catch(ex){e.name=old;log(ex.message,true);}name.value=e.name;};
-     const input=document.createElement('button');input.className='button quiet';input.textContent=e.data.length?'REPLACE WAV':'IMPORT WAV';input.onclick=()=>{target=i;q('bankWav').value='';q('bankWav').click();};
+     const input=document.createElement('button');input.className='button quiet';input.textContent=e.data.length?'REPLACE AUDIO':'IMPORT AUDIO';input.onclick=()=>{target=i;q('bankWav').value='';q('bankWav').click();};
      const play=document.createElement('button');play.className='button quiet';play.textContent='PLAY';play.disabled=!e.data.length;
      play.onclick=()=>{stopPreview();
       previousUrl=URL.createObjectURL(new Blob([e.data],{type:'audio/wav'}));const a=new Audio(previousUrl);previousAudio=a;a.play().catch(err=>log('Browser preview unavailable: '+err.message,true));};
@@ -1503,10 +1568,15 @@ const BeetleDeviceCodec=(()=>{
  q('bankDeviceRefresh').onclick=()=>safe(refreshFm1);
  window.BeetleSampleDevice=Object.freeze({refresh:refreshFm1,canUpload:()=>!deviceReading&&!!deviceSlots&&entries.some(e=>e.data.length>0)});
  q('bankWav').onchange=()=>safe(async()=>{const file=q('bankWav').files?.[0];if(!file)return;
-   if(!/\.wav$/i.test(file.name)||file.size>16*1024*1024)throw Error('Choose a WAV file up to 16 MiB (PC library limit, not FM1 flash).');
-   const data=new Uint8Array(await file.arrayBuffer());try{B.wavInfo(data);}catch(e){throw Error('Invalid WAV: '+e.message);}
-   stopPreview();const old=entries[target];entries[target]={name:safeName(file.name.replace(/\.wav$/i,'')),filename:safeName(file.name),label:shortName(old.label,target),data};
-   try{check();}catch(e){entries[target]=old;throw e;}dirty=true;draw();log('Imported WAV into shared library U'+(target+1)+'. Save the .beetlebank file.');
+   if(file.size>32*1024*1024)throw Error('Audio file exceeds the 32 MiB import limit.');
+   const result=await BeetleSampleConvert.normalizeBytes(new Uint8Array(await file.arrayBuffer()));
+   if(result.trimmed){const confirm=await modal('LONG SAMPLE — 20 SECOND LIMIT',
+     'The source is longer than the FM1 maximum. Convert and keep ONLY its first 20 seconds? The original file on your computer will not be changed.',
+     [{label:'CANCEL',value:'no'},{label:'CONVERT FIRST 20S',value:'yes'}]);if(confirm!=='yes')return;}
+   stopPreview();const old=entries[target];const stem=file.name.replace(/\.[^.]+$/,'');
+   entries[target]={name:safeName(stem),filename:safeName(stem+'.wav'),label:shortName(old.label,target),data:result.data};
+   try{check();}catch(e){entries[target]=old;throw e;}dirty=true;draw();
+   log('U'+(target+1)+': '+(result.converted?'Automatically converted to 22.05 kHz / mono / 16-bit PCM WAV.':'Already FM1-compatible WAV.')+' Save your .beetlebank before uploading.');
  });
  q('bankSave').onclick=()=>safe(async()=>{const raw=B.encode(entries),blob=new Blob([raw],{type:'application/octet-stream'});download(blob,'BEETLE-GLOBAL-LIBRARY.beetlebank');dirty=false;draw();log('Exported portable global bank ('+bytes(raw.length)+'). FM1 flash unchanged.');});
  q('bankOpen').onclick=()=>{q('bankFile').value='';q('bankFile').click();};

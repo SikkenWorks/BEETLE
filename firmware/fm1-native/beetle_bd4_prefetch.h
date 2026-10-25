@@ -88,6 +88,10 @@ void beetle_bd4_stream_choke_all(struct beetle_bd4_stream *stream);
  * The supplied output is replaced, not mixed into BEETLE's native bus.
  * Main-loop producer must establish safe cross-context handoff.
  */
+/* RAM-only availability probe. The active BD4S voice must not advance its
+ * source cursor until BOTH samples needed for interpolation are resident;
+ * first-window readiness alone cannot prevent an early step-1 truncation. */
+int beetle_bd4_stream_ready_now(const struct beetle_bd4_stream *stream,unsigned voice);
 void beetle_bd4_stream_render(struct beetle_bd4_stream *stream,unsigned voice,
                               int16_t *mono_output,uint32_t output_frames);
 #endif

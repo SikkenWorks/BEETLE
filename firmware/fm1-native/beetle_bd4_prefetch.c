@@ -198,6 +198,23 @@ static void release_old(struct beetle_bd4_stream_voice *v,uint32_t now){
   if(w->valid&&now>=w->first_frame+w->count)w->valid=0;
  }
 }
+int beetle_bd4_stream_ready_now(const struct beetle_bd4_stream *s,unsigned ix){
+ if(!s||ix>=BEETLE_BD4_STREAM_VOICES)return -1;
+ const struct beetle_bd4_stream_voice *v=&s->voices[ix];
+ if(!v->configured||!v->playing||v->invalid_blocks)return -1;
+ const uint32_t f=v->output_frames>>1u;
+ if(f>=v->frame_count)return -1;
+ /* Odd frame can use the interpolated pair cached by the previous even frame. */
+ if((v->output_frames&1u)&&v->interp_valid)return 1;
+ uint8_t a=0,b=(uint8_t)(f+1u>=v->frame_count);
+ for(unsigned j=0;j<BEETLE_BD4_WINDOW_COUNT;j++){
+  const struct beetle_bd4_window *w=&v->windows[j];
+  if(!w->valid)continue;
+  if(f>=w->first_frame&&f-w->first_frame<w->count)a=1;
+  if(!b&&f+1u>=w->first_frame&&f+1u-w->first_frame<w->count)b=1;
+ }
+ return (a&&b)?1:0;
+}
 void beetle_bd4_stream_render(struct beetle_bd4_stream *s,unsigned ix,int16_t *out,uint32_t n){
  if(!out)return;
  if(!s||ix>=BEETLE_BD4_STREAM_VOICES){memset(out,0,(size_t)n*sizeof(*out));return;}

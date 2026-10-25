@@ -43,7 +43,7 @@ static uint8_t track_store_preflight(const struct track_store_project *p){
  if(p->slot>=TRACK_PROJECTS || p->bpm<30u || p->bpm>300u ||
     p->harmony.root>=12u || p->harmony.mode>=9u || p->harmony.keylock>2u ||
     p->song.count<1u || p->song.count>TRACK_SONG_ENTRIES ||
-    p->song.loop>1u || p->song.enabled>1u || p->mixer.quantize_mutes>1u)return 0u;
+    p->song.loop>1u || p->song.enabled>1u || p->drum_note3_enabled>1u || p->mixer.quantize_mutes>1u)return 0u;
  for(uint8_t k=0u;k<p->song.count;k++)
   if(p->song.chain[k].pattern>=TRACK_PATTERNS ||
      p->song.chain[k].repeats<1u || p->song.chain[k].repeats>16u)return 0u;
@@ -66,7 +66,8 @@ static uint8_t track_store_preflight(const struct track_store_project *p){
    if(track_extra_count(&p->song,k,key)>2u)return 0u;
   }
   for(uint8_t s=0u;s<TRACK_STEPS;s++)
-   if(pat->note2_fx[s].effect>=TRACK_FX_COUNT||pat->note2_fx[s].value>100u)return 0u;
+   if(pat->note2_fx[s].effect>=TRACK_FX_COUNT||pat->note2_fx[s].value>100u||
+       (pat->note3[s]>=TRACK_DRUM_NOTE_COUNT&&pat->note3[s]!=TRACK_NOTE_STOP&&pat->note3[s]!=TRACK_NOTE_EMPTY))return 0u;
  }
  for(uint8_t k=0u;k<TRACK_DRUM_COUNT;k++){
   const struct track_drum_timbre *d=&p->drum[k];
@@ -96,7 +97,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
  PUT1(p->slot);PUT1(p->harmony.root);PUT1(p->harmony.mode);PUT1(p->harmony.keylock);
  if(i+2u>cap)return -2;
  wr16(out+i,p->bpm);i+=2;
- PUT1(p->song.count);PUT1(p->song.loop);PUT1(p->song.enabled);
+ PUT1(p->song.count);PUT1(p->song.loop);PUT1(p->song.enabled);PUT1(p->drum_note3_enabled);
  for(c=0;c<p->song.count;c++){PUT1(p->song.chain[c].pattern);PUT1(p->song.chain[c].repeats);
   for(uint8_t lane=0u;lane<TRACK_CHANNELS;lane++)PUT1(p->song.chain[c].lane[lane]);}
  for(c=0;c<TRACK_CHANNELS;c++){
@@ -149,6 +150,13 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
   for(s=0;s<TRACK_STEPS;s++)if(fx2_mask&(1u<<s)){
    PUT1(pat->note2_fx[s].effect);PUT1(pat->note2_fx[s].value);
   }
+  /* V26: CH6 independent NOTE3 lane. A mask and one byte per nonempty
+   * note keep empty patterns cheap and retain NOTE3 even in FX display mode. */
+  uint16_t note3_mask=0u;
+  for(s=0;s<TRACK_STEPS;s++)if(pat->note3[s]!=TRACK_NOTE_EMPTY)note3_mask|=(uint16_t)(1u<<s);
+  if(i+2u>cap)return -2;
+  wr16(out+i,note3_mask);i+=2u;
+  for(s=0;s<TRACK_STEPS;s++)if(note3_mask&(1u<<s))PUT1(pat->note3[s]);
   /* V21: per-pattern sparse slice of the global FX pool. */
   uint8_t extra_count=0u;
   for(uint8_t x=0u;x<p->song.extras.count;x++)
@@ -292,7 +300,7 @@ int track_store_encode(const struct track_store_project *p,uint8_t *out,uint32_t
 }
 int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_t n){
  if(!p||!data||n<42u||n>TRACK_STORE_MAX)return -1;
- if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=21u&&rd16(data+4u)!=22u&&rd16(data+4u)!=23u&&rd16(data+4u)!=24u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
+ if(rd32(data)!=TRACK_STORE_MAGIC||(rd16(data+4u)!=1u&&rd16(data+4u)!=2u&&rd16(data+4u)!=3u&&rd16(data+4u)!=4u&&rd16(data+4u)!=5u&&rd16(data+4u)!=6u&&rd16(data+4u)!=7u&&rd16(data+4u)!=8u&&rd16(data+4u)!=9u&&rd16(data+4u)!=10u&&rd16(data+4u)!=11u&&rd16(data+4u)!=12u&&rd16(data+4u)!=13u&&rd16(data+4u)!=14u&&rd16(data+4u)!=15u&&rd16(data+4u)!=16u&&rd16(data+4u)!=17u&&rd16(data+4u)!=18u&&rd16(data+4u)!=19u&&rd16(data+4u)!=20u&&rd16(data+4u)!=21u&&rd16(data+4u)!=22u&&rd16(data+4u)!=23u&&rd16(data+4u)!=24u&&rd16(data+4u)!=25u&&rd16(data+4u)!=TRACK_STORE_VERSION)||rd16(data+6u)>=TRACK_PROJECTS||rd32(data+8u)!=n||
     rd32(data+12u)!=track_store_crc32(data+24u,n-24u)||rd32(data+16u)!=track_store_crc32(data,16u))return -3;
  /* Fail closed on a structurally invalid V23 suffix before touching the
   * live staging bank or the RAM samples still referenced by the drum ISR. */
@@ -323,6 +331,7 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
  if(i+2u>n)return -2;
  p->bpm=rd16(data+i);i+=2;
  GET1(p->song.count);GET1(p->song.loop);GET1(p->song.enabled);
+ if(rd16(data+4u)>=26u){GET1(p->drum_note3_enabled);if(p->drum_note3_enabled>1u)return -3;}else p->drum_note3_enabled=0u;
  if(p->slot>=TRACK_PROJECTS||p->harmony.root>=12u||p->harmony.mode>=9u||p->harmony.keylock>2u||p->bpm<30u||p->bpm>300u||p->song.count<1u||p->song.count>TRACK_SONG_ENTRIES||p->song.loop>1u||p->song.enabled>1u)return -3;
  for(c=0;c<p->song.count;c++){
   GET1(p->song.chain[c].pattern);GET1(p->song.chain[c].repeats);
@@ -393,6 +402,16 @@ int track_store_decode(struct track_store_project *p,const uint8_t *data,uint32_
    for(s=0;s<TRACK_STEPS;s++)if(mask&(1u<<s)){
     GET1(pat->note2_fx[s].effect);GET1(pat->note2_fx[s].value);
     if(pat->note2_fx[s].effect>=TRACK_FX_COUNT||pat->note2_fx[s].value>100u)return -3;
+   }
+  }
+  /* V26: legacy files have no third-note events. Keep the empty sentinel. */
+  for(s=0;s<TRACK_STEPS;s++)pat->note3[s]=TRACK_NOTE_EMPTY;
+  if(rd16(data+4u)>=26u){
+   if(i+2u>n)return -2;
+   uint16_t n3mask=rd16(data+i);i+=2u;
+   for(s=0;s<TRACK_STEPS;s++)if(n3mask&(1u<<s)){
+    GET1(pat->note3[s]);
+    if(pat->note3[s]>=TRACK_DRUM_NOTE_COUNT && pat->note3[s]!=TRACK_NOTE_STOP)return -3;
    }
   }
   /* Decode sparse per-pattern FX entries into the shared bank. */

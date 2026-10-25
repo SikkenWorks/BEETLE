@@ -8,7 +8,7 @@ void track_song_init(struct track_song_bank *b,const struct track_engine *e){
  memset(b,0,sizeof(*b));
  for(uint8_t i=0;i<TRACK_PATTERNS;i++){
    b->patterns[i].length=16u;
-   for(uint8_t s=0;s<TRACK_STEPS;s++)b->patterns[i].note2_fx[s].value=50u;
+   for(uint8_t s=0;s<TRACK_STEPS;s++){b->patterns[i].note2_fx[s].value=50u;b->patterns[i].note3[s]=TRACK_NOTE_EMPTY;}
   for(uint8_t c=0;c<TRACK_CHANNELS;c++)for(uint8_t s=0;s<TRACK_STEPS;s++){
    b->patterns[i].ch[c][s].note=255u;
    b->patterns[i].ch[c][s].instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:c);
@@ -85,12 +85,12 @@ static void track_song_compose(struct track_song_bank *b,struct track_engine *e)
     * 16 per-cell modulo operations at each SONG boundary in the audio ISR. */
    if(plen==TRACK_STEPS){
     memcpy(out->ch[c],p->ch[c],sizeof(out->ch[c]));
-    if(c==TRACK_DRUM_CHANNEL)memcpy(out->note2_fx,p->note2_fx,sizeof(out->note2_fx));
+    if(c==TRACK_DRUM_CHANNEL){memcpy(out->note2_fx,p->note2_fx,sizeof(out->note2_fx));memcpy(out->note3,p->note3,sizeof(out->note3));}
    }else{
     for(uint8_t s=0u;s<TRACK_STEPS;s++){
      uint8_t k=(uint8_t)(s%plen);
      out->ch[c][s]=p->ch[c][k];
-     if(c==TRACK_DRUM_CHANNEL)out->note2_fx[s]=p->note2_fx[k];
+     if(c==TRACK_DRUM_CHANNEL){out->note2_fx[s]=p->note2_fx[k];out->note3[s]=p->note3[k];}
     }
    }
   }else{
@@ -98,7 +98,7 @@ static void track_song_compose(struct track_song_bank *b,struct track_engine *e)
     struct track_step *dst=&out->ch[c][s];
     memset(dst,0,sizeof(*dst));dst->note=TRACK_NOTE_EMPTY;
     dst->instrument=(uint8_t)(c==TRACK_DRUM_CHANNEL?3u:c);dst->value=50u;
-    if(c==TRACK_DRUM_CHANNEL){out->note2_fx[s].effect=0u;out->note2_fx[s].value=50u;}
+    if(c==TRACK_DRUM_CHANNEL){out->note2_fx[s].effect=0u;out->note2_fx[s].value=50u;out->note3[s]=TRACK_NOTE_EMPTY;}
    }
   }
  }

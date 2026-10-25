@@ -491,7 +491,7 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
  * No runtime allocations, no display writes, bounded integer DSP. */
 #define BEETLE_STEP_DELAY_FRAMES 128u
 static int16_t beetle_step_delay[TRACK_SYNTH_CHANNELS][BEETLE_STEP_DELAY_FRAMES]
- __attribute__((section(".beetle_song"),aligned(16)));
+ __attribute__((section(".beetle_edit_scratch"),aligned(16)));
 static uint16_t beetle_step_write[TRACK_SYNTH_CHANNELS];
 static uint32_t beetle_step_phase[TRACK_SYNTH_CHANNELS];
 void track_chip_fx_reset(void){

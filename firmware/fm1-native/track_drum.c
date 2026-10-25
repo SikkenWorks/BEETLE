@@ -257,6 +257,11 @@ void track_drum_render(struct track_drum_engine *d,const struct track_mixer *mix
    if(v->id>=32u){
     int state=beetle_bd4_live_next(i,v->sequence,&streamed);
     if(state<0){v->active=0u;continue;}
+    /* A global user sample's DMA phase, AGE, amplitude envelope and gate
+     * must never advance without its next interpolated PCM source frame.
+     * This also protects the first refill AFTER initial prefetch, which
+     * previously skipped the rest of NOTE3/step-1 under flash contention. */
+    if(state==0)continue;
    }
 #endif
    const uint32_t frac=v->phase&65535u;

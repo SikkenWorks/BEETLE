@@ -1,3 +1,34 @@
+## V1.5 — Sample Auto-Conversion, NOTE3 First-Frame Streaming & Clean WebInstaller (25 October 2026)
+
+- Version-label correction: the immediately preceding release was mistakenly labeled V1.4.4; this is that same build, correctly designated V1.5. Firmware payload, project format and user sample storage are unchanged.
+
+- Global sample import in Project Manager now decodes browser-supported audio (WAV/MP3/FLAC where supported), downmixes to mono, resamples to 22,050 Hz and writes 16-bit PCM WAV before storage/BD4S device upload. Existing incompatible sample-bank WAVs are converted in memory before device transfer. Clips longer than 20 seconds require explicit confirmation to keep only the first 20 seconds; unsupported/corrupt files are rejected before modifying slots. The FM1 still uses the existing BD4S 4-bit storage codec.
+- The first-step NOTE3 user-sample bug persisted in V1.4.37 because initial-prefetch gating did not protect subsequent PCM-window starvation. The live streamer now probes BOTH interpolation source frames before advancing the 44,100 Hz output cursor; a missing window stalls the drum voice phase and envelope until background prefetch completes. This applies to all three CH6 NOTE lanes. No flash reads were added inside the DMA audio interrupt and no additional PCM buffers allocated.
+- WebInstaller refreshed to a compact, dark BEETLE-style magenta UI with neutral safety notices and fewer repetitive high-visibility warning blocks. Consent, checksums, device verification, recovery information and confirmation controls remain functional.
+- Project format remains TRK1 V26. On-device HELP content continues to cover NOTE3, SONG LOOP, sample playback and project controls; unchanged controls need no new HELP entries. README stays an operation manual, not a release log. Physical FM1 playback, USB audio and OTA recovery remain unvalidated.
+
+## V1.4.37 — FM1 HELP and NOTE3 first-step sample startup (25 October 2026)
+
+- Updated FM1 on-device HELP for CH6 SEL+FX NOTE3/FX view, independent NOTE3 drums and global samples U01–U13, focused-note deletion, own STP, muted (but preserved) CH6 FX, and note entry without step advance.
+- Updated SONG CHAINS HELP: SEL short press, 650 ms hold for SONG LOOP, SEL+K1 range, and looping precisely selected rows when pressing PLAY.
+- Updated project SAVE/LOAD HELP to explain persisted NOTE3 mode and note content in TRK1 V26.
+- Kept WebSimulator HELP text identical to the native help array. Added mandatory automated HELP parity, 36-glyph width, chapter count and essential topic checks to clean-release verification, plus an explicit per-iteration HELP review rule.
+- Fixed global BD4S sample voices progressing their drum phase, age, amplitude envelope and gate while first waiting for background prefetch. The entire attack now remains intact instead of only playing a later fragment.
+- On transport PLAY, the first DMA frame waits (up to 0.5 seconds) for initial NOTE1/NOTE2/NOTE3 user-sample PCM windows to be ready; all six channels and USB capture remain aligned. The wait is silent and bounded; the audio IRQ never reads flash or decodes samples.
+- If a sample fails validation during preparation, its startup state is cleared so it cannot indefinitely block PLAY.
+- The existing `.beetle` project schema TRK1 V26, NOTE3 FX-view persistence, sample bank, 6-voice drum architecture and protected OTA assets remain unchanged. The FM1 firmware is experimental and physical playback/USB/OTA recovery remain unverified; README remains a user guide, not a version history.
+
+## V1.4.36 — CH6 third drum lane, FX view toggle and fixed tracker note cursor (experimental)
+
+- On CH6 TRACKER with transport stopped, **SEL + FX** toggles between `STEP · NOTE · NOTE2 · KIT · FX` and `STEP · NOTE · NOTE2 · NOTE3 · KIT`. In the second mode, the old CH6 FX column is hidden; existing CH6 FX data and events are preserved but their effects are muted during playback until the user returns to FX mode.
+- NOTE3 supports all 27 drum IDs (14 factory + U01–U13 global samples), independent keyboard entry, K3 note selection, focused SEL erase, empty and independently scoped `STP`; third drum hit is mixed through existing voices (no new allocated drumvoices), and is retained during song composition and pattern/lane clipboard transfers.
+- **NOTE entry does not advance** the editing cursor on any channel. NOTE2 and NOTE3 remain non-advancing. Other step navigation still uses K1.
+- Projects now store the CH6 NOTE3 enabled flag and sparse NOTE3 per-pattern entries in **TRK1 V26**. Supported V25 and legacy V23 projects still decode, initializing NOTE3 disabled and empty; V26 cannot be read by V25 firmware. The independent pattern codec is now TR5, with older TR1–TR4 formats readable.
+- WebSimulator mirrors NOTE3 display/editing/recording and native TRK1 V26 project import/export. The current Project Manager and bulk ZIP tools accept the device-reported V26 project schema; global sample data remain stored separately.
+- Regression test `tests/track/test_v1436_note3.c` verifies 27 drum IDs, cursor stays on row, V26 project mode on/off persistence, independent NOTE3/STP, hidden FX preservation, pattern V4-to-V5 migration and actual V25 legacy-project decoding. The previous V23 migration regression is run against an actual V23 fixture produced by the V25 baseline project encoder instead of treating V26 bytes as V23.
+- JieLi native build, firmware container/header/OTA loader validation, relevant host tests and browser JavaScript syntax pass. Real FM1 control timings, 3-drum hit load, live USB capture and OTA flashing/recovery **not hardware validated**. Back up before flashing.
+- README is version-history-free (stable user guide and credits only); all release-specific notes are here. Release ZIP contains only current firmware and supported project files.
+
 ## V1.4.35 — Punch-In FX bank LEDs, SONG SEL long hold, secure projects bulk ZIP and V23 fixture fix (experimental)
 
 - Eight physical FM1 white-key LEDs display the eight effects of the current Punch-In page. Existing held keys and Punch-In performance behavior preserved. WebSimulator mirrors page illumination.
@@ -7,6 +38,7 @@
 - Tests: native JieLi build; V23 song migration; V1.4.34 range looping; ZIP roundtrip and hostile ZIP rejects; JS syntax; package roundtrip and first 16 KiB/OTA loader identity. Physical hardware/OTA tests not yet performed.
 - Separate old `test_rc1011b_pcm_compat.c` checksum in `run_rc1011b_audio_stability.sh` also fails on identical V1.4.34 baseline (`dd0f3681` measured vs stale expected `43c0f1f6`); not modified or counted as a pass.
 - Project release remains clean: one current `.fwsc`, current HTML tools, source, tests, docs, and licenses; no old generated releases.
+- Documentation-only cleanup: moved chronological "New in V…" release narratives out of README; functional user instructions, installation and credits stay in README. All release changes belong in this CHANGELOG.
 
 ## V1.4.34 — SONG selection, range looping and UI/transport race fixes (experimental)
 
