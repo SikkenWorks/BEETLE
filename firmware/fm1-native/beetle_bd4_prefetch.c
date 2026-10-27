@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * BEETLE standalone BD4S PCM streaming lab, SikkenWorks.
- * Intentionally NOT in production firmware build.py.
+ * BEETLE BD4S prefetch/PCM streaming, SikkenWorks.
+ * Compiled into Storage V2 native firmware, with flash I/O restricted to the
+ * main-loop prefetch; the audio renderer only reads bounded RAM windows.
  */
 #include "beetle_bd4_prefetch.h"
 #include <string.h>
@@ -43,18 +44,30 @@ static int read_bytes(struct beetle_bd4_stream *s,struct beetle_bd4_stream_voice
 }
 static int fetch_block(struct beetle_bd4_stream *s,struct beetle_bd4_stream_voice *v,
                        const struct bd4_reader_binding *io){
- uint8_t head[6];
- if(v->source_offset>v->byte_length||v->byte_length-v->source_offset<6u)return 0;
- if(!read_bytes(s,v,io,v->source_offset,head,6u))return 0;
+ /* Most sample blocks encode 256 PCM frames (134 bytes including header).
+  * Fetch those in one background transaction instead of fetching their
+  * 6-byte header and payload separately. Short tail blocks use bounded
+  * two-stage reads; no speculative read beyond the verified sample blob. */
+ if(v->source_offset>v->byte_length)return 0;
+ uint32_t remaining=v->byte_length-v->source_offset;
+ if(remaining<6u)return 0;
+ uint8_t *head=v->encoded;
+ if(remaining>=BEETLE_BD4_BLOCK_BYTES){
+  if(!read_bytes(s,v,io,v->source_offset,v->encoded,BEETLE_BD4_BLOCK_BYTES))return 0;
+ }else{
+  if(!read_bytes(s,v,io,v->source_offset,head,6u))return 0;
+ }
  const uint16_t n=word(head+4),step=word(head+2);
- if(n==0u||n>256u||step<8u||step>8192u||n>v->frame_count-v->decoded_frames)return 0;
+ if(!n||n>BEETLE_BD4_BLOCK_FRAMES||step<8u||step>8192u||
+    n>v->frame_count-v->decoded_frames)return 0;
  const uint16_t size=(uint16_t)(6u+n/2u);
- if(v->source_offset>v->byte_length||size>v->byte_length-v->source_offset)return 0;
- if(!read_bytes(s,v,io,v->source_offset,v->encoded,size))return 0;
- if(memcmp(head,v->encoded,6u)!=0)return 0;
+ if(size>remaining)return 0;
+ if(remaining<BEETLE_BD4_BLOCK_BYTES && size>6u &&
+    !read_bytes(s,v,io,v->source_offset+6u,v->encoded+6u,
+                (uint16_t)(size-6u)))return 0;
  v->source_offset+=size;
- v->encoded_length=(uint8_t)(size-6u); /* maximum 128 bytes */
- v->block_frames=n;v->block_cursor=0;
+ v->encoded_length=(uint8_t)(size-6u);
+ v->block_frames=n;v->block_cursor=0u;
  v->predictor=(int16_t)word(head);v->step=step;
  return 1;
 }
@@ -158,7 +171,7 @@ int beetle_bd4_stream_start(struct beetle_bd4_stream *s,unsigned ix){
  if(!v->configured||!v->verified_header||v->invalid_blocks||v->playing)return 0;
  if(!v->windows[0].valid||
     (!v->windows[1].valid&&v->frame_count>BEETLE_BD4_WINDOW_FRAMES))return 0;
- v->output_frames=0;v->in_gap=0;v->last_output=0;v->fade_in=0;v->choke_frames=0u;v->playing=1;
+ v->output_frames=0;v->in_gap=0;v->last_output=0;v->fade_in=0;v->choke_frames=0u;v->interp_valid=0u;v->playing=1;
  return 1;
 }
 void beetle_bd4_stream_choke_voice(struct beetle_bd4_stream *s,unsigned ix){
@@ -185,6 +198,23 @@ static void release_old(struct beetle_bd4_stream_voice *v,uint32_t now){
   if(w->valid&&now>=w->first_frame+w->count)w->valid=0;
  }
 }
+int beetle_bd4_stream_ready_now(const struct beetle_bd4_stream *s,unsigned ix){
+ if(!s||ix>=BEETLE_BD4_STREAM_VOICES)return -1;
+ const struct beetle_bd4_stream_voice *v=&s->voices[ix];
+ if(!v->configured||!v->playing||v->invalid_blocks)return -1;
+ const uint32_t f=v->output_frames>>1u;
+ if(f>=v->frame_count)return -1;
+ /* Odd frame can use the interpolated pair cached by the previous even frame. */
+ if((v->output_frames&1u)&&v->interp_valid)return 1;
+ uint8_t a=0,b=(uint8_t)(f+1u>=v->frame_count);
+ for(unsigned j=0;j<BEETLE_BD4_WINDOW_COUNT;j++){
+  const struct beetle_bd4_window *w=&v->windows[j];
+  if(!w->valid)continue;
+  if(f>=w->first_frame&&f-w->first_frame<w->count)a=1;
+  if(!b&&f+1u>=w->first_frame&&f+1u-w->first_frame<w->count)b=1;
+ }
+ return (a&&b)?1:0;
+}
 void beetle_bd4_stream_render(struct beetle_bd4_stream *s,unsigned ix,int16_t *out,uint32_t n){
  if(!out)return;
  if(!s||ix>=BEETLE_BD4_STREAM_VOICES){memset(out,0,(size_t)n*sizeof(*out));return;}
@@ -195,15 +225,25 @@ void beetle_bd4_stream_render(struct beetle_bd4_stream *s,unsigned ix,int16_t *o
    uint32_t frame=v->output_frames>>1;
    if(frame>=v->frame_count){v->playing=0;}
    else{
-    release_old(v,frame);
-    int16_t a,b;
-    int ok=locate(v,frame,&a);
-    if(ok){
-     if(frame+1u==v->frame_count)b=a;
-     else if(!locate(v,frame+1u,&b))ok=0;
+    /* Each BD4S frame is played twice (22,050 -> 44,100 Hz). The odd
+     * output frame interpolates the SAME source pair fetched for the even
+     * frame. The old path re-scanned both PCM windows twice, every time.
+     * If the even frame underruns, retry normally on the odd one so a
+     * background refill can still recover as soon as it becomes available. */
+    int16_t a=0,b=0;
+    const uint8_t odd=(uint8_t)(v->output_frames&1u);
+    int ok=(odd&&v->interp_valid)?1:0;
+    if(ok){a=v->interp_a;b=v->interp_b;}
+    else{
+     ok=locate(v,frame,&a);
+     if(ok){
+      if(frame+1u==v->frame_count)b=a;
+      else if(!locate(v,frame+1u,&b))ok=0;
+     }
+     if(!odd){v->interp_a=a;v->interp_b=b;v->interp_valid=(uint8_t)ok;}
     }
     if(ok){
-     signal=(v->output_frames&1u)?((int32_t)a+(int32_t)b)/2:(int32_t)a;
+     signal=odd?((int32_t)a+(int32_t)b)/2:(int32_t)a;
      if(v->in_gap){v->in_gap=0;v->fade_in=16u;}
      if(v->fade_in){signal=signal*(int32_t)(17u-v->fade_in)/16;v->fade_in--;}
     }else{
@@ -211,7 +251,7 @@ void beetle_bd4_stream_render(struct beetle_bd4_stream *s,unsigned ix,int16_t *o
      signal=(v->last_output*7)/8; /* bounded click reduction, does not conceal underrun */
     }
     v->output_frames++;
-    /* Release a completed 64-frame window before the main-loop refill. */
+    /* Release a completed 128-frame window before the main-loop refill. */
     release_old(v,v->output_frames>>1);
    }
   }

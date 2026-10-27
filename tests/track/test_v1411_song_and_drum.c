@@ -52,13 +52,13 @@ static void test_serialization(void){
  a.song.chain[0].lane[1]=255u;
  a.song.chain[0].lane[2]=6u;
  uint32_t n=0;
- assert(track_store_encode(&a,wire,sizeof wire,&n)==0 && wire[4]==24u);
+ assert(track_store_encode(&a,wire,sizeof wire,&n)==0 && wire[4]==TRACK_STORE_VERSION);
  assert(track_store_decode(&b,wire,n)==0);
  assert(b.song.chain[0].lane[0]==128u);
  assert(b.song.chain[0].lane[1]==255u);
  assert(b.song.chain[0].lane[2]==6u);
  wire[40]^=0x01u;assert(track_store_decode(&b,wire,n)==-3);wire[40]^=0x01u;
- /* No sample bank suffix in V24 is valid; decoding stays guarded by CRC. */
+ /* No sample bank suffix in V26 is valid; decoding stays guarded by CRC. */
 }
 static unsigned long long render_drum(int dual){
  struct track_drum_engine d;track_drum_init(&d);
@@ -80,6 +80,6 @@ int main(void){
  test_song();test_serialization();
  printf("DRUM SINGLE CRC %016llx\n",render_drum(0));
  printf("DRUM DOUBLE CRC %016llx\n",render_drum(1));
- puts("PASS Song -- STOP, explicit empty sustain, row copy, V24 CRC and 128 dense drum loops");
+ puts("PASS Song -- STOP, explicit empty sustain, row copy, V26 CRC and 128 dense drum loops");
  return 0;
 }

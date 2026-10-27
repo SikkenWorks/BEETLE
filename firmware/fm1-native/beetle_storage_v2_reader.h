@@ -56,6 +56,18 @@ int beetle_v2_sample_chunk_read(struct beetle_v2_device *device,uint8_t slot,
  uint16_t *written,uint8_t index[4096]);
 /* Check a committed project record and unpack into caller-provided RAM.
  * 1 = project present, 0 = empty, negative = invalid. */
+/* Index-only NEW PROJECT allocation. Scans each slot's two metadata
+ * references once. Never decodes an occupied project, never trusts an
+ * unreadable/corrupt index as free. Return 0..11 free, 12 full, -1 error. */
+/* NEW PROJECT: 2 x 4KiB CRC-validated index copies, no extra flash read.
+ * Caller provides 8192 bytes. 0..11 free; 12 full; -1 invalid/unreadable. */
+int beetle_v2_audit_and_first_unused_project_fast(beetle_v2_read read,
+ void *context,struct beetle_v2_domains *report,uint8_t double_scratch[8192]);
+int beetle_v2_first_unused_project(struct beetle_v2_device *device,uint8_t *scratch);
+/* Shared CRC-checked index read: validate project/sample domain ownership
+ * and find a free project without a second 4KiB NOR read. -1 on failure. */
+int beetle_v2_audit_and_first_unused_project(struct beetle_v2_device *device,
+ struct beetle_v2_domains *report,uint8_t *scratch);
 int beetle_v2_project_read(struct beetle_v2_device *device,uint8_t slot,uint8_t *out,
  uint32_t capacity,uint32_t *written,uint8_t *scratch,
  uint8_t *packed_work,uint32_t packed_capacity);

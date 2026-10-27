@@ -34,6 +34,8 @@ struct track_song_bank {
  struct track_song_entry chain[TRACK_SONG_ENTRIES];
  uint8_t count,position,repeat_index,loop,enabled;
  uint8_t edit_row,edit_column,composite_active;
+ /* Transient playback-only range (not serialized). Selection is not a song edit. */
+ uint8_t play_range_active,play_range_first,play_range_last;
  /* Shared project-wide sparse FX pool: each record belongs to a pattern. */
  struct track_extra_bank {
   uint8_t count;
@@ -92,6 +94,9 @@ void track_song_capture(struct track_song_bank *bank,const struct track_engine *
 void track_song_restore(struct track_song_bank *bank,struct track_engine *engine);
 uint8_t track_song_punch_pattern(const struct track_song_bank *bank,const struct track_engine *engine);
 void track_song_start(struct track_song_bank *bank,struct track_engine *engine);
+/* Inclusive song row loop: always loops this range regardless of global song LOOP. */
+void track_song_start_range(struct track_song_bank *bank,struct track_engine *engine,
+                            uint8_t first,uint8_t last);
 /* Called only at wrap to step 00 in audio context. Returns 1 when a pattern changed. */
 int track_song_on_wrap(struct track_song_bank *bank,struct track_engine *engine);
 int track_song_insert(struct track_song_bank *bank,uint8_t after);

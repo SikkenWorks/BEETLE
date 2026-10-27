@@ -157,7 +157,7 @@ void track_chip_recover(struct track_chip_engine *s){
  if(!s)return;
  /* Keep oscillator settings, restart only damaged DSP state and its history. */
  uint8_t duty[TRACK_CHANNELS],cutoff[TRACK_CHANNELS],drive[TRACK_CHANNELS],types[TRACK_CHIP_SLOTS],step_gain[TRACK_CHANNELS],fx_type[TRACK_CHANNELS],fx_value[TRACK_CHANNELS],mono=s->mono;
- uint8_t ea[TRACK_CHIP_SLOTS],ed[TRACK_CHIP_SLOTS],es[TRACK_CHIP_SLOTS],er[TRACK_CHIP_SLOTS],punch_params[5];
+ uint8_t ea[TRACK_CHIP_SLOTS],ed[TRACK_CHIP_SLOTS],es[TRACK_CHIP_SLOTS],er[TRACK_CHIP_SLOTS],punch_params[16];
  memcpy(punch_params,s->punch_param,sizeof(punch_params));
  memcpy(ea,s->env_attack,sizeof(ea));memcpy(ed,s->env_decay,sizeof(ed));memcpy(es,s->env_sustain,sizeof(es));memcpy(er,s->env_release,sizeof(er));
  struct track_va_patch patches[TRACK_CHIP_SLOTS];memcpy(patches,s->patches,sizeof(patches));
@@ -391,8 +391,14 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
  }break;
  case TRACK_CHIP_SID_6581: case TRACK_CHIP_SID_8580:
  case TRACK_CHIP_SID_DIRTY: case TRACK_CHIP_SID_BASS: case TRACK_CHIP_SID_NOISE:{
+  /* The B oscillator is independent; no additional voice/RAM is needed. */
+  v->phase2+=step2;
+  /* SID hard sync: reset oscillator B on master A accumulator wrap.
+   * Disabled by default. Uses the existing SUB control in SID mode. */
+  if(sid_cfg->sync && v->phase<step)v->phase2=0u;
   uint8_t style=v->type;
-  level=beetle_sid_sample_prepared(sid_cfg,v->phase,step,&v->lfsr,
+  level=beetle_sid_sample_prepared(sid_cfg,v->phase,step,
+                                  sid_cfg->phase_lock?v->phase:v->phase2,&v->lfsr,
                                   &v->lowpass,&v->sid_bandpass);
   /* Soft 6581-style asymmetric saturation. Character variations remain
    * bounded to avoid feeding huge peaks into MASTER dynamics. */
@@ -460,37 +466,20 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
   else v->envelope-=v->release_rate;
  }
  if(v->type==TRACK_CHIP_RETRO_PULSE){
-  /* DMG 4-bit channel DAC and AC-coupled analog output. Quantizing the
-   * existing ADSR to 16 discrete steps gives the characteristic coarse
-   * volume changes without adding a second RAM envelope or breaking
-   * existing saved patches. Filter state is voice-local, bounded and
-   * updated once per sample, including during note release. */
-  uint32_t env4=(v->envelope*15u+524288u)>>20u;
-  if(env4>15u)env4=15u;
-  int32_t discrete=(int32_t)env4*1370;
-  int32_t amplitude=discrete;
-  if(v->env_stage==3u){
-   /* During release, 16 discrete gain steps produce audible low-rate
-    * amplitude zippering (the reported buzzy tail). Preserve the original
-    * DMG duty oscillator and sustained DAC level, but crossfade for 128
-    * samples into a smooth release envelope. Uses only bounded 32-bit math. */
-   uint32_t fade=v->release_left;
-   if(fade<128u){fade++;v->release_left=(uint16_t)fade;}
-   int32_t smooth=(int32_t)((((v->envelope>>8u)*20550u)+2048u)>>12u);
-   amplitude=(discrete*(int32_t)(128u-fade)+smooth*(int32_t)fade+64)>>7u;
-  }
-  int32_t dac=level?amplitude:0;
-  v->lowpass+=(dac-v->lowpass)>>8u;
-  /* DMG headphone output: AC coupling, a slightly dark single-pole
-   * analogue roll-off and smooth saturation. This is intentionally a
-   * different timbre from the open/bipolar NES PULSE implementation. */
-  int32_t ac=dac-v->lowpass;
-  v->sid_bandpass+=(ac-v->sid_bandpass)>>2u;
-  int32_t shaped=(v->sid_bandpass*3+ac)/4;
-  /* 4-bit headphone DAC clips asymmetrically before a modest gain lift. */
-  if(shaped>14500)shaped=14500+(shaped-14500)/4;
-  if(shaped< -14500)shaped=-14500+(shaped+14500)/4;
-  level=shaped*2;
+  /* V1.4.29: The old 4-bit envelope quantized a *continuous* ADSR every
+   * sample, introducing audible volume retriggers/zipper during decay and
+   * release. A slow AC-coupling integrator also tracked the pulsetrain and
+   * could create low-frequency modulation. Keep the genuine DMG 8-step
+   * duty waveform, but center its known duty cycle analytically so there
+   * is no sustained DC or moving servo. Use the original smooth ADSR. */
+  static const uint8_t duty_high[4]={1u,2u,4u,6u};
+  const uint8_t duty=(uint8_t)(s->duty[v->channel]&3u);
+  const int32_t centered=(level?8:0)-(int32_t)duty_high[duty];
+  /* One-pole gentle output smoothing; voice-local state, no RAM addition.
+   * Signed shift avoided for portable arithmetic on negative values. */
+  const int32_t raw=centered*3200;
+  v->sid_bandpass+=(raw-v->sid_bandpass)/4;
+  level=(int32_t)(((int64_t)v->sid_bandpass*v->envelope)>>20u);
  }else level=(int32_t)(((int64_t)level*v->envelope)>>20u);
  /* Normalize intrinsic waveform loudness before lane gain and effects.
   * Never normalize based on live RMS (which would flatten performance). */
@@ -502,7 +491,7 @@ static int32_t sample_one(struct track_chip_voice *v,const struct track_chip_eng
  * No runtime allocations, no display writes, bounded integer DSP. */
 #define BEETLE_STEP_DELAY_FRAMES 128u
 static int16_t beetle_step_delay[TRACK_SYNTH_CHANNELS][BEETLE_STEP_DELAY_FRAMES]
- __attribute__((section(".beetle_song"),aligned(16)));
+ __attribute__((section(".beetle_edit_scratch"),aligned(16)));
 static uint16_t beetle_step_write[TRACK_SYNTH_CHANNELS];
 static uint32_t beetle_step_phase[TRACK_SYNTH_CHANNELS];
 void track_chip_fx_reset(void){
@@ -591,7 +580,19 @@ void track_chip_render(struct track_chip_engine *s,const struct track_mixer *mix
   if(style==TRACK_CHIP_SID_BASS){wa=1u;wb=2u;mode=14u;cut=(uint8_t)(cut/2u+8u);}
   if(style==TRACK_CHIP_SID_NOISE){wa=3u;wb=2u;mix=20u;mode=80u;}
   sid_cache[vi]=beetle_sid_prepare(style,wa,wb,p->pulse_width,p->pulse_width_b,
-                                   mix,cut,reso,mode);
+                                   mix,cut,reso,mode,p->fm_depth,p->sub,p->noise);
+  /* V1.4.31 legacy SID neutrality: the common saved factory detune=12
+   * came from the VA oscillator but was inaudible before V1.4.30, since
+   * both SID waveforms then shared oscillator A's phase. Activating that
+   * dormant detune added a slow wah-like beat on 6581/DIRTY/BASS patches.
+   * Keep those old unmodified patches phase coherent. A genuine custom
+   * coarse/fine/detune (not 0/12), hard sync or ring modulation still
+   * enables oscillator B's independent phase and pitch. Leave 8580 and
+   * NOISE untouched so their V1.4.30 sound does not change. */
+  if(style!=TRACK_CHIP_SID_8580 && style!=TRACK_CHIP_SID_NOISE &&
+     p->coarse_b==0 && p->fine_b==0 && (p->detune==12u||p->detune==0u) &&
+     !p->sub && !p->noise)
+   sid_cache[vi].phase_lock=1u;
  }
  /* The ISR owns these controls until this render chunk completes. The
   * LFO rate never needs to be re-decoded five times per audio sample. */
@@ -737,6 +738,20 @@ void track_chip_process_punch(struct track_chip_engine *s,uint16_t mask,int16_t 
  const uint32_t pump_low=(pump_period/5u)?pump_period/5u:1u;
  const uint32_t pump_rise=(pump_period>pump_low)?pump_period-pump_low:1u;
  const uint32_t pump_slope=(192u<<12u)/pump_rise;
+ /* Compute button parameters ONCE per audio block. Bitcrusher combines true
+  * PCM amplitude quantization and zero-order-hold sample-rate reduction;
+  * original amplitude-only 8-bit default was inaudible on many FM1 patches.
+  * At K1=50: 8-bit at ~2.76 kHz effective sample rate. K1=0:
+  * 12-bit at 44.1 kHz; K1=100: 4-bit at ~1.4 kHz. */
+ const uint8_t crush_bits=(uint8_t)(12u-(uint32_t)s->punch_param[9]*8u/100u);
+ const int32_t crush_quant=(int32_t)(1u<<(16u-crush_bits));
+ const uint8_t crush_hold=(uint8_t)(1u+(uint32_t)s->punch_param[9]*30u/100u);
+ /* Two cascaded 1-pole highpasses: strong low cut (~180-850Hz nominal
+  * cutoff) while leaving all upper frequencies intact (no telephone LP).
+  * Coefficient in Q8; runs only when RADIO is held or fading out. */
+ const int32_t radio_alpha=7+(int32_t)s->punch_param[14]*21/100;
+ const int32_t hiss_level=44+(int32_t)s->punch_param[14]*2;
+
  for(uint32_t f=0u;f<frames;f++){
   const int32_t dry_l=dst[f*2u],dry_r=dst[f*2u+1u];
   int32_t l=dry_l,r=dry_r,wet_l=l,wet_r=r;
@@ -794,17 +809,25 @@ void track_chip_process_punch(struct track_chip_engine *s,uint16_t mask,int16_t 
    wet_r=(wet_r*(int32_t)rate)>>8u;
    s->punch_position+=rate;
   }else if(mode==6u){
-   /* SCRATCH: triangular bidirectional transport of a frozen mono-time slice.
-    * Playback speed controls both duration and pitch as on a physical deck. */
-   const uint32_t length=768u+((uint32_t)s->punch_param[8]*2048u)/100u;
-   const uint32_t cycle=2u*(length-1u)*256u;
-   uint32_t cursor=s->punch_position%cycle;
-   const uint32_t q8=cursor<(length-1u)*256u?cursor:(cycle-cursor);
-   const uint32_t pos=q8>>8u,fract=q8&255u;
-   uint16_t ai=punch_sample(s->punch_start,pos),bi=punch_sample(s->punch_start,(pos+1u)%length);
-   wet_l=punch_lerp(beetle_punch_history[ai][0],beetle_punch_history[bi][0],fract);
-   wet_r=punch_lerp(beetle_punch_history[ai][1],beetle_punch_history[bi][1],fract);
-   s->punch_position=(cursor+64u+(uint32_t)s->punch_param[8]*4u)%cycle;
+   /* CRY (formerly SCRATCH): a stationary stereo vinyl slice with a physically reversing
+    * read head. Accelerate through the middle and brake at both turnarounds;
+    * transport speed changes BOTH pitch and time, not just amplitude.  The
+    * complete 12KiB shared history is reused, never allocated anew. */
+   const uint32_t length=BEETLE_PUNCH_CAPTURE-64u;
+   const uint32_t half=(length-1u)*256u,cycle=half*2u;
+   const uint32_t cursor=s->punch_position%cycle;
+   const uint32_t q8=cursor<=half?cursor:cycle-cursor;
+   const uint32_t pos=q8>>8u,frac=q8&255u;
+   const uint16_t ai=punch_sample(s->punch_start,pos);
+   const uint16_t bi=punch_sample(s->punch_start,pos+1u);
+   wet_l=punch_lerp(beetle_punch_history[ai][0],beetle_punch_history[bi][0],frac);
+   wet_r=punch_lerp(beetle_punch_history[ai][1],beetle_punch_history[bi][1],frac);
+   /* 0.5x..~6x vinyl velocity (44.1k playback vs 22.05k capture).
+    * The 128-frame soft braking window removes artificial hard clicks. */
+   uint32_t speed=160u+(uint32_t)s->punch_param[8]*15u;
+   uint32_t edge=q8<32768u?q8:half-q8;
+   if(edge<32768u)speed=(speed*(64u+((edge*192u)>>15u)))>>8u;
+   s->punch_position=(cursor+speed)%cycle;
   }else if(mode==7u){
    /* GLITCH: small immutable fragments, deterministic pseudo-random jumps,
     * each with a short zero-cross-compatible amplitude taper. */
@@ -861,10 +884,28 @@ void track_chip_process_punch(struct track_chip_engine *s,uint16_t mask,int16_t 
   r=(base_r*(256-fw)+r*fw)>>8u;
   /* Page 2: all heavy modulation uses fixed point, bounded CPU and the
    * existing shared PCM history, with no allocation or per-frame division. */
-  if(mask&(1u<<9)){ /* BITCRUSH: 4..16 effective bits */
-   uint8_t drop=(uint8_t)((100u-s->punch_param[9])*12u/100u);
-   const int32_t grain=(int32_t)(1u<<drop);
-   l=(l>>drop)*grain;r=(r>>drop)*grain;
+  /* True BITCRUSH: not merely chopping inaudible LSBs. The held PCM
+   * value updates once every N 44.1kHz frames; thus aliasing/downsampling
+   * remains audible even on quieter / smooth synthesized sounds. Avoid
+   * resetting the hold counter at each 128-frame DMA block boundary. */
+  if(mask&(1u<<9)){if(s->punch_crush_wet<248u)s->punch_crush_wet+=8u;
+   else s->punch_crush_wet=255u;}
+  else{if(s->punch_crush_wet>=8u)s->punch_crush_wet-=8u;
+   else{s->punch_crush_wet=0u;s->punch_crush_count=0u;}}
+  if(s->punch_crush_wet){
+   if(!s->punch_crush_count){
+    /* Division is exact for power-of-two steps. Signed truncation is legal
+     * for negative values; avoid left-shifting signed negative samples. */
+    int32_t ql=((l>=0?l+crush_quant/2:l-crush_quant/2)/crush_quant)*crush_quant;
+    int32_t qr=((r>=0?r+crush_quant/2:r-crush_quant/2)/crush_quant)*crush_quant;
+    s->punch_crush_hold_l=(int16_t)punch_clip(ql);
+    s->punch_crush_hold_r=(int16_t)punch_clip(qr);
+    s->punch_crush_count=crush_hold;
+   }
+   --s->punch_crush_count;
+   const int32_t mix=s->punch_crush_wet;
+   l=(l*(256-mix)+(int32_t)s->punch_crush_hold_l*mix)>>8u;
+   r=(r*(256-mix)+(int32_t)s->punch_crush_hold_r*mix)>>8u;
   }
   if(mask&(1u<<10)){ /* PUMP: tempo locked duck/recovery envelope */
    uint32_t period=pump_period?pump_period:1u;
@@ -884,38 +925,66 @@ void track_chip_process_punch(struct track_chip_engine *s,uint16_t mask,int16_t 
    l=(l+(int32_t)beetle_punch_history[pos][0])/2;
    r=(r+(int32_t)beetle_punch_history[pos][1])/2;
   }
-  if(mask&(1u<<13)){ /* two allpass stages per side, moving phaser not flanger */
-   int32_t a=80+(((int32_t)track_va_sine[(uint8_t)(s->punch_mod_phase>>24u)]+32768)*100>>16u);
-   for(unsigned j=0;j<2u;j++){
-    int32_t yl=s->punch_phase_l[j]-((l*a)>>8u);
-    int32_t yr=s->punch_phase_r[j]-((r*a)>>8u);
-    s->punch_phase_l[j]=l+((yl*a)>>8u);s->punch_phase_r[j]=r+((yr*a)>>8u);
-    l=(l+yl)/2;r=(r+yr)/2;
+  if(mask&(1u<<13)){ /* PHASER: four *cascaded* time-varying allpass stages */
+   const int32_t phase=(int32_t)track_va_sine[(uint8_t)(s->punch_mod_phase>>24u)];
+   const int32_t a=40+(((phase+32768)*148)>>16u); /* Q8 .16.. .73 */
+   int32_t pl=l,pr=r;
+   for(unsigned j=0;j<4u;j++){
+    const int32_t yl=s->punch_phase_l[j]-((pl*a)>>8u);
+    const int32_t yr=s->punch_phase_r[j]-((pr*a)>>8u);
+    s->punch_phase_l[j]=pl+((yl*a)>>8u);
+    s->punch_phase_r[j]=pr+((yr*a)>>8u);
+    pl=yl;pr=yr;
    }
+   /* Dry+wet recombination generates the classic moving phaser notches.
+    * Never mix each stage back into dry: that kills the cascading effect. */
+   l=(l+pl)/2;r=(r+pr)/2;
   }
-  if(mask&(1u<<14)){ /* RADIO: narrow AM-like band and deterministic dust */
+  /* RADIO: a clear LOW-CUT, not a muted telephone band or noise-only
+   * generator. Two cascaded highpasses suppress bass without removing highs.
+   * Hiss is low-level PCM noise (~-48 dBFS at default), mixed INTO the
+   * existing audio. No extra audio-buffer allocation or floating point. */
+  if(mask&(1u<<14)){if(s->punch_radio_wet<252u)s->punch_radio_wet+=4u;
+   else s->punch_radio_wet=255u;}
+  else{if(s->punch_radio_wet>=4u)s->punch_radio_wet-=4u;
+   else s->punch_radio_wet=0u;}
+  if(s->punch_radio_wet){
+   int32_t out_l,out_r;
+   int32_t x=l;
+   s->punch_radio_lp[0]+=((x-s->punch_radio_lp[0])*radio_alpha)>>8u;
+   x-=s->punch_radio_lp[0];
+   s->punch_radio_hp[0]+=((x-s->punch_radio_hp[0])*radio_alpha)>>8u;
+   out_l=x-s->punch_radio_hp[0];
+   x=r;
+   s->punch_radio_lp[1]+=((x-s->punch_radio_lp[1])*radio_alpha)>>8u;
+   x-=s->punch_radio_lp[1];
+   s->punch_radio_hp[1]+=((x-s->punch_radio_hp[1])*radio_alpha)>>8u;
+   out_r=x-s->punch_radio_hp[1];
+   uint32_t seed=s->punch_fx_seed;
+   seed^=seed<<13u;seed^=seed>>17u;seed^=seed<<5u;
+   s->punch_fx_seed=seed?seed:0xA718934Fu;
+   out_l+=((((int32_t)((seed>>24u)&255u))-128)*hiss_level)>>7u;
+   out_r+=((((int32_t)((seed>>16u)&255u))-128)*hiss_level)>>7u;
+   const int32_t mix=s->punch_radio_wet;
+   l=(l*(256-mix)+out_l*mix)>>8u;
+   r=(r*(256-mix)+out_r*mix)>>8u;
+  }else{ /* prevent a stale HP state from introducing a click on next press */
+   s->punch_radio_lp[0]=l;s->punch_radio_lp[1]=r;
+   s->punch_radio_hp[0]=0;s->punch_radio_hp[1]=0;
+  }
+  if(mask&(1u<<15)){ /* DJ ISOLATOR: real three-way crossovers + band kill */
+   uint8_t kind=(uint8_t)(1u+s->punch_param[15]/15u);
+   if(kind>7u)kind=7u;
    int32_t in[2]={l,r};
    for(unsigned ch=0;ch<2u;ch++){
-    s->punch_radio_lp[ch]+=(in[ch]-s->punch_radio_lp[ch])>>3u;
-    s->punch_radio_hp[ch]+=(s->punch_radio_lp[ch]-s->punch_radio_hp[ch])>>7u;
-    int32_t v=s->punch_radio_lp[ch]-s->punch_radio_hp[ch];
-    v=(v*3)/2;
-    if(ch==0u)l=punch_clip(v);else r=punch_clip(v);
-   }
-   s->punch_fx_seed^=s->punch_fx_seed<<13u;s->punch_fx_seed^=s->punch_fx_seed>>17u;
-   s->punch_fx_seed^=s->punch_fx_seed<<5u;
-   int32_t hiss=(int32_t)((s->punch_fx_seed>>23u)&511u)-256;
-   l+=hiss;r+=hiss;
-  }
-  if(mask&(1u<<15)){ /* DJ ISOLATOR: bass/mid/high attenuation modes */
-   unsigned kind=1u+s->punch_param[15]/15u;if(kind>7u)kind=7u;
-   int32_t in[2]={l,r};
-   for(unsigned ch=0;ch<2u;ch++){
-    s->punch_iso_lp[ch]+=(in[ch]-s->punch_iso_lp[ch])>>6u;
-    s->punch_iso_hp[ch]+=(in[ch]-s->punch_iso_hp[ch])>>2u;
-    int32_t bass=s->punch_iso_lp[ch],high=in[ch]-s->punch_iso_hp[ch];
-    int32_t mid=in[ch]-bass-high;
-    int32_t out=((kind&1u)?0:bass)+((kind&2u)?0:mid)+((kind&4u)?0:high);
+    const int32_t x=in[ch];
+    /* ~400Hz low crossover and ~3kHz high crossover at 44.1kHz */
+    s->punch_iso_lp[ch]+=((x-s->punch_iso_lp[ch])*14)>>8u;
+    s->punch_iso_hp[ch]+=((x-s->punch_iso_hp[ch])*86)>>8u;
+    const int32_t bass=s->punch_iso_lp[ch];
+    const int32_t mid=s->punch_iso_hp[ch]-bass;
+    const int32_t high=x-s->punch_iso_hp[ch];
+    const int32_t out=((kind&1u)?0:bass)+((kind&2u)?0:mid)+((kind&4u)?0:high);
     if(ch==0u)l=out;else r=out;
    }
   }
@@ -937,7 +1006,10 @@ void track_chip_process_punch(struct track_chip_engine *s,uint16_t mask,int16_t 
     s->punch_decimate_phase=0u;
    }
   }
-  if(mask&((1u<<12)|(1u<<13)))s->punch_mod_phase+=12000u+(uint32_t)s->punch_param[12]*5000u;
+  if(mask&((1u<<12)|(1u<<13))){
+   const uint8_t speed=(mask&(1u<<13))?s->punch_param[13]:s->punch_param[12];
+   s->punch_mod_phase+=25000u+(uint32_t)speed*15000u;
+  }
   if(s->punch_age<0xFFFFFFFEu)s->punch_age++;
  }
 }

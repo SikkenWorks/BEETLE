@@ -1,0 +1,244 @@
+{
+  "validation": {
+    "path": "/mnt/data/beetle_v1436_work/BEETLE-V1.4.36-NOTE3-EXPERIMENTAL.fwsc",
+    "bytes": 610086,
+    "sha256": "0368fc590ea39777c2fd3bcf054d5c3aa35d8e941e7772939caadcb270e1ca5c",
+    "product": "FM-1_2123",
+    "chip": "AC791N",
+    "header_crc_ok": true,
+    "list_crc_ok": true,
+    "entries": [
+      {
+        "type": 0,
+        "index": 0,
+        "data_crc": 60951,
+        "zero": 0,
+        "offset": 1024,
+        "size": 602112,
+        "aligned_size": 602112,
+        "name": "flash.bin",
+        "data_crc_ok": true,
+        "sha256": "0b61fee860fc2189ced00abdea40e27b85a231c44c7e1137a39b30f2f047711a"
+      },
+      {
+        "type": 100,
+        "index": 1,
+        "data_crc": 14567,
+        "zero": 0,
+        "offset": 603136,
+        "size": 6930,
+        "aligned_size": 6944,
+        "name": "ota.bin",
+        "data_crc_ok": true,
+        "sha256": "d71d1b7c12adede951605e758a3580dacccedc427d49e1fceaf51decccc68a4b"
+      }
+    ],
+    "flash": {
+      "flash_header_crc_ok": true,
+      "flash_header_payload_hex": "20022f104cc900f00f001010a4ff4e5d0b41e0cd781dc856417fb367cf9f",
+      "top_entries": [
+        {
+          "header_crc": 7058,
+          "header_crc_ok": true,
+          "data_crc": 29128,
+          "offset": 160,
+          "size": 14384,
+          "flags": 0,
+          "reserved": 0,
+          "index": 0,
+          "name": "uboot.boot",
+          "name_raw_hex": "75626f6f742e626f6f7400ffffffffff"
+        },
+        {
+          "header_crc": 6396,
+          "header_crc_ok": true,
+          "data_crc": 28885,
+          "offset": 14544,
+          "size": 699,
+          "flags": 2,
+          "reserved": 128,
+          "index": 0,
+          "name": "isd_config.ini",
+          "name_raw_hex": "6973645f636f6e6669672e696e6900ff"
+        },
+        {
+          "header_crc": 32166,
+          "header_crc_ok": true,
+          "data_crc": 65535,
+          "offset": 16384,
+          "size": 4294967295,
+          "flags": 129,
+          "reserved": 255,
+          "index": 0,
+          "name": "app_dir_head",
+          "name_raw_hex": "6170705f6469725f6865616400ffffff"
+        },
+        {
+          "header_crc": 1757,
+          "header_crc_ok": true,
+          "data_crc": 65535,
+          "offset": 1044480,
+          "size": 4096,
+          "flags": 18,
+          "reserved": 1,
+          "index": 65535,
+          "name": "key_mac",
+          "name_raw_hex": "6b65795f6d616300ffffffffffffffff"
+        }
+      ],
+      "top_payloads": {
+        "uboot.boot": {
+          "bytes": 14384,
+          "sha256": "b5a0715940db344f951595e2d5a66050631c7721703cb06d33d8dc94eca3c861"
+        },
+        "isd_config.ini": {
+          "bytes": 699,
+          "sha256": "0952afd96f533dd0fba72a8fab9cb4a4336f55424a1a89eecb13ff8a51a0eff0"
+        }
+      },
+      "isd_crc_ok": true,
+      "chip_key": 38927,
+      "app_area": {
+        "header_crc": 59270,
+        "header_crc_ok": true,
+        "data_crc": 28285,
+        "offset": 33554720,
+        "size": 582235,
+        "flags": 131,
+        "reserved": 255,
+        "index": 0,
+        "name": "app_area_head",
+        "name_raw_hex": "6170705f617265615f6865616400ffff"
+      },
+      "app_entry": {
+        "header_crc": 31882,
+        "header_crc_ok": true,
+        "data_crc": 31058,
+        "offset": 288,
+        "size": 581564,
+        "flags": 130,
+        "reserved": 255,
+        "index": 0,
+        "name": "app.bin",
+        "name_raw_hex": "6170702e62696e00ffffffffffffffff"
+      },
+      "app_crc_ok": true
+    },
+    "ota": {
+      "bytes": 6930,
+      "outer_header_ok": true,
+      "inner_header_ok": true,
+      "name_ok": true,
+      "outer": {
+        "header_crc": 51439,
+        "header_crc_ok": true,
+        "data_crc": 9066,
+        "offset": 32,
+        "size": 6898,
+        "flags": 65,
+        "reserved": 0,
+        "index": 0,
+        "name": "usb_hid_ota.bin",
+        "name_raw_hex": "7573625f6869645f6f74612e62696e00"
+      },
+      "inner": {
+        "header_crc": 58669,
+        "header_crc_ok": true,
+        "data_crc": 36595,
+        "offset": 8216,
+        "size": 29403136,
+        "flags": 0,
+        "reserved": 0,
+        "index": 0,
+        "name": "usb_hid_ota.bin",
+        "name_raw_hex": "7573625f6869645f6f74612e62696e00"
+      },
+      "outer_data_crc_ok": true,
+      "inner_load_ok": true,
+      "inner_data_crc_ok": true,
+      "inner_payload_bytes": 8216,
+      "encoding": "lz4-blocks"
+    },
+    "valid": true
+  },
+  "comparison": {
+    "reference": "/mnt/data/BEETLE-V1.4.35-SONG-SEL-PUNCH-LED-BULK-EXPERIMENTAL.fwsc",
+    "candidate": "/mnt/data/beetle_v1436_work/BEETLE-V1.4.36-NOTE3-EXPERIMENTAL.fwsc",
+    "reference_valid": true,
+    "candidate_valid": true,
+    "same_container_shape": true,
+    "reference_shape": {
+      "chip": "AC791N",
+      "entry_names": [
+        "flash.bin",
+        "ota.bin"
+      ],
+      "entry_types": [
+        0,
+        100
+      ],
+      "entry_offsets": [
+        1024,
+        603136
+      ],
+      "flash_top_names": [
+        "uboot.boot",
+        "isd_config.ini",
+        "app_dir_head",
+        "key_mac"
+      ],
+      "chip_key": 38927,
+      "app_xip": 33554720,
+      "uboot_sha256": "b5a0715940db344f951595e2d5a66050631c7721703cb06d33d8dc94eca3c861",
+      "ota_shape": {
+        "outer_offset": 32,
+        "outer_flags": 65,
+        "inner_load": 29403136
+      }
+    },
+    "candidate_shape": {
+      "chip": "AC791N",
+      "entry_names": [
+        "flash.bin",
+        "ota.bin"
+      ],
+      "entry_types": [
+        0,
+        100
+      ],
+      "entry_offsets": [
+        1024,
+        603136
+      ],
+      "flash_top_names": [
+        "uboot.boot",
+        "isd_config.ini",
+        "app_dir_head",
+        "key_mac"
+      ],
+      "chip_key": 38927,
+      "app_xip": 33554720,
+      "uboot_sha256": "b5a0715940db344f951595e2d5a66050631c7721703cb06d33d8dc94eca3c861",
+      "ota_shape": {
+        "outer_offset": 32,
+        "outer_flags": 65,
+        "inner_load": 29403136
+      }
+    },
+    "reference_errors": [],
+    "candidate_errors": []
+  },
+  "build": {
+    "version": "BEETLE V1.4.36",
+    "schema": "TRK1 V26",
+    "fw_sha256": "0368fc590ea39777c2fd3bcf054d5c3aa35d8e941e7772939caadcb270e1ca5c",
+    "app_sha256": "84ed8210cda4d08786f853bdb1d2751f00c98ab01cc9f493424bceda333d8d2b",
+    "app_bytes": 514256,
+    "free_app_bytes": 67308,
+    "baseline_fw_sha256": "6e3bfc6e6261c55c2b8a523c155dcd79f0580f1826c4985ac1e0c6ef5f5dd637",
+    "protected_first_16k_byte_identical": true,
+    "ota_loader_byte_identical": true,
+    "physical_fm1_validated": false,
+    "feature": "CH6 NOTE3 independent third drum/sample hit with FX view toggle and stable note cursor"
+  }
+}

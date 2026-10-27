@@ -14,7 +14,9 @@ int main(void){
  assert(beetle_ui_page_valid(37u));
  assert(beetle_ui_page_valid(BEETLE_SETTINGS_PAGE));
  assert(!beetle_ui_page_valid(31u));
- assert(!beetle_ui_page_valid(39u));
+ assert(beetle_ui_page_valid(39u)); /* DELETE CONFIRM */
+ assert(beetle_ui_page_valid(40u)); /* DELETE PROGRESS */
+ assert(!beetle_ui_page_valid(41u));
  /* Choose menu item 6; a real FM1 matrix button-3 edge must open page 38. */
  assert(beetle_settings_enter(&nav,page,menu,sel,sel,0u));
  page=BEETLE_SETTINGS_PAGE;

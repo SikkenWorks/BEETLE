@@ -1,0 +1,8 @@
+# V1.4.36 NOTE3 — release QA
+
+- Select CH6, stop PLAY. Press SEL+FX together: CH6 columns switch to STEP / NOTE / NOTE2 / NOTE3 / KIT. Press again to restore FX. Toggle should not delete either note or FX data, even if the FX column was populated.
+- In NOTE3 mode, step cursor stays put after entering drum keys; NOTE1/NOTE2 remain unchanged. Verify U01–U13 keys, K3 scroll and independent NOTE3 STP/empty/SEL delete. Three hits on one step should be audible without changing the other two notes. Verify NOTE3 OFF suppresses third hit and NOTE3 ON suppresses CH6 step FX, without destroying their stored values.
+- Save project in NOTE3 ON mode, restart and LOAD. Mode and notes must return. Save with NOTE3 OFF and its hidden notes should still be retained when reenabled. V25 projects load in NOTE3 OFF and remain supported. Downgrading after writing V26 is unsafe for older firmware.
+- Run `tests/track/test_v1436_note3.c` under host UndefinedBehaviorSanitizer; compile with track_core/track_song/track_chip/track_drum/beetle_drum_rom/track_mixer/track_project_store. Fixture `tests/track/fixtures/valid_v25_note2.beetle` was created by V1.4.35 and has real V25 formatting. `tests/track/fixtures/valid_v23_song_chain.beetle` was generated using the V1.4.35 migration test from V25. Do not fabricate V23 by simply changing the schema byte.
+- Project Manager import/export individual files and all-project ZIP should preserve V26 bytes, old project import remains supported. Project files never bundle user sample audio; retain a separate sample bank backup.
+- Firmware build uses JieLi; protected first 16 KiB and OTA loader match V1.4.35 exactly, not physical flashing certification. Check with a known recovery route and independent backups.

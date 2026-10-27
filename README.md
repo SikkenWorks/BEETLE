@@ -17,10 +17,51 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.4.25 EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.7.14 FASTER NEW PROJECT · EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
   <br>
   <b>The user sample feature is still experimental!</b>
 </p>
+
+---
+
+> **V1.7.14 (experimental):** Fast NEW PROJECT keeps the initialized audio DMA running with silence on stopped sessions, instead of repeating the complete DAC startup. Read [validation notes](V1.7.14-VALIDATION.md). Real-device latency and output safety are not yet measured.
+
+
+## Fast new project creation (V1.7.14, experimental)
+
+NEW PROJECT no longer waits for NOR flash index reads or draws a second loading overlay. It creates a clean session in RAM, while safely pausing/restarting audio DMA around the reset. The first SAVE finds the first available slot using the same CRC-checked Storage V2 index and project/sample overlap audit, only after audio has been paused and the SAVE feedback is visible. If storage is full/corrupt, auto-save fails safely; no occupied slot is overwritten. To choose an existing slot deliberately, use K4 on PROJECT NAME or PROJECTS to opt out of automatic allocation. The project data schema (TRK1 V26), oscillator DSP, samples, USB and loader are unchanged. See [V1.7.14 validation](V1.7.14-VALIDATION.md). Hardware timing/peak safety remain unverified.
+
+## New project loading feedback (V1.7.10)
+
+After selecting **NEW PROJECT**, BEETLE pauses the audio engine using the existing safety procedure, then immediately displays a compact, pixel-art **CREATING PROJECT / PLEASE WAIT...** indicator **before** running its synchronous flash index scan and RAM reset. The indicator updates only 46 of 240 LCD rows (~22 KB), avoiding another full-screen repaint. The eight small bars are decorative activity cues, not a numerical percentage. When creation finishes, the existing path shows the tracker normally and retains its safe button-release quarantine.
+
+**HOME → PROJECTS → DIAGNOSTICS → RC NEW PROJECT** now includes `LOADING UI MS`, the measured cost of the small indicator. The existing `FLASH SCAN`, `DMA PAUSE`, `RESET RAM`, `DMA RESTART`, `DRAW LCD` and `TOTAL` times are retained. There is no proof of improved total load time on physical hardware; the purpose is immediate feedback with minimal additional LCD traffic. This is an experimental firmware; physical analog audio peak safety has not been proven. See [V1.7.10 validation](V1.7.10-VALIDATION.md).
+
+## Reduced new project I/O (V1.7.9)
+
+V1.7.8 mistakenly issued a second full LCD repaint after the original menu already drew the tracker, and repeated Storage V2 ownership/index checks. V1.7.9 removes the duplicate render, combines the CRC-checked V2 index domain audit and free-slot lookup, and adds **HOME → PROJECTS → DIAGNOSTICS → K1 to RC NEW PROJECT**, which reports flash scan, audio DMA, project reset, LCD draw and total elapsed time in milliseconds. All existing original sound/DMA/MASTER safety paths are retained. **Real hardware timing and peak safety have not been verified.** See [V1.7.9 validation](V1.7.9-VALIDATION.md).
+
+---
+
+## Faster new project workflow (V1.7.8)
+
+V1.7.8 preserves the original V1.6.10-responsive tracker interface and all 12 restored oscillator gains from V1.7.7. On NEW PROJECT, the TRACKER repaints immediately even while the previous button-release safety interval continues to suppress unintended edits. On Storage V2 volumes, the free-slot scan uses a single validated project index, not twelve full project decodes. Project SAVE/LOAD still validate their full records and CRCs.
+
+The NEW PROJECT DMA suspension and audio rearm protections from V1.7.5 remain unchanged. **This is a software-tested experimental performance correction, not a physical FM1 timing measurement or a proof that the earlier extreme analog volume event has been eliminated.** Do not test with headphones or powered monitors. See [V1.7.8 validation](V1.7.8-VALIDATION.md).
+
+---
+
+## Restored VA OSC / VA OSC2 sound (V1.7.6)
+
+V1.7.6 is based on the V1.7.5 fast-UX recovery branch. It changes **only the two VA oscillator gain-table entries**: VA OSC from 204 to 256, VA OSC2 from 276 to 345, restoring exactly the V1.6.10 output levels. The VA DSP and shapes are unchanged. Forty native-PCM reference scenes were compared against the V1.6.10 source and found bit-identical; the 10 non-VA gains and V1.6.11 AUDIO STOP/MASTER protections remain unchanged. The old all-12-type RMS uniformity test will now fail (1.583 vs maximum 1.30) rather than silently changing existing patches again. The physical FM1 peak-safety bug remains **unverified**. See [V1.7.6 validation](V1.7.6-VALIDATION.md).
+
+---
+
+## Responsive UX recovery (V1.7.5)
+
+This is a **deliberate V1.6.10-behavior recovery branch**, not a feature-forward merge of V1.7.4. The original tracker/Song Mode scheduling, synth DSP, drum DSP and full-screen display paths are restored, while the V1.6.11 MASTER ADC watchdog, fail-closed DMA guard and protected audio-stop semantics remain. The new project reset now suspends DMA before flash scanning or bulk project reset; the physical MASTER ADC is given a foreground read opportunity between the original two LCD halves without reworking the UI renderer.
+
+This version omits the extra STEP 01 diagnostic pages and LCD tiling added after V1.6.11. Only the oscillator output gain table comes from V1.7, correcting the old RMS balance regression without changing oscillator algorithms. It retains the V26 project and global sample data model. **Software tests do not prove the analog volume spike is fixed, nor are hardware timing and glitch-free UI verified.** Use an independently attenuated measurement setup only. See [V1.7.5 Validation](V1.7.5-VALIDATION.md).
 
 ---
 
@@ -43,30 +84,20 @@ Read [Global User Samples & Storage V2](#global-user-samples--storage-v2-v1424-e
 
 ---
 
-## New in V1.4.25: Sixteen Punch-In FX & Custom Sample Labels
-
-**PUNCH-IN FX now has two pages with 16 playable white-key effects.** Page 1 retains REPEAT, RING MOD, FILTER, TAPE STOP, STUTTER, OCT UP, OCT DOWN and MUTE. Page 2 adds **SCRATCH, BITCRUSH, PUMP, GLITCH, WOW, PHASER, RADIO and DJ ISOLATOR**. Press **FX** to cycle through Per-Step FX, Punch-In 1/2 and Punch-In 2/2. The display **automatically jumps to the page of the most recently pressed Punch-In key**, regardless of the currently shown page. If that key is released while another remains held, the display switches back to the most recently held effect. Hold a parameterized key and turn **K1** to adjust its live setting. Existing REVERSE is *not* reintroduced: SCRATCH uses bounded bidirectional movement through a short shared audio buffer rather than promising full-length reverse playback.
-
-**GLOBAL SAMPLE LIBRARY labels are now editable in the Project Manager**. Each U01–U13 slot can have its own **three-character tracker label**, such as `KIK`, `SN2` or `!FX`. These labels are saved to `.beetlebank` V2 with backward-compatible loading of V1 banks, and are transferred alongside sample data to compatible Storage V2 firmware. Labels are global, not stored separately in each project; the default labels remain U01–U13. The short name is distinct from the full PC-side WAV filename/sample name. Samples must be uploaded again for edited labels to appear on the FM1.
-
-**Project format:** TRK1 **V25** stores the additional Punch-In parameters and full sixteen-effect event IDs. Supported older projects, including V24, remain readable, but older firmware cannot read newly saved V25 projects. Back up projects before upgrading or downgrading. The updated 32-bit Punch-In interpolation avoids the former 64-bit per-sample multiply without reducing interpolation precision. The existing shared audio history is retained rather than enlarging RAM buffers.
-
-**Development warning:** native compilation and software tests are not physical FM1 performance measurements. Simultaneous heavy FX, user samples, USB multitrack, timing and OTA recovery remain hardware-unverified. Storage V2 migration is destructive and requires independent verified backups.
-
 ## What is BEETLE?
 
 BEETLE turns the **M-VAVE FM1** into a standalone, hands-on music workstation. Compose patterns, play the built-in keyboard, design instruments, program drums, arrange songs and perform with live effects, all using the FM1's own controls.
 
 | | |
 | :-- | :-- |
-| **6 channels** | CH1–CH5: synthesizers · CH6: digital drums with two hits per step |
+| **6 channels** | CH1–CH5: synthesizers · CH6: digital drums with two hits per step, or three when NOTE3 is enabled |
 | **48 patterns** | 1–16 steps per pattern, with independent channel content |
 | **Song Chains** | 64 song positions with a separate pattern source for each channel |
 | **Sound engine** | Up to eight shared synth voices, six drum voices, 14 built-in drum sounds |
 | **User samples** | 13 additional CH6 one-shot slots (U01–U13), shared across projects after Storage V2 migration; experimental |
 | **Sound design** | Eight active synth instrument patches, 12 selectable oscillator types, two VA oscillator modes, plus eight project-local library presets |
 | **Performance** | Mixer, mute/solo, Punch-In FX, snapshots and mute groups |
-| **Projects** | 12 project slots, TRK1 V25 project format, encrypted `.beetle` backups and an optional shared Storage V2 volume |
+| **Projects** | 12 project slots, TRK1 V26 project format, encrypted `.beetle` backups and an optional shared Storage V2 volume |
 
 ## Where to Start
 
@@ -76,8 +107,8 @@ You can learn the workflow in a few minutes using the [Web Simulator](https://si
 2. **Choose a channel.** Turn **SELECT**: CH1–CH5 are synth lanes; CH6 is the drum lane. Turning left from CH1 also reaches the recorded Punch-In event lane.
 3. **Pick a pattern.** Turn **ALGORITHM** to choose one of the 48 patterns while stopped.
 4. **Move around the grid.** Turn **K1** for the step (row) and **K2** for the field (column). Turn **K3** to change the selected value.
-5. **Enter a sound.** With Tracker **REC ON**, press a musical key to write a note or drum hit. Press **REC** to toggle note writing; with **REC OFF**, the keys only audition sounds. The tracker normally advances after the main note is entered. On CH6, selecting **NOTE2** with K2 lets you enter a second drum hit without overwriting NOTE1 or advancing the step.
-6. **Correct mistakes.** **SEL** clears the selected step. **ENV** inserts a note stop (`[STP]`) in the focused note field; it is *not* the same as clearing the entire step. Use **SEQ + OP5** to undo an edit.
+5. **Enter a sound.** With Tracker **REC ON**, press a musical key to write a note or drum hit. Press **REC** to toggle note writing; with **REC OFF**, the keys only audition sounds. Entering a note **does not move the step cursor**. On CH6, select **NOTE2** to enter a second drum hit, or press **SEL + FX** to swap the FX column for a third independent **NOTE3** lane. NOTE3 supports all 14 drums and U01–U13, and is saved together with the project.
+6. **Correct mistakes.** **SEL** clears the selected NOTE / NOTE2 / NOTE3 cell on CH6 independently. **ENV** inserts a note stop (`[STP]`) in the focused note field; it is *not* the same as clearing the entire step. Use **SEQ + OP5** to undo an edit.
 7. **Play it back.** Press **PLAY/STOP**. Change the tempo with **K4**. Stop playback before making structural edits.
 8. **Build the sound and arrangement.** Press **EDIT** for instruments, **GLO** for the mixer, **LFO** for master effects, or **ARP** for Song Chains. In Song Chains, hold **SEL** and turn **K1** to select rows; **SEQ + OP1 / OP2** copies/pastes them. Press **SEQ** to return to the tracker.
 9. **Save your work.** Press **SAVE**, or open **HOME → SAVE / SAVE AS** to manage a project slot.
@@ -90,13 +121,21 @@ Press **HOME → HELP**. Turn **K2** to browse the thirteen topics. Turn **K1** 
 
 Chapters: Tracker Basics, Pattern Editing, Step Dynamics / Groove, Instrument / Keyboard, Projects, Live FX / Record, Song Chains, Live Mixer / Solo, Mixer / Performance, Master FX, Guide / Navigation, Block Instrument / Delete and USB-C Audio.
 
-## Global User Samples & Storage V2 (V1.4.24, experimental)
+## CH6 Drum NOTE3 / FX mode
+
+On the **tracker** select **CH6 (DRUM)**. Press **SEL + FX** while stopped to switch between **FX mode** (`STEP · NOTE · NOTE2 · KIT · FX`) and **NOTE3 mode** (`STEP · NOTE · NOTE2 · NOTE3 · KIT`). Press the same combination again to restore the normal FX column.
+
+In NOTE3 mode, choose the **NOTE3** cell with **K2**. Turn **K3** to select any of the 14 built-in drum sounds, **U01–U13** user samples, empty (`---`) or note stop (`STP`). With Tracker REC armed, pressing a drum key enters that sound in the focused NOTE, NOTE2 or NOTE3 cell. None of these key entries advances the step cursor. **SEL** clears only the focused note cell; **ENV** sets its own `STP`. Each lane can hold an independent hit on the same step, sharing the existing six drumvoices.
+
+While NOTE3 mode is enabled, existing CH6 step-FX entries remain saved in the project but are **not played**. Switching back to FX mode restores their earlier settings; toggling the view does not erase them. **The NOTE3 ON/OFF state and all NOTE3 events are saved in each project** using TRK1 **V26**. Older V25 project files load with NOTE3 off and empty. Firmware V1.4.35 or older cannot load V26 projects; back up both projects and the global sample bank before updating or downgrading.
+
+## Global User Samples & Storage V2 (experimental)
 
 BEETLE has **14 built-in digital drum sounds** and **13 additional global one-shot slots, U01–U13**, assigned to CH6 drum note IDs **14–26**. The global bank is independent of individual `.beetle` projects: when it is stored on a compatible FM1, the same U-slots are available to all twelve projects. The native playback path uses the existing **six drum voices**, not extra synth voices. Global sample playback requires a **successfully migrated Storage V2 volume**; installing V1.4.24 firmware alone does not activate samples on a legacy A/B volume.
 
 The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html) includes a **GLOBAL SAMPLE LIBRARY**. Open or build a `.beetlebank`, import/replace/delete WAVs in U01–U13, and **SAVE GLOBAL LIBRARY** to keep your original WAV files in a portable computer backup. On a connected Storage V2 FM1, choose **UPLOAD PC WAVs · KEEP OTHER FM1 SLOTS** to transfer only the WAV slots you have loaded locally. The manager converts device-bound WAVs to BEETLE's **22,050 Hz mono, 4-bit BD4S** format and verifies their transfers. The `.beetlebank` computer-file limit is **not** the FM1's capacity; available sample duration depends on occupied flash space and the twelve projects. A full volume rejects new writes instead of silently replacing saved data.
 
-**V1.4.25 Project Manager sample-safety update:** On every connection, all 13 FM1 sample slots are scanned read-only. The display distinguishes **STORED ON FM1** from **PC WAV NOT LOADED**, including after reconnecting. Empty PC slots now **preserve existing device samples** rather than deleting them. Only explicitly loaded WAV slots are eligible for upload; any occupied device slot that would be replaced requires separate confirmation. To erase a sample from the FM1, use the individual **DELETE ON FM1** control with backup acknowledgment. If the device scan fails, uploads are blocked. Note that the currently installed native protocol only exposes device occupancy, byte count and CRC/generation: **it cannot download the original WAV or read back its 3-character tracker label**. Keep your `.beetlebank` original backup. The fix changes only browser tools and requires **no firmware reflash**.
+**Sample inventory on reconnect:** On every connection, all 13 FM1 sample slots are scanned read-only. The display distinguishes **STORED ON FM1** from **PC WAV NOT LOADED**, including after reconnecting. Empty PC slots now **preserve existing device samples** rather than deleting them. Only explicitly loaded WAV slots are eligible for upload; any occupied device slot that would be replaced requires separate confirmation. To erase a sample from the FM1, use the individual **DELETE ON FM1** control with backup acknowledgment. If the device scan fails, uploads are blocked. Note that the currently installed native protocol only exposes device occupancy, byte count and CRC/generation: **it cannot download the original WAV or read back its 3-character tracker label**. Keep your `.beetlebank` original backup. The fix changes only browser tools and requires **no firmware reflash**.
 
 ### Migrating an existing FM1 to Storage V2
 
@@ -109,7 +148,7 @@ The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project
 
 **Important:** V1.4.24's conversion **erases the previous BEETLE-owned project volume** before restoring it and is **not an atomic or power-loss-safe migration**. A failed conversion may leave some or all projects unavailable until restored from the computer backup. Firmware recovery, physical flash/USB behavior and heavy-load DPCM4 sample playback have **not been validated on a real FM1**. See [`docs/V1424-STORAGE-MIGRATION.md`](docs/V1424-STORAGE-MIGRATION.md) and [`docs/V1422-GLOBAL-SAMPLES-NATIVE-RELEASE.md`](docs/V1422-GLOBAL-SAMPLES-NATIVE-RELEASE.md).
 
-### Project-reserved sample capacity meter (V1.4.25 storage-safety variant)
+### Project-reserved sample capacity meter
 
 The Project Manager includes an **FM1 SAMPLE SPACE** bar. With firmware supporting the read-only `0x76` capacity command, it shows current compressed sample bytes, an estimate of remaining flash pages usable for samples, plus an explicit **32 KiB (eight-sector) project reserve and 16 KiB (four-sector) recovery guard**. The new firmware refuses a sample upload during preflight if it would violate those limits, before programming flash. This is a *minimum* allowance for future project saving, **not** a guarantee that every full-size future project will always fit: project size, journal generations, fragmentation and flash wear matter.
 
@@ -130,7 +169,22 @@ export JIELI_TOOLCHAIN=/path/to/jieli-linux-toolchain
 python firmware/fm1-native/build.py --beetle-storage-lab --updater --usb-audio --beetle-v2
 ```
 
-The V1.4.24 `.fwsc` retains the existing protected boot header and OTA loader, and reports the established `FM-1_2123` identity. It includes experimental Storage V2, sample transfer and audio support; a working independent recovery route and physical FM1 validation are still required before treating it as safe for everyday use.
+The distributed `.fwsc` retains the protected boot header and OTA loader, and reports the established `FM-1_2123` identity. Storage V2, sample transfer and USB audio remain experimental; a working independent recovery route and physical FM1 validation are required before treating it as safe for everyday use.
+
+### Audio safety and safe editing
+
+**Important USB exception:** the optional six-channel multitrack USB mode exports dry, pre-MASTER stems. The physical MASTER controls the analog/stereo master path but **does not control the level of those individual USB stems in a DAW**. Control and monitor multitrack gain in the DAW to avoid summing six unattenuated channels into an unexpectedly loud output.
+
+
+**Do not copy, paste or perform heavy editing while playback is running.** Stop playback first, especially before editing the drum lane or a large Song Chain. Copies now refuse to run during playback, rather than holding the audio interrupt off while modifying active song data.
+
+**Hardware MASTER** is read from the FM1 potentiometer in the foreground. The DAC audio interrupt applies that reading as a final output ceiling. If the knob ADC fails, becomes stale because the foreground is blocked for more than 80 ms, or the audio DMA misses its buffer deadline, BEETLE V1.6.11 fails closed: stale/invalid gain mutes the digital output; a DMA fault disables the analog output and latches `AUDIO STOP`. This intentionally prefers silence over distortion. Automatic audio restarts are disabled. After checking and lowering MASTER and disconnecting sensitive playback equipment, press and hold HOME + PLAY for one second to manually rearm. If a project again crackles, stops or becomes unusually loud, discontinue playback, restore a known-good firmware, and report the incident. **These protections have been host-tested only, not physically verified on an FM1.**
+
+### Loading and deleting a project
+
+On the startup **NEW PROJECT / LOAD PROJECT** selector, use K1 to select **LOAD PROJECT**, then press and release SEL on its own. In the subsequent 12-slot **LOAD PROJECT** list, highlight an occupied slot with K1 and hold **EDIT + SEL** to open **DELETE PROJECT?**. The confirmation defaults to **NO**; select YES with K1 and make a fresh SEL press to confirm, or press HOME to cancel. The global U01–U13 sample library is not part of a single project-slot delete.
+
+**Physical diagnostic (V1.6.10):** the startup screen displays **BEETLE V1.6.10**, so you can confirm the actually running application version after a firmware update. If the shortcut fails in the 12-slot LOAD list, its footer temporarily shows **KEYS: E... S... / CHORD ...**; E is the EDIT button, S is SEL, and CHORD shows whether the low-level keyboard scanner observed both simultaneously. This information allows hardware-level diagnosis without deleting any project.
 
 ## FM1 Controls
 
@@ -173,11 +227,11 @@ Every dedicated button is listed here with its role in BEETLE.
 | Where | What the keyboard does |
 | :-- | :-- |
 | **Tracker / CH1–CH5** | With Tracker REC armed, enter synth notes even if another column has focus; existing instrument/chord/FX fields are preserved. With REC OFF, audition only. |
-| **Tracker / CH6** | With REC armed, enter a drum in NOTE1, or a separate second hit when **NOTE2** is focused. The original 14 factory hits are retained; U01–U13 (drum IDs 14–26) require the experimental global Storage V2 sample bank. REC OFF auditions without writing. |
+| **Tracker / CH6** | With REC armed, enter a drum in NOTE1, or a separate second hit (factory drum or U01–U13) when **NOTE2** is focused. The original 14 factory hits are retained; U01–U13 (drum IDs 14–26) require the experimental global Storage V2 sample bank. REC OFF auditions without writing. |
 | **Instrument Editor** | Audition the selected synth patch without adding tracker notes. |
 | **Drum Editor** | Audition the selected drum component. |
 | **Mixer / Live Mixer** | The six assigned **black keys mute CH1–CH6**; their six corresponding **white keys solo CH1–CH6**. LEDs reflect active mute/solo states. |
-| **Punch-In FX / Punch-In REC armed** | Eight assigned white keys, from left to right, hold the eight performance effects. Release the key to end the held effect. Punch-In recording is separate from Tracker note recording. |
+| **Punch-In FX / Punch-In REC armed** | The eight white keys mapped to the currently displayed effect page illuminate. Play or hold the mapped FX key to trigger its effect; release it to end the held effect. Punch-In recording is separate from Tracker note recording. |
 
 ### Editing shortcuts
 
@@ -209,6 +263,8 @@ These combinations apply in the **Tracker** unless another screen is specified. 
 
 Each pattern holds up to 16 steps for each of six lanes. The highlighted cell is edited with K1/K2/K3; with Tracker **REC armed**, the keyboard enters notes. REC OFF auditions sounds without altering the pattern. `[---]` means no new note, while `[STP]` ends a sounding note. **CH6** has independent NOTE1 and NOTE2 drum hits and their own step FX, with thirteen additional U-slots available after global sample-bank setup. Hold **SEL + K1** to select a range for copying, editing, deletion or transposition. Use **FX** for effects and **SEQ + FX / ENV** for step dynamics and groove. The tracker and Song Chain playhead have incremental LCD updates intended to keep the highlighted step synchronized; physical LCD/audio-load validation is still pending.
 
+**Chord audition:** On CH1–CH5, enter a root note, select **CHD** with K2 and turn **K3**. Each chord is immediately auditioned using the step instrument and current keylock settings, without adding extra notes or changing playback. It is silent during PLAY and on empty/STOP notes or CH6; MONO mode remains single-voice.
+
 ### Instrument Editor and Library
 
 Press **EDIT** to adjust synth types, oscillators, envelopes, filters and patch settings. BEETLE includes VA, SID-inspired and NES-inspired sound types. Instrument settings are independent across eight active patch slots. In EDIT MONO, the keyboard uses last-note priority and returns to an earlier still-held note; rapid note transitions no longer use the former 45 ms note-on rejection. The **Instrument Library** (SEQ + EDIT) keeps eight named patches *inside the current project*; its STORE, LOAD, COPY and RENAME actions use K1 for slot, K2 for action, K3 for active instrument, K4 for copy destination, and SEL to execute. Save the project to keep library changes.
@@ -227,6 +283,8 @@ Press **LFO** for the master effects chain. Turn **SELECT** to focus **EQ**, **C
 
 ### Punch-In FX
 
+The keyboard LEDs illuminate the **eight white keys assigned to the currently displayed Punch-In FX page**. Switching pages switches the lit effect bank. Pressed FX keys stay indicated.
+
 Press **FX** to move between Per-Step FX, **PUNCH-IN 1/2** and **PUNCH-IN 2/2**. The **first eight white keys** trigger the original effects; the **next eight white keys** trigger the new effects, regardless of which page is visible. Pressing an FX key immediately shows its page. If you hold several, the most recently pressed effect takes display focus; releasing it restores focus to the latest still-held effect. Hold the key and turn **K1** to adjust its setting. **REC on either Punch-In page** arms performance-FX recording independently of Tracker note recording.
 
 | Page | Effect | Behavior / K1 parameter |
@@ -239,7 +297,7 @@ Press **FX** to move between Per-Step FX, **PUNCH-IN 1/2** and **PUNCH-IN 2/2**.
 | **1/2** | **OCT UP** | Temporary pitch-shift up; no K1 parameter. |
 | **1/2** | **OCT DOWN** | Temporary pitch-shift down; no K1 parameter. |
 | **1/2** | **MUTE** | Temporarily mute the mix; no K1 parameter. |
-| **2/2** | **SCRATCH** | Bidirectional transport of a short frozen audio fragment; K1 changes the scratch movement. Not a long-record scratch. |
+| **2/2** | **CRY** | Bidirectional transport of a short frozen audio fragment; K1 changes the scratch movement. Not a long-record scratch. |
 | **2/2** | **BITCRUSH** | Reduce effective PCM bit resolution; K1 adjusts crush depth. |
 | **2/2** | **PUMP** | BPM-linked sidechain-style level modulation; K1 selects rhythmic rate. |
 | **2/2** | **GLITCH** | Jump between short, deterministic fragments of captured audio; K1 adjusts fragment size/chaos. |
@@ -248,7 +306,7 @@ Press **FX** to move between Per-Step FX, **PUNCH-IN 1/2** and **PUNCH-IN 2/2**.
 | **2/2** | **RADIO** | Lo-fi radio-like bandwidth and distortion; K1 changes intensity. |
 | **2/2** | **DJ ISOLATOR** | Performance EQ/kill-style filtering; K1 selects frequency emphasis. |
 
-**Buffer sharing:** REPEAT, TAPE STOP, SCRATCH and GLITCH use the same bounded frozen audio history. Only one of these snapshot readers can own it at a time; other lightweight effects may be layered where CPU permits. The available snapshot is only approximately **128 ms**. This does not provide full-length audio REVERSE; no such feature is claimed.
+**Buffer sharing:** REPEAT, TAPE STOP, CRY and GLITCH use the same bounded frozen audio history. Only one of these snapshot readers can own it at a time; other lightweight effects may be layered where CPU permits. The available snapshot is only approximately **128 ms**. This does not provide full-length audio REVERSE; no such feature is claimed.
 
 All **thirteen adjustable Punch-In settings** (five original and eight new) are saved with the project. With Punch-In REC armed and playback running, BEETLE can record effect holds and parameter changes. Leaving the FX page disarms Punch-In capture without affecting Tracker note recording. Recorded FX IDs and settings are stored using the new V25 project format; older supported projects remain readable.
 
@@ -263,17 +321,23 @@ Press **ARP** to arrange patterns into a complete song. A song has up to **64 po
 | **K3** | Choose source pattern 01–48, `--` for a silent channel, or repeats 1–16 in REP. |
 | **OCT+** | Insert a new song position. Each channel defaults to the pattern matching that position (POS above 48 defaults to P48). |
 | **OCT−** | Delete the selected song position. |
-| **SEL** | Turn SONG ON or OFF. |
+| **SEL (short press)** | Clear an existing song-row selection; without a selection, toggle SONG ON/OFF. |
+| **SEL (hold 650 ms)** | Toggle SONG LOOP ON/OFF. Hold SEL while rotating K1 to select a range instead, without toggling SONG LOOP. |
+| **PLAY** | Loop exactly the selected song-row range if present (even when SONG LOOP is OFF); otherwise play the full song using the SONG LOOP setting. |
 | **ARP** | With SONG ON, switch between Song Chains and Live Mixer. |
 | **SEQ + OP1 / OP2** | Copy / paste a selected Song Chain row or contiguous row range; paste begins at the current row. |
+
+**Song-row selection:** Hold **SEL** while turning **K1**. Selected rows are highlighted in magenta, with a pink cursor outline matching tracker step selection. The selection can run forwards or backwards. **PLAY** loops only the selected rows and respects each row’s `REP` value; **STOP** keeps the range selected. A short SEL press clears the selection. With no selected range, PLAY returns to normal full-song behavior.
 
 **Example:** POS 02 can play CH1–CH5 from **P02** while DR uses **P01**. The source patterns remain unchanged. Shorter source patterns loop within the song position. Recorded global Punch-In events use the CH1 source pattern; setting CH1 to `--` also silences those events for that position. An explicit `--` releases active synth notes at the next position boundary, or fades/chokes the CH6 drum tail. Selecting a numbered, empty pattern is different: it can allow the previous note's sustain to continue.
 
 ### Projects and Project Manager
 
-Press **HOME** to access **NEW**, **SAVE**, **SAVE AS**, **LOAD**, **HELP** and other project tools. There are **12 project slots**. A project saves patterns, song arrangements, instruments and library, drums, mixer, effects and performance settings. The current native project schema is **TRK1 V25**. Older supported project versions can be read and, via the Project Manager, explicitly converted with authenticated backup and readback verification. **TRK1 V25 is not the same thing as Storage V2**: the former is a project-file format; the latter is a destructive, opt-in reorganization of the BEETLE flash volume. Older firmware may not open projects newly saved in V25; export copies before downgrading.
+Press **HOME** to access **NEW**, **SAVE**, **SAVE AS**, **LOAD**, **HELP** and other project tools. There are **12 project slots**. A project saves patterns, song arrangements, instruments and library, drums, mixer, effects and performance settings. The current native project schema is **TRK1 V26**. Older supported project versions can be read and, via the Project Manager, explicitly converted with authenticated backup and readback verification. **TRK1 V26 is not the same thing as Storage V2**: the former is a project-file format; the latter is a destructive, opt-in reorganization of the BEETLE flash volume. Older firmware may not open projects newly saved in V26; export copies before downgrading.
 
-The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html) can import/export encrypted `.beetle` projects, inspect the twelve physical slots, convert older project formats to V25, and maintain a separate global `.beetlebank` sample library. Its AES-GCM project-container encryption uses a shared key included in the open-source tools: this protects against casual inspection and detects tampering, **not determined decryption**. Device operations require compatible **Project Transfer** firmware; **Storage V2 conversion and restoration require protocol V5 (V1.4.24)**. All FM1 USB transfer, conversion and sample playback remain hardware-unverified.
+The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project-Manager.html) can import/export encrypted `.beetle` projects, inspect the twelve physical slots, convert older project formats to V26, and maintain a separate global `.beetlebank` sample library. Its AES-GCM project-container encryption uses a shared key included in the open-source tools: this protects against casual inspection and detects tampering, **not determined decryption**. Device operations require compatible **Project Transfer** firmware; **Storage V2 conversion and restoration require protocol V5 (V1.4.24)**. All FM1 USB transfer, conversion and sample playback remain hardware-unverified.
+
+**Bulk project backups:** Use **EXPORT PROJECTS ZIP** to save every occupied project slot together, or **IMPORT PROJECTS ZIP** to restore them to their recorded slots. The ZIP contains individual encrypted `.beetle` projects and a verification manifest. The Manager validates the complete archive and requires explicit confirmation before overwriting existing projects. Import is sequential rather than atomic: do not disconnect during transfer, and verify every restored slot. Bulk ZIP currently supports the Manager’s store-only ZIP format. These project ZIPs **do not contain the global U01–U13 sample audio**; use the separate `.beetlebank` workflow to back up your sample library. Single-slot `.beetle` import/export remains available.
 
 **Storage and firmware safety:** On-device flash capacity is finite; a completely filled 48-pattern project or thirteen long samples may not fit. Storage V2 migration explicitly erases the BEETLE-owned **`0x97000–0xDFFFF`** partition after a verified project backup, then restores projects. It is **not power-loss atomic**, and older ETCH/Felucca user storage within those sectors could be lost. Obtain a verified full-flash backup and a working independent recovery method before destructive storage or firmware updates. The WebInstaller does not make a full device backup, and successful checksums do not guarantee safe boot, DMA behavior, a successful Firmware Hub switch or reliable recovery. BEETLE retains guarded outgoing OTA checks for selected Felucca-family loaders, not unrestricted cross-firmware flashing.
 

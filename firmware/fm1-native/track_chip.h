@@ -79,6 +79,10 @@ struct track_chip_engine {
  uint16_t punch_bpm; /* Updated per audio block; never read project flash in ISR. */
  uint8_t punch_param[16]; /* 0..100; ring modulation intensity and stutter are saved */
  int32_t punch_hp_l,punch_hp_r,punch_bp_l,punch_bp_r;
+ /* FX 10: per-channel sample-and-hold for REAL downsampling plus bit-depth
+  * reduction. FX 15: click-safe high-pass + subtle hiss mix. No heap/buffer. */
+ int16_t punch_crush_hold_l,punch_crush_hold_r;
+ uint8_t punch_crush_count,punch_crush_wet,punch_radio_wet;
  int32_t punch_filter_l,punch_filter_r;
 };
 struct track_mixer;

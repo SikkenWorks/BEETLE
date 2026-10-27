@@ -58,7 +58,8 @@ struct track_note2_fx {uint8_t effect,value;};
 /* Global sparse FX pool is attached to song bank, not the 48 patterns.
  * Pool lives once per project rather than multiplying every undo snapshot. */
 struct track_pattern {struct track_step ch[TRACK_CHANNELS][TRACK_STEPS];uint8_t length;
- struct track_note2_fx note2_fx[TRACK_STEPS];};
+ struct track_note2_fx note2_fx[TRACK_STEPS];
+ uint8_t note3[TRACK_STEPS]; /* CH6 independent third drum hit, 255=EMPTY 254=STP */};
 static inline uint8_t track_extra_key(uint8_t lane,uint8_t row,uint8_t note2){
  return (uint8_t)(lane*TRACK_STEPS+row+(note2?128u:0u));
 }
@@ -71,9 +72,25 @@ uint8_t track_note_scroll(uint8_t value,int32_t detents,uint8_t drum);
 uint8_t track_note_scroll_keylocked(uint8_t value,int32_t detents,uint8_t drum,const struct track_harmony *h);
 void track_init(struct track_engine *e);
 int track_enter_note(struct track_engine *e,uint8_t note);
-/* Drum NOTE2 uses chord encoding: 0=empty, 1..14=pad, 15=STP.
- * Entry does not alter NOTE1, selected row or non-note fields. */
+/* Drum NOTE2: 4-bit chord holds empty/STOP and pad 1..14. The normally
+ * 0..3 drum KIT field has a reserved bit 2 (0x4): when set, NOTE2 chord
+ * 1..13 addresses user samples U01..U13. No new project bytes required.
+ * The lower KIT bits and NOTE1 are untouched by NOTE2 selection. */
+static inline uint8_t track_note2_id(const struct track_step *s){
+ if(!s||!s->chord||s->chord==15u)return TRACK_NOTE_EMPTY;
+ if(s->instrument&4u)return s->chord<=13u?(uint8_t)(13u+s->chord):TRACK_NOTE_EMPTY;
+ return (uint8_t)(s->chord-1u);
+}
+static inline void track_note2_set(struct track_step *s,uint8_t id){
+ if(!s)return;
+ if(id==TRACK_NOTE_STOP){s->chord=15u;s->instrument&=3u;}
+ else if(id==TRACK_NOTE_EMPTY){s->chord=0u;s->instrument&=3u;}
+ else if(id>=14u&&id<=26u){s->chord=(uint8_t)(id-13u);s->instrument|=4u;}
+ else if(id<14u){s->chord=(uint8_t)(id+1u);s->instrument&=3u;}
+}
+/* Entry does not alter NOTE1, cursor, drum KIT (low 2 bits) or step FX. */
 int track_enter_drum_note2(struct track_engine *e,uint8_t drum_note);
+int track_enter_drum_note3(struct track_engine *e,uint8_t drum_note);
 int track_set_note(struct track_engine *e,uint8_t channel,uint8_t step,uint8_t note);
 int track_clear_step(struct track_engine *e,uint8_t channel,uint8_t step);
 int track_clear_step_range(struct track_engine *e,uint8_t channel,uint8_t first,uint8_t last);
@@ -101,7 +118,8 @@ int track_is_lit(uint8_t button); /* FN indices 2..13; ARP=10 remains off */
 uint32_t track_home_action(uint32_t held_ms,uint8_t released); /* 1 HOME short, 2 GUIDE long */
 /* Pure endian-defined codec: fixed 324-byte pattern, no flash access. */
 #define TRACK_PATTERN_V3_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*7u)
-#define TRACK_PATTERN_BYTES (TRACK_PATTERN_V3_BYTES+TRACK_STEPS*2u)
+#define TRACK_PATTERN_V4_BYTES (TRACK_PATTERN_V3_BYTES+TRACK_STEPS*2u)
+#define TRACK_PATTERN_BYTES (TRACK_PATTERN_V4_BYTES+TRACK_STEPS)
 #define TRACK_PATTERN_V2_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*6u)
 #define TRACK_PATTERN_LEGACY_BYTES (4u+TRACK_CHANNELS*TRACK_STEPS*5u)
 int track_pattern_encode(const struct track_pattern *pattern,uint8_t *dst,uint32_t cap);

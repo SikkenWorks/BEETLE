@@ -15,9 +15,11 @@
 /* Physical FM1 page validator is called BOTH on each input poll and inside
  * screen(). SETTINGS used page 38 but an older whitelist stopped at 37,
  * so selecting SETTINGS immediately reset the on-device screen to TRACKER.
- * Keep the page whitelist in a testable native header, not the browser. */
+ * DELETE confirmation and progress screens (39 and 40) have the EXACT
+ * same failure if excluded: the popup is replaced with an empty TRACKER.
+ * Keep this whitelist in a testable native header, not the browser. */
 static inline uint8_t beetle_ui_page_valid(uint8_t page){
- return (uint8_t)(page<=30u || page==32u || (page>=33u && page<=BEETLE_SETTINGS_PAGE));
+ return (uint8_t)(page<=30u || page==32u || (page>=33u && page<=40u));
 }
 
 struct beetle_settings_nav {

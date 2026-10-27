@@ -9,6 +9,9 @@
 #include "native_output_startup.h"
 #include "native_performance_midi.h"
 #include "native_preset_ramp.h"
+#ifdef TRACK_FIRMWARE
+#include "beetle_audio_safety.h"
+#endif
 static struct etch_native_audio native_audio __attribute__((section(".pool")));
 static volatile struct etch_native_controls native_controls;
 static int32_t native_dma[ETCH_NATIVE_FRAMES*4] __attribute__((aligned(4)));
@@ -59,6 +62,11 @@ static volatile uint8_t native_tripped,native_panic,native_suspended,native_edit
  * first-frame DMA contention from occurring with nonzero synth audio.
  * It does not promise an analog pop-free physical power enable. */
 static volatile uint8_t native_output_enabled;
+#ifdef TRACK_FIRMWARE
+/* Main-owned timestamp; ALNK0 refuses stale physical MASTER commands. */
+static volatile uint32_t native_master_last_good_ms;
+static volatile uint8_t native_song_stop_pending;
+#endif
 /* USB attach/suspend can change analog ground/power bias. No claim of
  * eliminating the hardware edge; defer it until bus state is stable. */
 static struct etch_output_usb_gate native_usb_gate;
@@ -133,13 +141,14 @@ static void native_budget_late(void){
  /* The tracker runs track_chip_render(), not ETCH's native voice renderer.
   * The old protection shed ETCH voices and had NO effect on BEETLE load,
   * eventually producing repeated AUDIO STOP/restarts in dense song rows. */
- if(track_chip.realtime_voice_budget>4u){
-  track_chip_set_realtime_budget(&track_chip,(uint8_t)(track_chip.realtime_voice_budget-1u));
-  ++native_voice_shed_count;
-  native_missed_streak=0u;
- }else if(++native_missed_streak>=8u){
-  etch_boot_audio_fault(&etch_boot);native_stop();
- }
+ /* A missed DMA half can replay stale/unattenuated samples. Do not
+  * progressively shed voices while potentially distorted output continues.
+  * Hard-stop the analogue output on the FIRST verified deadline miss. */
+ ++native_missed_streak;
+ /* Stop Song Mode and its pending triggers as well as switching off PC6. */
+ native_song_stop_pending=1u;
+ etch_boot_audio_fault(&etch_boot);
+ native_stop();
 #else
  if(native_audio.voice_limit>4u){
   native_audio.voice_limit=etch_voice_budget_reduce(native_audio.voice_limit);
@@ -163,6 +172,58 @@ static void native_budget_ok(void){
 #endif
  }
 }
+/* BEETLE V1.7.14: NEW PROJECT may reset RAM without power-cycling the
+ * codec or restarting its 1s+1s+USB-qualified cold-start gate. This is only
+ * permitted after the original analog/digital startup completed, with the
+ * sequencer stopped and no USB capture stream. Interrupts stay enabled during
+ * the RAM reset: the ALNK0 ISR will write SILENCE to each free DMA half and
+ * never dereference the project or DSP objects being replaced.
+ * This fast path is NOT used by SAVE/LOAD, OTA, fault recovery or playback. */
+#ifdef TRACK_FIRMWARE
+static uint8_t native_new_quiesce(void){
+ fm1_irq_off();
+#if ETCH_NATIVE_UAC
+ const uint8_t capture_active=(uint8_t)(uac.feed!=0u);
+#else
+ const uint8_t capture_active=0u;
+#endif
+ uint8_t eligible=(uint8_t)(!capture_active && !native_suspended && !native_tripped &&
+  !native_safe && native_output_enabled &&
+  native_output_analog_ready && native_boot_audio_released &&
+  native_screen_gate.ready && !native_screen_gate.timed_out);
+ if(eligible)native_suspended=1u;
+ fm1_irq_enable_all();
+#if ETCH_NATIVE_PANEL_MIDI
+ if(eligible)etch_perf_midi_flush(&native_perf_out,native_panel_usb_emit,0);
+#endif
+ return eligible;
+}
+static void native_new_resume(void){
+ /* Renderer cannot access the old project while suspended. Keep the ALNK
+  * hardware, original PC6 analog state, USB clock, and LCD startup gate. */
+ etch_native_reset(&native_audio);
+ etch_preset_ramp_reset(&native_preset_ramp);
+ etch_panel_midi_reset(&native_panel_out);
+#if ETCH_NATIVE_USB
+ mi_r=mi_w;RING_PUBLISH();
+#endif
+ native_preset_ramp_requested=0u;
+ native_missed_streak=0u;
+ native_healthy_blocks=0u;
+ native_scope_ready=0u;
+ native_scope_cursor=0u;
+ native_scope_has_signal=0u;
+ native_scope_held_note=0u;
+ native_scope_window_peak=0u;
+ native_scope_silent_windows=0u;
+ fm1_irq_off();
+ /* The already-powered codec remains on. New voices fade in over the normal
+  * 8192 samples; no old ISR may read reset state before this publication. */
+ native_output_fade=0u;
+ native_suspended=0u;
+ fm1_irq_enable_all();
+}
+#endif
 /* Main-only pause: block a leftover ALNK interrupt before transferring ownership. */
 static void native_pause(void){
  fm1_irq_off();native_suspended=1;native_output_enabled=0u;fm1_audio_output_enable(0u);fm1_audio_stop();fm1_audio_ack_half();fm1_irq_enable_all();
@@ -180,7 +241,16 @@ void fm1_alnk0_irq(void){
  native_in_audio=1u;
  uint8_t p=fm1_audio_pending();fm1_audio_ack_aux(p);
  if(p&FM1_AUDIO_HALF){
-  if(native_suspended){fm1_audio_ack_half();native_in_audio=0u;return;}
+  if(native_suspended){
+#ifdef TRACK_FIRMWARE
+   /* Warm NEW transaction: prevent repeated pre-reset PCM from escaping
+    * the DMA buffer. The physical codec stays powered in its stable state. */
+   uint32_t silent_half=fm1_audio_free_half();
+   int32_t *silent_dst=&native_dma[silent_half*ETCH_NATIVE_FRAMES*2u];
+   for(uint32_t i=0u;i<ETCH_NATIVE_FRAMES*2u;i++)silent_dst[i]=0;
+#endif
+   fm1_audio_ack_half();native_in_audio=0u;return;
+  }
   uint32_t half=fm1_audio_free_half(),start=fm1_ticks();
   struct etch_native_controls c;
   c=native_controls;
@@ -259,9 +329,14 @@ etch_native_reset(&native_audio);native_audio.keys=keys&0x7ffffffu;}
    /* BEETLE renders into the ETCH DMA path, so its mixed chip+drum+FX
     * PCM must be attenuated using the SAME physical MASTER knob as ETCH.
     * Slew gain in Q15 per sample, without allocation or IRQ division by zero. */
-   /* One shared gain state for both channels, sample-level smoothing. */
+   /* One shared gain state for both channels, sample-level smoothing.
+    * Main/flash congestion must not leave the last HIGH knob value active:
+    * if the ADC has not supplied a valid value within 80ms, fade is bypassed
+    * DOWN only (track_master_apply immediately clamps to the new ceiling). */
    int32_t gain_prev=native_audio.master_gain_q16;
-   left=track_master_apply((int16_t)left,native_controls.gain,&gain_prev);
+   const uint16_t verified_gain=beetle_master_safe_gain(native_controls.gain,
+                                   etch_ms,native_master_last_good_ms);
+   left=track_master_apply((int16_t)left,verified_gain,&gain_prev);
    right=(int32_t)(((int64_t)right*(gain_prev>>16u))/32767);
    native_audio.master_gain_q16=gain_prev;
 #endif

@@ -1944,7 +1944,7 @@ static void screen_render(void){
    label(uac.alt?(uac.flowing?"UAC STREAM":"UAC WAIT HOST"):"UAC IDLE",10,128,0xffff);
    label("UND",10,146,0x7bef);number(uac.underruns,50,146);
    label("OVER",125,146,0x7bef);number(uac.overruns,175,146);
-   label("MISS",10,165,0x7bef);number(uac.missed,60,165);
+   label("RECOV",10,165,0x7bef);number(uac.recoveries,75,165);
    label("STALL",125,165,0x7bef);number(uac.stalls,182,165);
 #else
    label("UAC DISABLED",10,142,0xfda0);
@@ -2190,6 +2190,26 @@ static void screen(void){
  }
 }
 #ifdef TRACK_FIRMWARE
+/* V1.7.5: keep the original two-half fast LCD compositor, but publish a
+ * fresh, validated MASTER ADC value between halves when one is due.
+ * Never sample ADC in ALNK0 or bypass the stale/invalid-gain fail-safe. */
+static uint32_t beetle_master_last_poll_ms;
+static void beetle_master_service_if_due(void){
+ if(native_safe || native_updating ||
+    (uint32_t)(etch_ms-beetle_master_last_poll_ms)<20u)return;
+ beetle_master_last_poll_ms=etch_ms;
+ int32_t adc=fm1_adc_read(FM1_ADC_MASTER);
+ uint16_t next=0u;
+ if(adc>=0 && adc<=BEETLE_MASTER_ADC_MAX)
+  next=beetle_master_publish_step(native_controls.gain,adc);
+ fm1_irq_off();
+ native_controls.gain=next;
+ if(adc>=0 && adc<=BEETLE_MASTER_ADC_MAX)
+  native_master_last_good_ms=etch_ms;
+ fm1_irq_enable_all();
+}
+#endif
+#ifdef TRACK_FIRMWARE
 #include "track_runtime.h"
 #if ETCH_NATIVE_OTA
 #include "beetle_project_transfer.inc"
@@ -2278,7 +2298,12 @@ void fm1_cstart(void){
  native_editor.dirty=1;native_compile_edit();
  native_parameter_publish();
  int32_t pot=fm1_adc_read(FM1_ADC_MASTER);
+#ifdef TRACK_FIRMWARE
+ native_controls.gain=0u; /* fail-closed until valid ADC polls ramp upward */
+ native_master_last_good_ms=etch_ms;
+#else
  if(pot>=0)native_controls.gain=(uint16_t)(pot*32767/1023);
+#endif
 /* Initialise BEETLE state BEFORE audio ISR starts reading it. */
 #ifdef TRACK_FIRMWARE
  track_fm1_boot();
@@ -2312,6 +2337,9 @@ void fm1_cstart(void){
   /* MASTER is a performance control, not an LCD refresh event.
    * Its ADC gets polled five times as often as the legacy UI tick;
    * gain smoothing still happens in the DSP once per sample. */
+#ifdef TRACK_FIRMWARE
+  if(!safe)beetle_master_service_if_due();
+#else
   if(!safe&&!native_updating&&(uint32_t)(etch_ms-last_gain_sample_ms)>=20u){
    last_gain_sample_ms=etch_ms;
    int32_t master_adc=fm1_adc_read(FM1_ADC_MASTER);
@@ -2320,6 +2348,7 @@ void fm1_cstart(void){
     fm1_irq_off();native_controls.gain=next_gain;fm1_irq_enable_all();
    }
   }
+#endif
 #ifdef TRACK_FIRMWARE
   /* Read battery ADC only every four seconds in foreground. Never read ADC,
    * draw pixels or touch flash from the realtime audio callback. Threshold
@@ -2355,6 +2384,7 @@ void fm1_cstart(void){
   /* Deadline faults are recoverable WITHOUT firmware reboot. Back off after
    * repeated stalls to protect the amplifier, USB and audio pipeline. The
    * main loop feeds WDT throughout; never restart DMA inside the ISR. */
+#ifndef TRACK_FIRMWARE
   if(!muted && native_tripped && !native_updating){
    if(!native_auto_fault_at)native_auto_fault_at=etch_ms?etch_ms:1u;
    uint32_t backoff=1000u+(uint32_t)(native_auto_restarts<8u?native_auto_restarts:8u)*1000u;
@@ -2373,6 +2403,19 @@ void fm1_cstart(void){
    if(!native_tripped && native_auto_restarts &&
       native_healthy_blocks>600u)native_auto_restarts=0u;
   }
+#else
+  /* BEETLE safety latch: an audio deadline fault stays QUIET until an
+   * intentional HOME+PLAY hardware recovery or power cycle. Never
+   * re-enable the loud output in an automatic restart loop. */
+  (void)native_auto_fault_at;
+  (void)native_auto_restarts;
+#endif
+#ifdef TRACK_FIRMWARE
+  if(native_song_stop_pending){
+   fm1_irq_off();track_state.transport.playing=0u;track_audio_started=0u;
+   native_song_stop_pending=0u;fm1_irq_enable_all();
+  }
+#endif
   if(muted||native_tripped){
    fm1_irq_off();native_midi_drain(0);fm1_irq_enable_all();
    if(native_tripped && usb.config)etch_perf_midi_flush(&native_perf_out,native_panel_usb_emit,0);

@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * BEETLE V1.2 oscillator calibration. Measured with the original FM1 C
+ * BEETLE V1.7.7: restore ALL 12 oscillator gains to their V1.6.10
+ * values. Existing user projects must keep their original relative mix.
+ * Measured with the original FM1 C
  * renderer: C4, sustain=100, velocity=110, clean patch, no MASTER FX.
  * These fixed gains reduce RMS jumps when browsing instrument/wave types.
  * They are deliberately STATIC, not a per-note AGC: no attack pumping,

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * BEETLE V1.4.9: original, isolated BD4S streaming laboratory.
- * NOT WIRED TO FM1 FLASH, INTERRUPTS, MIXER OR USB.
- * All methods presently require serialized access in caller's scheduler.
+ * BEETLE BD4S streaming: active with Storage V2 native FM1 firmware.
+ * Prefetch uses main-loop flash I/O; render uses RAM only.
+ * Producer/consumer handoff must remain serialized by the caller.
  */
 #ifndef BEETLE_BD4_PREFETCH_H
 #define BEETLE_BD4_PREFETCH_H
@@ -9,7 +9,7 @@
 #include "beetle_dpcm4.h"
 #define BEETLE_BD4_STREAM_VOICES 6u
 #define BEETLE_BD4_STREAM_SLOTS 13u
-#define BEETLE_BD4_WINDOW_FRAMES 64u
+#define BEETLE_BD4_WINDOW_FRAMES 128u
 #define BEETLE_BD4_WINDOW_COUNT 2u
 #define BEETLE_BD4_SAMPLE_RATE 22050u
 #define BEETLE_BD4_OUTPUT_RATE 44100u
@@ -36,6 +36,10 @@ struct beetle_bd4_stream_voice {
  uint32_t generation;
  uint32_t reads, underruns, invalid_blocks, skipped_frames;
  int32_t predictor,step,last_output;
+ /* Cache the two 22.05 kHz source samples for the intervening 44.1 kHz
+  * interpolation frame. Per-voice, RAM-only; no extra PCM windows/flash. */
+ int16_t interp_a,interp_b;
+ uint8_t interp_valid;
  uint16_t block_frames,block_cursor;
  uint8_t slot, configured, playing, verified_header, encoded_length, next_write;
  uint8_t pinned;
@@ -57,7 +61,7 @@ int beetle_bd4_stream_prepare(struct beetle_bd4_stream *stream, unsigned voice,
 int beetle_bd4_stream_prepare_pinned(struct beetle_bd4_stream *stream, unsigned voice,
                                      uint8_t slot, uint32_t compressed_bytes,
                                      uint32_t generation);
-/* Poll a bounded number of 64-frame decode windows from background context.
+/* Poll a bounded number of 128-frame decode windows from background context.
  * Returns windows filled, or negative on invalid arguments. Never writes flash.
  */
 int beetle_bd4_prefetch_poll(struct beetle_bd4_stream *stream,
@@ -76,14 +80,18 @@ int beetle_bd4_stream_start(struct beetle_bd4_stream *stream,unsigned voice);
 void beetle_bd4_stream_disarm(struct beetle_bd4_stream *stream,unsigned voice);
 /* Song Chain drum-lane -- is STP: fade any active user-sample voice in
  * 48 output frames. A deliberately selected empty pattern does not choke.
- * These functions are RAM-only and remain HOST-LAB until safe DMA integration.
+ * These functions operate on RAM-only stream state; no device writes.
  */
 void beetle_bd4_stream_choke_voice(struct beetle_bd4_stream *stream,unsigned voice);
 void beetle_bd4_stream_choke_all(struct beetle_bd4_stream *stream);
 /* Realtime stage: reads PCM windows ONLY. No I/O, decoding, or allocation.
  * The supplied output is replaced, not mixed into BEETLE's native bus.
- * Production integration must establish safe cross-context handoff first.
+ * Main-loop producer must establish safe cross-context handoff.
  */
+/* RAM-only availability probe. The active BD4S voice must not advance its
+ * source cursor until BOTH samples needed for interpolation are resident;
+ * first-window readiness alone cannot prevent an early step-1 truncation. */
+int beetle_bd4_stream_ready_now(const struct beetle_bd4_stream *stream,unsigned voice);
 void beetle_bd4_stream_render(struct beetle_bd4_stream *stream,unsigned voice,
                               int16_t *mono_output,uint32_t output_frames);
 #endif

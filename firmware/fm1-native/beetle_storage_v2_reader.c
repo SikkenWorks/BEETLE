@@ -163,6 +163,36 @@ static int project_attempt(struct beetle_v2_device *d,uint8_t slot,uint32_t g,
  if(written)*written=(uint32_t)decoded;
  return 1;
 }
+/* Audit reads the already selected, CRC-checked index into scratch.
+ * Reuse those exact bytes for free-slot selection: this prevents a second
+ * flash transfer and keeps all fail-closed cross-domain checks intact. */
+static int first_unused_index(const uint8_t *scratch){
+ int candidate=BEETLE_V2_PROJECTS;
+ for(uint32_t slot=0u;slot<BEETLE_V2_PROJECTS;slot++){
+  const uint32_t pos=20u+slot*32u;
+  uint8_t allocated=0u;
+  for(uint32_t bank=0u;bank<2u;bank++){
+   const uint8_t *p=scratch+pos+bank*16u;
+   const uint32_t gen=u32(p),off=u32(p+4),len=u32(p+8),crc=u32(p+12);
+   if(!gen){if(off||len||crc)return -1;continue;}
+   if(len<16u||len>12272u||off<8192u||(off&255u)||
+      off>BEETLE_V2_BYTES-24u-len)return -1;
+   allocated=1u;
+  }
+  if(!allocated&&candidate==BEETLE_V2_PROJECTS)candidate=(int)slot;
+ }
+ return candidate;
+}
+int beetle_v2_audit_and_first_unused_project(struct beetle_v2_device *d,
+ struct beetle_v2_domains *report,uint8_t *scratch){
+ if(beetle_v2_audit_domains(d,report,scratch))return -1;
+ return first_unused_index(scratch);
+}
+int beetle_v2_first_unused_project(struct beetle_v2_device *d,uint8_t *scratch){
+ if(current_index(d,scratch))return -1;
+ return first_unused_index(scratch);
+}
+
 int beetle_v2_project_read(struct beetle_v2_device *d,uint8_t slot,uint8_t *out,
  uint32_t capacity,uint32_t *written,uint8_t *scratch,
  uint8_t *packed_work,uint32_t packed_capacity){
@@ -185,9 +215,11 @@ int beetle_v2_project_read(struct beetle_v2_device *d,uint8_t slot,uint8_t *out,
  * full-flash bitmap. This deliberately does NOT run in audio or USB IRQ.
  * It can be called before enabling a migrated Storage V2 volume.
  */
-int beetle_v2_audit_domains(struct beetle_v2_device *d,
- struct beetle_v2_domains *report,uint8_t *scratch){
- if(!report||current_index(d,scratch))return -1;
+/* Share the complete project/sample overlap verification between ordinary
+ * indexed reads and NEW PROJECT's read-once fast path. */
+static int audit_domains_checked_index(struct beetle_v2_domains *report,
+ const uint8_t *scratch){
+ if(!report||!scratch)return -1;
  uint8_t owners[72]={0};
  uint16_t occupied_pages[72]={0};
  struct beetle_v2_domains result={0};
@@ -246,4 +278,33 @@ int beetle_v2_audit_domains(struct beetle_v2_device *d,
  if(pos!=20u+u32(scratch+12))return -2;
  *report=result;
  return 0;
+}
+int beetle_v2_audit_domains(struct beetle_v2_device *d,
+ struct beetle_v2_domains *report,uint8_t *scratch){
+ if(!report||current_index(d,scratch))return -1;
+ return audit_domains_checked_index(report,scratch);
+}
+/* V1.7.11 NEW PROJECT path: two CRC-checked 4KiB indexes, no third NOR
+ * read. Use the higher generation and apply the exact same cross-domain
+ * collision checks. This uses caller-owned 8KiB staging scratch only after
+ * the DMA is suspended; no heap or retained metadata cache. */
+int beetle_v2_audit_and_first_unused_project_fast(beetle_v2_read rd,
+ void *context,struct beetle_v2_domains *report,uint8_t double_scratch[8192]){
+ if(!rd||!report||!double_scratch)return -1;
+ struct beetle_v2_device device={0};
+ device.read=rd;device.context=context;
+ uint32_t best_generation=0u;
+ int best_copy=-1;
+ for(unsigned sec=0u;sec<2u;sec++){
+  uint8_t *index=double_scratch+4096u*sec;
+  uint32_t generation=0u;
+  if(reader(&device,4096u*sec,index,4096u)||index_parse(index,&generation))continue;
+  if(best_copy<0||(int32_t)(generation-best_generation)>0){
+   best_generation=generation;best_copy=(int)sec;
+  }
+ }
+ if(best_copy<0)return -1;
+ const uint8_t *selected=double_scratch+4096u*(unsigned)best_copy;
+ if(audit_domains_checked_index(report,selected))return -1;
+ return first_unused_index(selected);
 }

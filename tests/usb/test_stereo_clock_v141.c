@@ -6,19 +6,20 @@
 #include <stdio.h>
 #include "beetle_usb_capture_src.h"
 #include "beetle_usb_multitrack.h"
+#include "beetle_usb_capture_recovery.h"
 int main(void){
  const uint32_t DURATION_MS=600000u;
  const uint64_t block_ns=2901339ull;
- uint64_t w=104u,r=0u,next=0u;
+ uint64_t w=BEETLE_UAC_PRIME_44100,r=0u,next=0u;
  uint32_t step=BEETLE_UAC_SRC_ONE,frac=0u,acc=0u;
- int32_t filtered=104*256;
+ int32_t filtered=BEETLE_UAC_PRIME_44100*256;
  uint32_t under=0,over=0,minfill=512u,maxfill=0u,minstep=100000u,maxstep=0u;
  for(uint32_t ms=0;ms<DURATION_MS;ms++){
   uint64_t ns=(uint64_t)ms*1000000ull;
   while(next<=ns){
    uint32_t fill=(uint32_t)(w-r);
    filtered=beetle_uac_mt_filter_fill(filtered,fill>512u?512u:fill);
-   step=beetle_usb_src_next_step(step,(uint32_t)(filtered+128)>>8u,104u);
+   step=beetle_uac_mt_next_step(step,filtered,BEETLE_UAC_PRIME_44100);
    if(fill+128u>512u)over++;else w+=128u;
    next+=block_ns;
   }
@@ -38,7 +39,7 @@ int main(void){
  }
  printf("Stereo UAC 10min: under=%u over=%u fill=%u..%u step=%u..%u final=%u\n",under,over,minfill,maxfill,minstep,maxstep,step);
  assert(under==0u&&over==0u);
- assert(minfill>20u&&maxfill<320u);
+ assert(minfill>100u&&maxfill<490u);
  assert(step>=65540u&&step<65610u);
  return 0;
 }

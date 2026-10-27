@@ -11,7 +11,7 @@
 #include "beetle_performance_snapshots.h"
 #include "beetle_mute_groups.h"
 #define TRACK_STORE_MAGIC 0x314B5254u /* little endian "TRK1" */
-#define TRACK_STORE_VERSION 25u
+#define TRACK_STORE_VERSION 26u
 #define TRACK_STORE_MAX 24576u /* include legacy V1-V3 decode capacity */
 #define TRACK_STORE_V4_MAX 12256u /* physical V4 payload budget */
 struct track_store_instrument {
@@ -45,6 +45,7 @@ struct track_store_project {
  char title[13];
  uint16_t bpm;
  uint8_t slot;
+ uint8_t drum_note3_enabled; /* V26: CH6 replaces the FX cell with NOTE3 */
 };
 uint32_t track_store_crc32(const uint8_t *data,uint32_t n);
 /* Encode/decode endian-defined data with CRC32; no samples or foreign objects. */

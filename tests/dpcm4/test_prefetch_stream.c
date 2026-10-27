@@ -71,7 +71,7 @@ static void slow_io(struct context *c){
  uint32_t early=s.voices[0].underruns;
  c->fail_reads=0;
  assert(beetle_bd4_prefetch_poll(&s,read_blob,c,8)==2);
- assert(s.voices[0].skipped_frames>=192);
+ assert(s.voices[0].skipped_frames<=BEETLE_BD4_WINDOW_FRAMES);
  c->in_render=1;beetle_bd4_stream_render(&s,0,out,128);c->in_render=0;
  assert(s.voices[0].underruns==early);
  assert(out[127]!=0); /* refill and resumption after the missed interval */
@@ -81,7 +81,7 @@ static void edge_cases(struct context *c){
  for(unsigned slot=6;slot<13;slot++){
   struct beetle_bd4_stream s;beetle_bd4_stream_reset(&s);
   assert(beetle_bd4_stream_prepare(&s,0,(uint8_t)slot,c->slots[slot].size)==0);
-  unsigned first=c->slots[slot].frames>64?2u:1u;
+  unsigned first=c->slots[slot].frames>BEETLE_BD4_WINDOW_FRAMES?2u:1u;
   assert(beetle_bd4_prefetch_poll(&s,read_blob,c,first)==(int)first);
   assert(beetle_bd4_stream_start(&s,0)==1);
   int16_t out[128];
@@ -125,6 +125,47 @@ static void song_stop(struct context *c){
  /* Explicitly assigned blank patterns must NOT call choke in song runtime. */
  puts("Six global sample voices obey Song -- STP with 48-frame fade, zero ISR reads: PASS");
 }
+/* V1.4.28: simulate rapid pattern-loop retriggering across all six drum
+ * voices. Samples are independently decoded on each new note, and neither
+ * a stale interpolation pair nor a previous voice can leak into the next. */
+static void loop_retrigger(struct context *c){
+ struct beetle_bd4_stream s;
+ beetle_bd4_stream_reset(&s);
+ int16_t pcm[128];
+ for(unsigned round=0;round<64u;round++){
+  for(unsigned voice=0;voice<6u;voice++){
+   unsigned slot=(voice+round)%6u;
+   assert(beetle_bd4_stream_prepare(&s,voice,(uint8_t)slot,c->slots[slot].size)==0);
+  }
+  uint32_t before=c->reads;
+  assert(beetle_bd4_prefetch_poll(&s,read_blob,c,12u)==12);
+  if(round==0){
+   /* Header + one complete 256-frame encoded block: only TWO reads for
+    * the initial two 128-frame PCM windows (V1.4.27 used three). */
+   assert(c->reads-before==12u);
+  }
+  for(unsigned voice=0;voice<6u;voice++)assert(beetle_bd4_stream_start(&s,voice)==1);
+  for(unsigned section=0;section<2u;section++){
+   if(section)assert(beetle_bd4_prefetch_poll(&s,read_blob,c,6u)>=0);
+   for(unsigned voice=0;voice<6u;voice++){
+    const unsigned slot=(voice+round)%6u;
+    uint32_t reads=c->reads;
+    c->in_render=1;
+    beetle_bd4_stream_render(&s,voice,pcm,128u);
+    c->in_render=0;
+    assert(c->reads==reads);
+    for(unsigned frame=0;frame<128u;frame++){
+     unsigned time=section*128u+frame,at=time>>1;
+     int32_t a=c->slots[slot].expected[at],b=c->slots[slot].expected[at+1u];
+     int32_t expected=(time&1u)?(a+b)/2:a;
+     assert(pcm[frame]==expected);
+    }
+    assert(s.voices[voice].underruns==0u);
+   }
+  }
+ }
+ puts("64 pattern loops x 6 retriggered voices: PCM-exact, no I/O in render, zero underruns: PASS");
+}
 static void corrupt(struct context *c){
  struct beetle_bd4_stream s;beetle_bd4_stream_reset(&s);
  assert(beetle_bd4_stream_prepare(&s,0,0,c->slots[0].size)==0);
@@ -150,7 +191,7 @@ int main(int argc,char **argv){
   for(unsigned j=0;j<pl/2;j++)c.slots[i].expected[j]=(int16_t)((uint16_t)pcm[j*2]|((uint16_t)pcm[j*2+1]<<8));
   free(pcm);
  }
- normal(&c);edge_cases(&c);slow_io(&c);corrupt(&c);song_stop(&c);
+ normal(&c);edge_cases(&c);slow_io(&c);corrupt(&c);song_stop(&c);loop_retrigger(&c);
  assert(beetle_bd4_stream_prepare(NULL,0,0,4000)==-1);
  assert(beetle_bd4_stream_prepare(&(struct beetle_bd4_stream){0},0,13,4000)==-1);
  for(unsigned i=0;i<13;i++){free(c.slots[i].data);free(c.slots[i].expected);}

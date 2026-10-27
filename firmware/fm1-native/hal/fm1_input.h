@@ -166,6 +166,7 @@ static volatile struct {
     uint32_t notes;              /* debounced: bit n = note key n (0 = F3 .. 26 = G5) */
     uint32_t buttons;            /* debounced: bit i = button i (0..13) */
     uint32_t pressed, released;  /* button edges since the last fm1_input_edges() */
+    uint32_t chords; /* latched in 10 kHz physical scan, not the 18 ms UI loop */
     uint32_t notes_pressed;      /* note-key press edges since the last fm1_input_note_edges() */
     uint8_t raw[FM1_NCOL];       /* last frame, packed rows, 1 = closed */
     uint8_t cnt[FM1_NKEY];       /* frames in a row against the debounced state */
@@ -306,6 +307,10 @@ static void fm1__key(uint32_t id, uint32_t closed)
         fm1_in.notes ^= bit;
     } else {
         fm1_in.buttons ^= bit;
+        /* EDIT(id 6)+SEL(id 3) must survive an entire press/release
+         * occurring between two UI polls. Preserve the edge under IRQ. */
+        if ((fm1_in.buttons & ((1u << 3) | (1u << 6))) ==
+            ((1u << 3) | (1u << 6))) fm1_in.chords |= 1u;
         if (!on)
             fm1_in.pressed |= bit;
         else
@@ -601,6 +606,17 @@ static uint32_t fm1_input_edges(uint32_t *released)
     fm1_in.pressed = fm1_in.released = 0;
     fm1__unlock(k);
     return p;
+}
+
+/* Consume a physical chord atomically; independent of UI rate and
+ * the SEL release filtering used after project I/O. */
+static uint32_t fm1_input_chord_events(void)
+{
+    uint32_t k = fm1__lock();
+    uint32_t events = fm1_in.chords;
+    fm1_in.chords = 0u;
+    fm1__unlock(k);
+    return events;
 }
 
 static uint32_t fm1_input_note_edges(void)

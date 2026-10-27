@@ -1,0 +1,39 @@
+{
+  "version": "V1.6.11",
+  "classification": "CRITICAL AUDIO SAFETY - EXPERIMENTAL - hardware not tested",
+  "firmware_filename": "BEETLE-V1.6.11-AUDIO-SAFETY-EXPERIMENTAL.fwsc",
+  "sha256": "5539e624c1a709f188e7fc36514e8731c395cd2f72b60463a32c0da3828aa6f8",
+  "app_sha256": "d75ce4abf9405d1da77ec5ee662061c1ca9fcf41d54b6862492fa7b6314fa1a3",
+  "app_bytes": 518252,
+  "app_headroom_bytes": 63312,
+  "previous_release": "V1.6.10",
+  "source_confirmed_faults": [
+    "stale foreground ADC/master command while ISR continues audio",
+    "unbounded copy interrupt lock during live song",
+    "ineffective ETCH voice shedding on BEETLE DMA deadline",
+    "automatic DMA audio fault restart",
+    "cross-lane NOTE3 clipboard overwrite"
+  ],
+  "physical_root_cause_proven": false,
+  "physical_tested": false,
+  "acoustic_peak_measured": false,
+  "audio_safety_strategy": [
+    "output zero when last valid MASTER ADC >80ms old",
+    "clamp invalid ADC to mute, bound positive gain slew",
+    "hardware analog PC6 off at first late DMA half",
+    "latch until HOME+PLAY manual rearm",
+    "refuse copy during active transport"
+  ],
+  "project_format": "TRK1 V26",
+  "global_user_samples_unchanged": true,
+  "ota_header_identical_to_previous": true,
+  "ota_loader_identical_to_previous": true,
+  "native_build_success": true,
+  "firmware_package_verified": true,
+  "webinstaller_embeds_exact_fwsc": true,
+  "manager_embeds_current_webtools": true,
+  "ota_recovery_proven": false,
+  "release_notes_location": "CHANGELOG.md",
+  "manual": "README.md",
+  "safety_analysis": "docs/V1611-AUDIO-INCIDENT-FORENSICS.md"
+}

@@ -1,0 +1,11 @@
+{
+  "ref_sha256": "756acee091c5ef9d3f4b4242ed2159904e3e20ed16828af4e408caece0d67ea3",
+  "candidate_sha256": "6e3bfc6e6261c55c2b8a523c155dcd79f0580f1826c4985ac1e0c6ef5f5dd637",
+  "app_sha256": "337937f6889bb609467f60e3122c0463ccce22f928e3d9e266c100640a6f9bc9",
+  "ota_sha256": "d71d1b7c12adede951605e758a3580dacccedc427d49e1fceaf51decccc68a4b",
+  "protected_first_16kiB_byte_identical": true,
+  "ota_payload_byte_identical": true,
+  "app_payload_roundtrip_verified": true,
+  "container_shape_identical": true,
+  "hardware_validated": false
+}
