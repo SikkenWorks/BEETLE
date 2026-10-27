@@ -17,51 +17,10 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.7.14 FASTER NEW PROJECT · EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.7.14</strong> · <a href="CHANGELOG.md">Release history</a></sub>
   <br>
   <b>The user sample feature is still experimental!</b>
 </p>
-
----
-
-> **V1.7.14 (experimental):** Fast NEW PROJECT keeps the initialized audio DMA running with silence on stopped sessions, instead of repeating the complete DAC startup. Read [validation notes](V1.7.14-VALIDATION.md). Real-device latency and output safety are not yet measured.
-
-
-## Fast new project creation (V1.7.14, experimental)
-
-NEW PROJECT no longer waits for NOR flash index reads or draws a second loading overlay. It creates a clean session in RAM, while safely pausing/restarting audio DMA around the reset. The first SAVE finds the first available slot using the same CRC-checked Storage V2 index and project/sample overlap audit, only after audio has been paused and the SAVE feedback is visible. If storage is full/corrupt, auto-save fails safely; no occupied slot is overwritten. To choose an existing slot deliberately, use K4 on PROJECT NAME or PROJECTS to opt out of automatic allocation. The project data schema (TRK1 V26), oscillator DSP, samples, USB and loader are unchanged. See [V1.7.14 validation](V1.7.14-VALIDATION.md). Hardware timing/peak safety remain unverified.
-
-## New project loading feedback (V1.7.10)
-
-After selecting **NEW PROJECT**, BEETLE pauses the audio engine using the existing safety procedure, then immediately displays a compact, pixel-art **CREATING PROJECT / PLEASE WAIT...** indicator **before** running its synchronous flash index scan and RAM reset. The indicator updates only 46 of 240 LCD rows (~22 KB), avoiding another full-screen repaint. The eight small bars are decorative activity cues, not a numerical percentage. When creation finishes, the existing path shows the tracker normally and retains its safe button-release quarantine.
-
-**HOME → PROJECTS → DIAGNOSTICS → RC NEW PROJECT** now includes `LOADING UI MS`, the measured cost of the small indicator. The existing `FLASH SCAN`, `DMA PAUSE`, `RESET RAM`, `DMA RESTART`, `DRAW LCD` and `TOTAL` times are retained. There is no proof of improved total load time on physical hardware; the purpose is immediate feedback with minimal additional LCD traffic. This is an experimental firmware; physical analog audio peak safety has not been proven. See [V1.7.10 validation](V1.7.10-VALIDATION.md).
-
-## Reduced new project I/O (V1.7.9)
-
-V1.7.8 mistakenly issued a second full LCD repaint after the original menu already drew the tracker, and repeated Storage V2 ownership/index checks. V1.7.9 removes the duplicate render, combines the CRC-checked V2 index domain audit and free-slot lookup, and adds **HOME → PROJECTS → DIAGNOSTICS → K1 to RC NEW PROJECT**, which reports flash scan, audio DMA, project reset, LCD draw and total elapsed time in milliseconds. All existing original sound/DMA/MASTER safety paths are retained. **Real hardware timing and peak safety have not been verified.** See [V1.7.9 validation](V1.7.9-VALIDATION.md).
-
----
-
-## Faster new project workflow (V1.7.8)
-
-V1.7.8 preserves the original V1.6.10-responsive tracker interface and all 12 restored oscillator gains from V1.7.7. On NEW PROJECT, the TRACKER repaints immediately even while the previous button-release safety interval continues to suppress unintended edits. On Storage V2 volumes, the free-slot scan uses a single validated project index, not twelve full project decodes. Project SAVE/LOAD still validate their full records and CRCs.
-
-The NEW PROJECT DMA suspension and audio rearm protections from V1.7.5 remain unchanged. **This is a software-tested experimental performance correction, not a physical FM1 timing measurement or a proof that the earlier extreme analog volume event has been eliminated.** Do not test with headphones or powered monitors. See [V1.7.8 validation](V1.7.8-VALIDATION.md).
-
----
-
-## Restored VA OSC / VA OSC2 sound (V1.7.6)
-
-V1.7.6 is based on the V1.7.5 fast-UX recovery branch. It changes **only the two VA oscillator gain-table entries**: VA OSC from 204 to 256, VA OSC2 from 276 to 345, restoring exactly the V1.6.10 output levels. The VA DSP and shapes are unchanged. Forty native-PCM reference scenes were compared against the V1.6.10 source and found bit-identical; the 10 non-VA gains and V1.6.11 AUDIO STOP/MASTER protections remain unchanged. The old all-12-type RMS uniformity test will now fail (1.583 vs maximum 1.30) rather than silently changing existing patches again. The physical FM1 peak-safety bug remains **unverified**. See [V1.7.6 validation](V1.7.6-VALIDATION.md).
-
----
-
-## Responsive UX recovery (V1.7.5)
-
-This is a **deliberate V1.6.10-behavior recovery branch**, not a feature-forward merge of V1.7.4. The original tracker/Song Mode scheduling, synth DSP, drum DSP and full-screen display paths are restored, while the V1.6.11 MASTER ADC watchdog, fail-closed DMA guard and protected audio-stop semantics remain. The new project reset now suspends DMA before flash scanning or bulk project reset; the physical MASTER ADC is given a foreground read opportunity between the original two LCD halves without reworking the UI renderer.
-
-This version omits the extra STEP 01 diagnostic pages and LCD tiling added after V1.6.11. Only the oscillator output gain table comes from V1.7, correcting the old RMS balance regression without changing oscillator algorithms. It retains the V26 project and global sample data model. **Software tests do not prove the analog volume spike is fixed, nor are hardware timing and glitch-free UI verified.** Use an independently attenuated measurement setup only. See [V1.7.5 Validation](V1.7.5-VALIDATION.md).
 
 ---
 
