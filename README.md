@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <sub>Development release: <strong>V1.7.14</strong> · <a href="CHANGELOG.md">Release history</a></sub>
+  <sub>Development release: <strong>V1.8 BLUE-INSPIRED STABILITY · EXPERIMENTAL</strong> · <a href="CHANGELOG.md">Release history</a></sub>
   <br>
   <b>The user sample feature is still experimental!</b>
 </p>
@@ -319,6 +319,8 @@ BEETLE is developed by **SikkenWorks (Joppe Sikken)**. It builds on earlier open
 | **JieLi Technology** | Manufacturer of the AC79-series target chip and associated toolchain/device SDK. Applicable JieLi and upstream notices continue to apply; third-party compiler toolchain binaries are not bundled. |
 | **[reSID](https://github.com/libsidplayfp/resid)** · **Dag Lem** | Original creator of reSID, a MOS6581 SID emulator and technical inspiration for BEETLE's five SID-style instruments: `SID 6581`, `SID 8580`, `SID DIRTY`, `SID BASS`, `SID NOISE`. **Original reSID C++ source is not bundled, compiled, linked or executed.** BEETLE's lightweight implementation is SID-inspired, not cycle-accurate reSID emulation. |
 | **[Nes_Snd_Emu](https://github.com/jamesathey/Nes_Snd_Emu)** · **Shay Green (blargg)**, fork maintained by **James Athey** | NES APU technical reference for BEETLE's `NES PULSE`, `NES TRIANGLE` and `NES NOISE` types. Upstream library: **LGPL-2.1**. BEETLE implements an independent, lightweight fixed-point C engine in `firmware/fm1-native/beetle_nes_apu.h`. **Original Nes_Snd_Emu C++ code is not copied, embedded, compiled or linked** and this is not cycle-accurate NES APU emulation. See `LICENSES/NES-SND-EMU-LGPL-2.1.txt`. |
+
+**Battery HUD attribution (V1.8).** The FM1 battery ADC voltage boundaries `531 / 561 / 591` originate in Felucca `ui_draw.c`, `batt_level()` by Leo Kuroshita (@kurogedelic), Hügelton Instruments (GPL-3.0-only). BLUE RC12 supplied the filtering, invalid-read display, four-bar presentation and USB-enumeration symbol; SikkenWorks ported these interface adaptations to BEETLE. These are voltage bands, not measured charge percentages or verified charging status.
 
 **Additional upstream attributions.** The preserved [`LICENSES/FELUCCA-LICENSING.txt`](LICENSES/FELUCCA-LICENSING.txt) acknowledges **DaisySP** (Electrosmith / Emilie Gillet, MIT), **Rings** (Emilie Gillet, MIT), **msfa/Dexed** (Google / Pascal Gauthier, Apache-2.0), **CrispyZebra**, **Fukiai**, **Inter Tight**, **DotGothic16**, **Versilian Studios VSCO-2**, **klattsch** and **X0X**. These are attributions within the broader upstream project; BEETLE does **not** claim to include all of those engines, fonts or sound assets.
 

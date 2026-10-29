@@ -91,6 +91,8 @@ static volatile uint8_t track_battery_low20;
 static volatile uint8_t track_battery_ui_dirty;
 static uint16_t track_battery_adc_filtered;
 static uint8_t track_battery_valid;
+static uint8_t track_battery_bad_reads;
+static uint8_t track_battery_usb_link;
 
 /* REC only saves fresh physical down edges after PLAY. Orphan OFF events are ignored.
  * Preserve the source clip even when Song Chains advances during a hold. */
@@ -222,6 +224,7 @@ static uint32_t beetle_new_perf_total_ms,beetle_new_perf_count;
 static uint8_t beetle_new_perf_paint_pending;
 static uint8_t track_help_offset; /* Chapter-local scroll, never saved in project. */
 static uint8_t track_help_chapter;
+static uint8_t track_credits_page;
 static struct beetle_load_input_gate track_load_input_guard; /* legacy SEL-delete fence */
 static struct beetle_io_input_gate track_io_input_guard; /* ALL controls during and after disk I/O */
 static uint8_t track_audio_started,track_prev_notes[TRACK_CHANNELS][5];
@@ -995,7 +998,7 @@ static void track_preview_release(uint32_t held){
 static void track_fm1_boot(void){
  track_init(&track_state);track_drum_note3_enabled=0u;track_drum_note3_serial=0u;track_sel_fx_latch=0u;track_state.record_armed=1u;track_punch_rec_armed=0u;
  track_song_range_on=track_song_sel_was_range=0u;track_song_sel_since=0u;track_song_rows_clip.valid=0u;
- track_battery_low20=track_battery_valid=track_battery_ui_dirty=0u;track_battery_adc_filtered=0u;beetle_mute_cancel(&track_mute_queue);beetle_live_reset();beetle_snapshots_init(&track_snapshots);track_snapshot_slot=0u;beetle_groups_init(&track_groups);track_group_slot=track_group_lane=0u;track_mixer_init(&track_mix);track_drum_init(&track_drum);
+ track_battery_low20=track_battery_valid=track_battery_ui_dirty=track_battery_bad_reads=track_battery_usb_link=0u;track_battery_adc_filtered=0u;beetle_mute_cancel(&track_mute_queue);beetle_live_reset();beetle_snapshots_init(&track_snapshots);track_snapshot_slot=0u;beetle_groups_init(&track_groups);track_group_slot=track_group_lane=0u;track_mixer_init(&track_mix);track_drum_init(&track_drum);
  track_master_default(&track_master_cfg);track_drum_component=0u;track_drum_field=0u;
  track_master_focus=0u;track_master_chain_edit=0u;
  for(uint32_t z=0u;z<sizeof(track_master_dsp)/sizeof(uint32_t);z++)((uint32_t*)&track_master_dsp)[z]=0u;
@@ -1600,6 +1603,33 @@ static void track_fmt_int(char *dst,uint32_t value){
  do{tmp[n++]=(char)('0'+value%10u);value/=10u;}while(value&&n<11u);
  uint8_t i=0u;while(n)dst[i++]=tmp[--n];dst[i]=0;
 }
+/* Battery HUD uses Felucca's FM1 PB1 ADC bands; the cell voltage is
+ * only a coarse state indication, particularly while USB power is present.
+ * No fabricated percentage or verified charger status is shown.
+ * Lightning means an enumerated USB host is present, NOT verified charging:
+ * a wall charger can charge without enumeration and USB may not charge.
+ * The LCD path never touches ADC or USB registers. */
+static void beetle_battery_hud(uint16_t x,uint16_t y){
+ const uint16_t frame=TRACK_BRIGHT, fill=TRACK_PINK;
+ lcd_fill(x,y,21u,10u,frame);
+ lcd_fill(x+1u,y+1u,19u,8u,TRACK_DARK);
+ lcd_fill(x+21u,y+3u,3u,4u,frame);
+ if(track_battery_valid){
+  uint8_t bars=beetle_battery_bars(track_battery_adc_filtered);
+  for(uint8_t i=0u;i<bars;i++)lcd_fill((uint16_t)(x+3u+4u*i),y+3u,3u,4u,fill);
+ }else track_pix_text("?",x+8u,y+2u,TRACK_WHITE);
+ if(track_battery_usb_link){
+  /* BLUE USB-power symbol: USB enumeration, NOT proof of charging. */
+  lcd_fill(x+29u,y+1u,3u,1u,fill);
+  lcd_fill(x+28u,y+2u,3u,1u,fill);
+  lcd_fill(x+27u,y+3u,3u,1u,fill);
+  lcd_fill(x+26u,y+4u,6u,1u,fill);
+  lcd_fill(x+29u,y+5u,2u,1u,fill);
+  lcd_fill(x+28u,y+6u,2u,1u,fill);
+  lcd_fill(x+27u,y+7u,2u,1u,fill);
+  lcd_fill(x+26u,y+8u,2u,1u,fill);
+ }
+}
 static void track_page_header(const char *title,uint16_t line_y){
  track_pix_top(title,track_state.transport.edit_channel,track_state.transport.bpm);
  if(track_battery_low20){lcd_fill(101u,3u,39u,9u,TRACK_DARK);track_pix_center("BEETLE",120u,4u,0xF800u);}
@@ -1743,7 +1773,8 @@ static void track_fm1_grid(void){
  }
  char pat[32]="PAT ";char num[12];track_u8(num,track_state.pattern_slot+1u);
  pat[4]=num[0];pat[5]=num[1];pat[6]=' ';pat[7]='/';pat[8]=' ';pat[9]='4';pat[10]='8';pat[11]=0;
- track_pix_text(pat,129u,224u,TRACK_PINK);
+ track_pix_text(pat,168u,224u,TRACK_PINK);
+ /* PAT footer position and independent HUD placement match BLUE RC12. */
  if(drum)track_pix_text(track_drum_note3_enabled?"N3 ON":"N3 OFF",48u,224u,TRACK_BRIGHT);
 
  track_grid_lane_status();
@@ -1752,6 +1783,7 @@ static void track_fm1_grid(void){
   lcd_fill(104u,202u,126u,13u,TRACK_DARK);
   track_pix_text("PROJECT SAVED",112u,204u,TRACK_PINK);
  }
+ beetle_battery_hud(204u,208u);
 }
 static void track_fm1_mixer_screen(void){
  track_page_header("MIXER",44u);
@@ -2398,39 +2430,58 @@ static void track_fm1_paint(void){
   beetle_draw_keyboard_octave(216u);return;
  }
  if(track_page==19u){
+  /* BLUE RC12-style three-card HELP, with the complete BEETLE guide retained.
+   * Offset is a page index; K2 changes chapter, K1 changes page. */
   track_page_header("HELP",43u);
-  uint8_t first=(uint8_t)(beetle_help_chapter_heading(track_help_chapter)+1u);
-  uint8_t length=beetle_help_chapter_length(track_help_chapter);
-  uint8_t max=beetle_help_chapter_maxscroll(track_help_chapter);
-  const char *chapter=beetle_help_lines[first-1u]+2;
+  const uint8_t first=(uint8_t)(beetle_help_chapter_heading(track_help_chapter)+1u);
+  const uint8_t length=beetle_help_chapter_length(track_help_chapter);
+  const uint8_t pages=(uint8_t)(beetle_help_chapter_maxscroll(track_help_chapter)+1u);
+  const char *chapter=beetle_help_lines[first-1u]+2u;
   char counter[16],num[8],total[8];
   track_fmt_int(num,(uint32_t)track_help_chapter+1u);
   track_fmt_int(total,beetle_help_chapter_count());
   uint8_t n=0u,j=0u;while(num[j]&&n<5u)counter[n++]=num[j++];counter[n++]='/';
   j=0u;while(total[j]&&n<11u)counter[n++]=total[j++];counter[n]=0;
-  track_pix_text("K2: CHAPTER   K1: SCROLL",9u,49u,TRACK_PINK);
+  track_pix_text("K2 TOPIC  /  K1 PAGE",10u,49u,TRACK_PINK);
   lcd_fill(9u,63u,221u,1u,0x4807u);
-  lcd_fill(9u,66u,219u,14u,0x3005u);
+  lcd_fill(9u,66u,220u,14u,TRACK_ROW_BG);
   track_pix_text(chapter,12u,69u,TRACK_BRIGHT);
-  track_pix_text(counter,196u,69u,TRACK_PINK);
+  track_pix_text(counter,197u,69u,TRACK_PINK);
   for(uint8_t row=0u;row<BEETLE_HELP_VISIBLE;row++){
-   uint8_t local=(uint8_t)(track_help_offset+row);
+   const uint8_t local=(uint8_t)((uint16_t)track_help_offset*BEETLE_HELP_VISIBLE+row);
    if(local>=length)break;
-   uint8_t idx=(uint8_t)(first+local);
-   track_pix_text(beetle_help_lines[idx],12u,(uint16_t)(86u+(uint16_t)row*12u),TRACK_WHITE);
+   const char *line=beetle_help_lines[first+local];
+   const uint16_t top=(uint16_t)(83u+(uint16_t)row*38u);
+   lcd_fill(9u,top,220u,34u,TRACK_ROW_BG);
+   lcd_fill(9u,top,3u,34u,TRACK_PINK);
+   /* Existing colons separate an action from its explanation; a line without
+    * a colon remains a single exact instruction. This avoids losing facts. */
+   uint8_t colon=0u;while(line[colon] && line[colon]!=':' && colon<29u)colon++;
+   if(line[colon]==':' && colon>0u && colon<29u){
+    char title[30];for(uint8_t k=0u;k<colon;k++)title[k]=line[k];title[colon]=0;
+    track_pix_text(title,18u,(uint16_t)(top+4u),TRACK_BRIGHT);
+    track_pix_text(line+colon+1u,18u,(uint16_t)(top+18u),TRACK_WHITE);
+   }else{
+    /* Split non-colon phrases on a word boundary; every original word is
+     * still visible, spread over BLUE-style title and detail rows. */
+    uint8_t split=0u;while(line[split] && split<18u)split++;
+    while(split>0u && line[split]!=' ')split--;
+    if(split>0u){
+     char title[30];for(uint8_t k=0u;k<split;k++)title[k]=line[k];title[split]=0;
+     track_pix_text(title,18u,(uint16_t)(top+4u),TRACK_BRIGHT);
+     track_pix_text(line+split+1u,18u,(uint16_t)(top+18u),TRACK_WHITE);
+    }else{
+     track_pix_text("BEETLE GUIDE",18u,(uint16_t)(top+4u),TRACK_BRIGHT);
+     track_pix_text(line,18u,(uint16_t)(top+18u),TRACK_WHITE);
+    }
+   }
   }
-  lcd_fill(231u,84u,2u,110u,0x3807u);
-  uint16_t thumb_y=(uint16_t)(84u+(max?(uint32_t)track_help_offset*92u/max:0u));
-  lcd_fill(230u,thumb_y,4u,18u,TRACK_PINK);
   lcd_fill(9u,201u,221u,1u,0x4807u);
-  track_pix_text("HOME: MENU  SEQ: TRACKER",10u,208u,TRACK_BRIGHT);
-  char count[18]="";char a[8],b[8];
-  uint8_t seen=(uint8_t)(track_help_offset+BEETLE_HELP_VISIBLE);
-  if(seen>length)seen=length;
-  track_fmt_int(a,seen);track_fmt_int(b,length);
-  n=0u;j=0u;while(a[j]&&n<8u)count[n++]=a[j++];count[n++]='/';
-  j=0u;while(b[j]&&n<15u)count[n++]=b[j++];count[n]=0;
-  track_pix_center(count,120u,225u,TRACK_PINK);
+  track_pix_text("HOME MENU  SEQ TRACKER",10u,207u,TRACK_BRIGHT);
+  char count[18],a[8],b[8];track_fmt_int(a,(uint32_t)track_help_offset+1u);
+  track_fmt_int(b,pages);n=0u;j=0u;while(a[j]&&n<8u)count[n++]=a[j++];
+  count[n++]='/';j=0u;while(b[j]&&n<15u)count[n++]=b[j++];count[n]=0;
+  track_pix_center(count,120u,224u,TRACK_PINK);
   return;
  }
  if(track_page==29u){
@@ -2438,32 +2489,20 @@ static void track_fm1_paint(void){
   const char *const options[]={"NEW PROJECT","LOAD PROJECT"};
   track_web_list(options,2u,track_boot_menu_choice,82u,32u);
   track_pix_center("K1 CHOOSE   SEL OPEN",120u,209u,TRACK_PINK);
-  track_pix_center("BEETLE V1.7.14",120u,224u,TRACK_BRIGHT);
+  track_pix_center("BEETLE V1.8",120u,224u,TRACK_BRIGHT);
   return;
  }
  if(track_page==28u){
   track_page_header("CREDITS",43u);
-  static const char *const lines[]={
-   "BEETLE / SIKKENWORKS",
-   "JOPPE SIKKEN",
-   "DESIGN / FIRMWARE / UI",
-   "",
-   "FELUCCA / LEO KUROSHITA",
-   "HUGELTON INSTRUMENTS",
-   "FM1 HAL / BOOT / OTA",
-   "",
-   "RESID / DAG LEM (SID REF)",
-   "NES_SND_EMU / SHAY GREEN",
-   "JAMES ATHEY (MAINTAINER)",
-   "NES TECHNICAL REFERENCE"
+  static const char *const pages[2][12]={
+   {"BEETLE / SIKKENWORKS","JOPPE SIKKEN","DESIGN / FIRMWARE / UI","GPL-3.0-ONLY","ETCH / SIKKENWORKS","FM1 SOURCE LINEAGE","FELUCCA / LEO KUROSHITA","HUGELTON INSTRUMENTS","HAL / BOOT / OTA / ADC","JIELI TECHNOLOGY","AC79 HARDWARE / TOOLCHAIN","THIRD PARTY NOTICES RETAINED"},
+   {"SID TECHNICAL REFERENCE","RESID / DAG LEM","NOT LIBSIDPLAYFP EMULATION","NES TECH REFERENCE","NES_SND_EMU / SHAY GREEN","JAMES ATHEY / FORK","NO UPSTREAM C++ EMBEDDED","FELUCCA LICENCE NOTICES","DAISYSP / ELECTROSMITH","RINGS / EMILIE GILLET","DEXED / GAUTHIER / MSFA","MORE: README + LICENSES"}
   };
-  /* Keep all credit lines visible above the footer on the 240px display. */
   for(uint8_t i=0u;i<12u;i++){
    uint16_t y=(uint16_t)(53u+i*12u);
-   uint16_t color=(i==0u||i==4u||i==8u||i==9u)?TRACK_PINK:TRACK_WHITE;
-   track_pix_text(lines[i],8u,y,color);
+   track_pix_text(pages[track_credits_page&1u][i],8u,y,(i%3u==0u)?TRACK_PINK:TRACK_WHITE);
   }
-  track_pix_text("HOME MENU  SEQ TRACKER",9u,217u,TRACK_BRIGHT);
+  track_pix_text("K1 PAGE  HOME MENU  SEQ EXIT",8u,216u,TRACK_BRIGHT);
   return;
  }
  if(track_page==33u || track_page==34u){
@@ -3797,6 +3836,7 @@ static void track_fm1_poll(void){
  }
  /* Credits is read-only and never forwards edits to the tracker. */
  if(track_page==28u){
+  if(k1){track_credits_page=(uint8_t)(k1>0?1u:0u);changed=1u;}
   if(pressed&(1u<<8)){track_page=1u;track_home_fired=1u;track_home_since=now;changed=1u;}
   if(released&(1u<<8)){track_home_fired=0u;track_home_since=0u;}
   if(released&(1u<<11)){track_page=0u;changed=1u;}
@@ -4778,7 +4818,7 @@ static void track_fm1_poll(void){
     }else if(track_menu_index==6u){
      /* SETTINGS already handled above; never mistake this menu index for LOAD. */
     }else if(track_menu_index==5u){
-     track_page=28u;changed=1u;
+     track_credits_page=0u;track_page=28u;changed=1u;
     }else if(track_menu_index==4u){
      track_help_chapter=0u;track_help_offset=0u;track_page=19u;changed=1u;
     }else if(track_menu_index==3u){

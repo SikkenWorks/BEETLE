@@ -2350,20 +2350,30 @@ void fm1_cstart(void){
   }
 #endif
 #ifdef TRACK_FIRMWARE
-  /* Read battery ADC only every four seconds in foreground. Never read ADC,
-   * draw pixels or touch flash from the realtime audio callback. Threshold
-   * is provisional until verified from real FM1 readings. */
+  /* Felucca voltage bands, four-second FOREGROUND poll; avoids adding
+   * ADC reads or extra work to the DMA callback. This is NOT a fuel gauge. */
   static uint32_t beetle_last_battery_sample_ms=0u;
   if(!safe && !native_updating && (uint32_t)(etch_ms-beetle_last_battery_sample_ms)>=4000u){
    beetle_last_battery_sample_ms=etch_ms;
    int32_t raw_battery=fm1_adc_read(FM1_ADC_BATT);
-   if(raw_battery>=0){
+   if(raw_battery>=0 && beetle_battery_raw_valid((uint16_t)raw_battery)){
+    const uint8_t old_valid=track_battery_valid;
+    const uint8_t old_bars=beetle_battery_bars(track_battery_adc_filtered);
     track_battery_adc_filtered=beetle_battery_filter(track_battery_adc_filtered,(uint16_t)raw_battery,track_battery_valid);
-    track_battery_valid=1u;
+    track_battery_valid=1u;track_battery_bad_reads=0u;
     uint8_t low=beetle_battery_low20(track_battery_adc_filtered,track_battery_low20);
     if(low!=track_battery_low20){track_battery_low20=low;track_battery_ui_dirty=1u;}
+    if(!old_valid || old_bars!=beetle_battery_bars(track_battery_adc_filtered))track_battery_ui_dirty=1u;
+   }else{
+    if(track_battery_bad_reads<3u)track_battery_bad_reads++;
+    if(track_battery_bad_reads>=3u && track_battery_valid){
+     track_battery_valid=0u;track_battery_low20=0u;track_battery_ui_dirty=1u;
+    }
    }
   }
+  /* USB enumeration is NOT proof of charging. */
+  uint8_t beetle_usb=(uint8_t)(usb.config && !usb.suspended);
+  if(beetle_usb!=track_battery_usb_link){track_battery_usb_link=beetle_usb;track_battery_ui_dirty=1u;}
 #endif
   uint8_t gone=!usb.config||usb.suspended;
   if(gone&&!disconnected){fm1_irq_off();midi_in_overflow=1;fm1_irq_enable_all();}

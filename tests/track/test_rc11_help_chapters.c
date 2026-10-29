@@ -5,7 +5,7 @@
 #include "../../firmware/fm1-native/beetle_help.h"
 int main(void){
  unsigned count=beetle_help_chapter_count();
- assert(count==13u);assert(BEETLE_HELP_VISIBLE==9u);
+ assert(count==13u);assert(BEETLE_HELP_VISIBLE==3u);
  assert(!strcmp(beetle_help_lines[0],"# TRACKER BASICS"));
  unsigned covered=0u;
  for(unsigned chapter=0u;chapter<count;chapter++){
@@ -26,6 +26,6 @@ int main(void){
  assert(beetle_help_chapter_shift((uint8_t)(count-1u),-100)==0u);
  assert(!strcmp(beetle_help_lines[beetle_help_chapter_heading((uint8_t)(count-1u))],"# USB-C AUDIO"));
  assert(covered==BEETLE_HELP_COUNT-count);
- puts("PASS RC1.1: chapter browsing, boundaries, scrolling and USB help");
+ puts("PASS RC1.1: chapter browsing, boundaries, three-card pages and USB help");
  return 0;
 }

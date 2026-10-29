@@ -47,7 +47,7 @@ body.migration-running .app button,body.migration-running .app input,body.migrat
 </head>
 <body>
 <main class="app">
-<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.7.12 · TOOL V2.4</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
+<header><div><div class="wordmark">BEETLE <span>PROJECT MANAGER / BEETLE V1.8 · TOOL V2.4</span></div><div class="micro">SIKKENWORKS · M-VAVE FM1 · PROJECT BACKUP & RESTORE</div></div><div class="status"><span id="led" class="dot"></span><span id="connectionState">NOT CONNECTED</span></div></header>
 <section class="hero"><div><h1>YOUR PROJECTS. YOUR SLOTS.</h1><p>Move complete BEETLE projects between your FM1 and computer. Encrypted backups, deliberate overwrites and true slot deletion. Storage V2 migration is available with compatible V1.4.24 firmware. Only the dedicated BEETLE project/sample partition is reformatted after an explicit backup.</p></div><div class="hero-art" aria-hidden="true">▦</div></section>
 <section class="box" aria-label="USB-MIDI connection">
 <div class="box-title">01 / DEVICE CONNECTION <small>USB · WEB MIDI SYSEX</small></div>
@@ -118,7 +118,7 @@ body.migration-running .app button,body.migration-running .app input,body.migrat
 <input id="sampleFile" type="file" accept=".beetle" hidden>
 <input id="sampleWave" type="file" accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.ogg,.m4a" hidden>
 </section>
-<footer><span>BEETLE · <strong>BORN OUT OF PASSION.</strong></span><span>BY SIKKENWORKS · LOCAL BROWSER TOOL · STORAGE MIGRATION REQUIRES CONFIRMATION</span></footer>
+<footer><span>BEETLE · <strong>BORN OUT OF PASSION.</strong></span><span>BY SIKKENWORKS · LOCAL BROWSER TOOL · STORAGE MIGRATION REQUIRES CONFIRMATION</span></footer><details class="beetle-credits" style="max-width:1100px;margin:12px auto;padding:12px;border:1px solid #403042;color:#bfaabd;font:11px/1.6 Consolas,monospace"><summary style="cursor:pointer;color:#e8a4db">CREDITS / OPEN SOURCE</summary><p>BEETLE by SikkenWorks / Joppe Sikken (GNU GPL-3.0-only). FM1 foundations: Felucca by Leo Kuroshita, Hügelton Instruments (GPL-3.0-only); ETCH by SikkenWorks; JieLi Technology hardware/toolchain. SID reference: reSID by Dag Lem (upstream code not embedded). NES reference: Nes_Snd_Emu by Shay Green, James Athey fork (upstream code not embedded). Battery thresholds: Felucca (531/561/591), pixel HUD adapted from BEETLE BLUE RC12. The original Felucca licensing file also attributes DaisySP / Electrosmith, Rings / Emilie Gillet, msfa / Dexed and other inherited third-party components. For accurate full attributions, permissions and license notices consult README.md, docs/CREDITS-AND-LICENSES.md, LICENSE and LICENSES. An attribution does not imply that an entire upstream synthesis library is embedded.</p></details>
 </main>
 <input id="file" type="file" accept=".beetle,application/octet-stream" hidden>
 <div class="modal-backdrop" id="backdrop"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><h2 id="modalTitle"></h2><p id="modalText"></p><div id="modalExtra"></div><div id="modalActions" class="modal-actions"></div></div></div>
@@ -981,7 +981,7 @@ $('convertStorageV2').onclick=()=>safe(convertStorageV2);
 $('restoreStorageV2').onclick=()=>{if(!busy){$('migrationBackupFile').value='';$('migrationBackupFile').click();}};
 $('migrationBackupFile').onchange=()=>{const f=$('migrationBackupFile').files?.[0];if(f)safe(()=>restoreV2FromZip(f));};
 $('copyDiagnostics').onclick=async()=>{
- const report='BEETLE V1.7.12 PROJECT MANAGER · STORAGE MIGRATION\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
+ const report='BEETLE V1.8 PROJECT MANAGER · STORAGE MIGRATION\n'+$('diagnosticResult').textContent+'\n'+$('diagnosticMeta').textContent;
  try{await navigator.clipboard.writeText(report);log('Connection report copied.');}
  catch{log('Could not copy automatically. Select an HTTPS/localhost page and try again.',true);}
 };

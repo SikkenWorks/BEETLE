@@ -24,7 +24,7 @@ manifest=r/f'BEETLE-{a.version}-BUILD-MANIFEST.json'
 assert manifest.exists()
 roots={'firmware','tools','tests','docs','web','assets','LICENSES','reference','_includes'}
 root_optional={'BEETLE.png','BEETLE-(banner).png','favicon.png',
- 'BEETLE-Hub-Diagnostics.html','GLOBAL-BANK-STATUS.md','FIRMWARE-MANIFEST.json'}
+ 'BEETLE-Hub-Diagnostics.html','GLOBAL-BANK-STATUS.md','FIRMWARE-MANIFEST.json','V1.8-VALIDATION.md'}
 selected=[]
 for p in r.rglob('*'):
  if not p.is_file() or p.resolve()==out:continue

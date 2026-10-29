@@ -65,29 +65,23 @@ int beetle_bd4_live_next(uint8_t voice,uint32_t serial,int16_t *sample){
  struct live_note *n=&live_notes[voice];
  if(n->serial!=serial)return -1;
  if(n->pending||n->starting)return 0;
- /* V1.5: the old first-step fix only held BEFORE stream_start().
-  * The very next PCM window can still arrive too late on flash;
-  * rendering a missing frame would advance output_frames and discard the
-  * initial portion of the sample. Return PENDING so the drum renderer also
-  * holds its phase/age/envelope. Retry the exact source frame after refill. */
- int ready=beetle_bd4_stream_ready_now(&live_stream,voice);
- if(ready<0)return -1;
- if(!ready)return 0;
- beetle_bd4_stream_render(&live_stream,voice,sample,1u);
- return 1;
+ /* One RAM-only pass; when windows are missing, HOLD without advancing
+  * the voice envelope or source frame. No flash reads inside DMA. */
+ return beetle_bd4_stream_read_one_ready(&live_stream,voice,sample);
 }
 void beetle_bd4_live_stop(uint8_t voice){
  if(!live_rt||voice>=BEETLE_BD4_STREAM_VOICES)return;
  live_notes[voice].serial=0u;
  live_notes[voice].pending=0u;
  live_notes[voice].starting=0u;
- beetle_bd4_stream_choke_voice(&live_stream,voice);
+ /* The foreground producer owns its stream/decoder state. */
 }
 void beetle_bd4_live_choke_all(void){
  if(!live_rt)return;
  for(unsigned i=0;i<BEETLE_BD4_STREAM_VOICES;i++){
+  live_notes[i].serial=0u;
   live_notes[i].pending=0u;live_notes[i].starting=0u;
-  beetle_bd4_stream_choke_voice(&live_stream,i);
+  /* Deferred foreground decoder cleanup. */
  }
 }
 uint8_t beetle_bd4_live_start_pending(void){
@@ -191,22 +185,45 @@ void beetle_bd4_live_poll(beetle_v2_read read,void *ctx,void (*lock)(void),void 
   live_refresh=0u;
  }
  if(!live_valid)return;
+ /* Release stopped decoder windows only in the foreground. */
+ for(unsigned i=0u;i<BEETLE_BD4_STREAM_VOICES;i++){
+  lock();
+  if(!live_notes[i].serial && !live_notes[i].pending &&
+     live_stream.voices[i].configured){
+   beetle_bd4_stream_choke_voice(&live_stream,i);
+   live_stream.voices[i].configured=0u;
+   live_stream.voices[i].playing=0u;
+  }
+  unlock();
+ }
  for(unsigned i=0;i<6u;i++){
   struct live_note *n=&live_notes[i];
-  if(n->pending){
-   uint32_t seq=n->serial;uint8_t slot=n->slot;
-   n->pending=0u;
-   live_chunks[i].valid=0u;live_rt->cached_valid=0u;
-   if(!beetle_bd4_live_available(slot)){
-    n->starting=0u;n->serial=0u;continue;
+  lock();
+  const uint8_t pending=n->pending;
+  const uint32_t seq=n->serial;
+  const uint8_t slot=n->slot;
+  if(pending)n->pending=0u;
+  unlock();
+  if(pending){
+   /* Preserve CRC-verified pinned chunks for repeat triggers of the same
+    * immutable sample; avoids full-sector CRC during fast drum repetitions. */
+   if(!beetle_bd4_live_available(slot)||!live_chunks[i].valid ||
+      live_chunks[i].slot!=slot ||
+      live_chunks[i].generation!=live_slots[slot].generation){
+    live_chunks[i].valid=0u;
+    if(live_rt->cached_voice==i)live_rt->cached_valid=0u;
    }
-   lock();
+   if(!beetle_bd4_live_available(slot)){
+    if(n->serial==seq&&!n->pending){n->starting=0u;n->serial=0u;}
+    continue;
+   }
+   /* Do not disable audio IRQs for the entire stream preparation. */
    int prepare=beetle_bd4_stream_prepare_pinned(&live_stream,i,slot,
      live_slots[slot].byte_length,live_slots[slot].generation);
-   unlock();
-   if(prepare){n->starting=0u;n->serial=0u;continue;}
-   /* An IRQ may have retriggered the same drum voice during this setup.
-    * Its newer serial/pending flag must win. */
+   if(prepare){
+    if(n->serial==seq&&!n->pending){n->starting=0u;n->serial=0u;}
+    continue;
+   }
    if(n->serial!=seq||n->pending)continue;
   }
  }

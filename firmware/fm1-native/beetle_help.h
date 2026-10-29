@@ -5,11 +5,11 @@
 #ifndef BEETLE_HELP_H
 #define BEETLE_HELP_H
 #include <stdint.h>
-#define BEETLE_HELP_VISIBLE 9u
+#define BEETLE_HELP_VISIBLE 3u /* three cards per page, not dense scrolling */
 static const char *const beetle_help_lines[] = {
  "# TRACKER BASICS",
  "K1 STEP   K2 CELL  K3 VALUE",
- "HELP: K2 CHAPTER K1 SCROLL",
+ "HELP: K2 TOPIC K1 PAGE",
  "K4 BPM  SEQ+K4 PAT LEN 1-16",
  "PLAY+ALG: QUEUE NEXT PATTERN",
  "SELECT: CHANNEL 1-6",
@@ -110,7 +110,7 @@ static const char *const beetle_help_lines[] = {
  "LOAD: K1 SLOT, TAP SEL TO OPEN",
  "LOAD: EDIT+SEL DELETE PROJECT",
  "LOAD: CHECK E/S KEY DIAGNOSTIC",
- "VERSION: BEETLE V1.7.14",
+ "VERSION: BEETLE V1.8",
  "AUDIO STOP: CHECK AMP/MASTER",
  "FAULT: HOME+PLAY TO RESTART",
  "DELETE: K1 YES/NO, SEL CONFIRM",
@@ -260,7 +260,7 @@ static inline uint8_t beetle_help_chapter_length(uint8_t chapter){
 }
 static inline uint8_t beetle_help_chapter_maxscroll(uint8_t chapter){
  uint8_t n=beetle_help_chapter_length(chapter);
- return n>BEETLE_HELP_VISIBLE?(uint8_t)(n-BEETLE_HELP_VISIBLE):0u;
+ return n?(uint8_t)((n-1u)/BEETLE_HELP_VISIBLE):0u;
 }
 static inline uint8_t beetle_help_chapter_shift(uint8_t chapter,int32_t detents){
  int32_t result=(int32_t)chapter+detents;

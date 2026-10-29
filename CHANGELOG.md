@@ -1,3 +1,14 @@
+## BEETLE V1.8 — BLUE HUD / HELP and deterministic sample streaming (EXPERIMENTAL)
+
+- Adapted BLUE RC12's Felucca-derived FM1 voltage ADC bands (531/561/591), validated foreground reads, invalid-sample fallback, four-bar pixel HUD and non-charging-claim USB indicator. Battery percentage is NOT measured.
+- PAT counter matches BLUE right-aligned footer placement; BEETLE retains its original global pattern length and six-channel synthesizer/drum architecture.
+- HELP uses three easy-to-read instruction cards per page, retaining all 13 original BEETLE topics and all original instructions. K1 changes page and K2 changes topic.
+- CREDITS now has two read-only pages (K1 navigation) listing SikkenWorks, ETCH, Felucca/Hügelton/Leo Kuroshita, JieLi, reSID/Dag Lem, Nes_Snd_Emu/Shay Green/James Athey, and preserved upstream attributions. Full licensing remains in README and LICENSES.
+- In the BD4S sample ISR, merged window-ready and PCM fetch into one RAM-only pass; avoid advancing source time when prefetch data is not ready. Foreground snapshots retrigger serial/pending under short IRQ lock; preserve immutable generation-pinned verified sectors on identical sample retriggers, and defer decoder cleanup to foreground.
+- No change to the TRK1 V26 project format, storage partition layout, firmware ID, protected bootloader or the five synth lanes. No new sample cache allocations in RAM; BLUE-specific six-drum and BDR1 project changes intentionally NOT imported.
+- Native full and read-only JieLi builds, baseline user-sample PCM, 12-slot V2 storage interruption tests PASS in software. A preexisting legacy audio fingerprint expectation differs from the baseline and is not considered PASS.
+- NO physical FM1 audio DMA, volume peak, USB multitrack, OTA or recovery validation. DMA DEADLINE may still occur under heavy hardware workloads.
+
 ## V1.7.14 — Warm DMA NEW PROJECT (experimental)
 
 NEW no longer cold-restarts the DAC when the stopped tracker is already safely initialized and USB capture is inactive. Instead the running ALNK0 DMA receives silence during the RAM reset, then restores DSP state with a sample fade-in. PLAY/USB capture/safety-fault cases retain the cold route. Free-slot scan still occurs at first SAVE with existing CRC validation. Hardware latency/audio safety remain unverified; details: [V1.7.14 validation](V1.7.14-VALIDATION.md).

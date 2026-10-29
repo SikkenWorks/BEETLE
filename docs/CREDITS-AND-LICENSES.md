@@ -15,6 +15,10 @@ Original **reSID**: written by **Dag Lem**, a reverse-engineered MOS6581 SID emu
 
 BEETLE's `beetle_sid_lite.h` and the five **SID 6581, SID 8580, SID DIRTY, SID BASS, SID NOISE** instrument flavors are original, approximate fixed-point SID-style synth implementations. These emulate aspects of the sound but **do not** implement cycle-exact reSID, chip-specific measured oscillator combinations, or authentic analog SID filters. They should not be described publicly as original reSID or exact MOS6581/8580 emulation.
 
+## FM1 battery ADC and UI (BEETLE V1.8)
+
+The battery raw ADC threshold boundaries `531 / 561 / 591` come from Felucca, `firmware/src/ui_draw.c`, `batt_level()` (Leo Kuroshita / Hügelton Instruments, GPL-3.0-only). The four-band pixel HUD and filtered validity checks were adapted from BEETLE BLUE RC12, SikkenWorks. USB enumeration is not a charger-state sensor. The original upstream notice in `beetle_battery_policy.h` is retained.
+
 ## NES-style instruments and Nes_Snd_Emu
 
 **Nes_Snd_Emu** — originally written by **Shay Green (blargg)**, later maintained
