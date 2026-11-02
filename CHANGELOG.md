@@ -1,3 +1,20 @@
+## V1.8.2 — Official V15 return via Firmware Hub (software-tested)
+
+- Improved the outgoing native OTA route for a **byte-pinned M-VAVE official V15 return**. Before erasing staging flash, verify BOTH the original V15 0x93000-byte flash.bin SHA-256 and the exact 19,969-byte M-VAVE ota.bin SHA-256; retain the original firmware-loader header/CRC checks.
+- A verified V15 return may re-use the dedicated 0xE0000–0xE4FFF OTA staging sectors even if an earlier custom/stock firmware or interrupted session left an unknown marker. **This bypass never applies to other firmware or to project/sample storage**, and only runs after exact stock component hashes match.
+- The official loader body receives full CRC verification before the first erase; the existing staged write/readback check and reset handshake remain unchanged. Corrupt loaders and unrecognized package layouts are rejected.
+- Native OTA host replay exercises clean and dirty staging, a corrupted official-style loader, and an untrusted custom package. The full application firmware and read-only build compile. PCM, Song Mode, project storage, samples and MASTER controls retain prior behavior.
+- This is **not a claim of guaranteed or hardware-proven stock recovery**. A genuine, unmodified official V15 package and a physical FM1 should be used for final device validation. The official V16 is not yet authenticated or supported by this V15-specific exception.
+
+## BEETLE V1.8.1 — Realtime MASTER math and audio regression audit (EXPERIMENTAL)
+
+- Replaced the two per-frame 64-bit divisions in the final stereo MASTER output path with mathematically identical signed 32-bit arithmetic. Every multiplication fits int32 for signed PCM16 and Q15 gain. No gain scaling, ramp, limiting, DAC format, sample rate, voices or DSP algorithms were altered.
+- Host PCM equivalence: 2,572,864 sample/gain cases including exhaustive PCM16 for boundary gain states and one million varying controls, all **exact matches** to the previous 64-bit output. The existing invalid ADC / 80 ms stale MASTER fail-closed behavior is unchanged.
+- Audited the older chip PCM test: its 43c0f1f6 expectation was already out of sync before V1.8. The archived V1.7.14 fixture and both involved native source files are byte-identical to V1.8. The unchanged chip render fingerprint `dd0f3681` is now pinned for **current cross-version regression**; why the historical baseline changed originally remains undetermined.
+- Native JieLi storage/OTA/USB and read-only builds plus Storage V2 samples, 12-slot journal failure tests and legacy song-chain tests performed in software. No TRK1 V26 or Storage V2 changes.
+- The READMEs remain user-facing guides; release changes are recorded only here. No changes to the protected first 16 KiB or OTA loader by design; build container equivalence and installer checks are documented in `V1.8.1-VALIDATION.md`.
+- **Not proven on hardware:** DMA deadline elimination, analog peak safety, USB multitrack under full load and physical flash recovery. A single deadline still causes `AUDIO STOP` instead of masking the fault. Do not call this a final hardware-safe release until real FM1 stress and output measurements pass.
+
 ## BEETLE V1.8 — BLUE HUD / HELP and deterministic sample streaming (EXPERIMENTAL)
 
 - Adapted BLUE RC12's Felucca-derived FM1 voltage ADC bands (531/561/591), validated foreground reads, invalid-sample fallback, four-bar pixel HUD and non-charging-claim USB indicator. Battery percentage is NOT measured.

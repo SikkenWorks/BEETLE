@@ -447,12 +447,39 @@ static int etch_ota_available(uint8_t *b){
 #ifndef ETCH_TEST_RESTORE_ONLY
 #define ETCH_TEST_RESTORE_ONLY 0
 #endif
-/* Reference SHA-256 of the original M-VAVE V15 flash.bin (0x93000 B). */
-static int etch_ota_stock(uint32_t off,uint8_t *b){
- static const uint8_t want[32]={0xc1,0x06,0x8a,0x40,0x3c,0x04,0xa6,0x37,0x8a,0x62,0x6a,0xfb,0x66,0xcc,0x21,0x7f,0x72,0xd1,0x3f,0x10,0xaa,0x20,0x0e,0x98,0x3b,0x7a,0x98,0x17,0xcc,0x1d,0xac,0x03};
- struct etch_sha256 h;uint8_t digest[32];etch_sha256_init(&h);
- for(uint32_t i=0;i<0x93000u;i+=512){if(ota_read(off+i,b,512))return 0;etch_sha256_add(&h,b,512);ota_idle();}
+/* BEETLE V1.8.2 stock-return authorization.
+ * Full, independent SHA-256 pins for M-VAVE's genuine V15 flash.bin and
+ * nested ota.bin. The official OTA loader is a WHOLE-FLASH writer, not the
+ * Felucca app-only writer. Its bytes MUST be identified before the device
+ * may hand it control. The two hashes are from the original V15 package;
+ * the complete .fwsc is separately SHA-pinned by The Firmware Hub.
+ * An unknown / modified official-looking loader is NOT authorized.
+ * V16 is a different release, not covered by these V15 pins.
+ */
+static int beetle_ota_sha256_host(uint32_t off,uint32_t bytes,
+                                 const uint8_t want[32],uint8_t *b){
+ struct etch_sha256 h;uint8_t digest[32];uint32_t i,n;
+ etch_sha256_init(&h);
+ for(i=0u;i<bytes;i+=n){
+  n=bytes-i;if(n>512u)n=512u;
+  if(ota_read(off+i,b,n))return 0;
+  etch_sha256_add(&h,b,n);ota_idle();
+ }
  etch_sha256_end(&h,digest);return ota_memeq(digest,want,32);
+}
+/* The two 32-byte digests must match official V15 byte for byte. */
+static const uint8_t beetle_stock_v15_flash_sha256[32]={
+ 0xc1,0x06,0x8a,0x40,0x3c,0x04,0xa6,0x37,0x8a,0x62,0x6a,0xfb,0x66,0xcc,0x21,0x7f,
+ 0x72,0xd1,0x3f,0x10,0xaa,0x20,0x0e,0x98,0x3b,0x7a,0x98,0x17,0xcc,0x1d,0xac,0x03};
+static const uint8_t beetle_stock_v15_loader_sha256[32]={
+ 0xef,0x1f,0x2d,0xb8,0x9b,0x01,0x1f,0xa5,0x3e,0x71,0xdf,0x36,0x3f,0x01,0x22,0xde,
+ 0x0e,0xa8,0x96,0x61,0x8c,0x53,0xfb,0x53,0xe8,0xda,0x67,0x63,0x22,0x00,0x45,0x41};
+static int etch_ota_stock(uint32_t off,uint8_t *b){
+ return beetle_ota_sha256_host(off,0x93000u,beetle_stock_v15_flash_sha256,b);
+}
+static int beetle_ota_stock_loader(uint32_t off,uint32_t size,uint8_t *b){
+ return size==OTA_LDR_LEN+0x20u &&
+        beetle_ota_sha256_host(off,size,beetle_stock_v15_loader_sha256,b);
 }
 static int ota_stage(void)                       /* steps 1..6; 0 = host said success */
 {
@@ -490,7 +517,14 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
      */
     if(len==OTA_LDR_LEN && ota_rd16(b)==OTA_LDR_HCRC &&
        ota_rd16(b+2)==OTA_LDR_DCRC && etch_ota_stock(fl_off,b)) {
+        /* Exact known V15 flash is insufficient to authorize running an
+         * arbitrary loader alongside it. Require the exact M-VAVE loader. */
+        if(!beetle_ota_stock_loader(ota_off,ota_len,mine))return -25;
         official_stock_restore=1u;
+        /* Reject a damaged V15 loader before any staging-sector erase. */
+        rc=beetle_validate_incoming_loader_crc(ota_off+0x20u,len,
+                                                proposed_loader_crc,mine);
+        if(rc)return rc;
     } else {
         compatible_community_loader=(uint8_t)beetle_compatible_felucca_loader(b,len);
         /* Keep recognizing the original known loader even if its label
@@ -510,7 +544,14 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
         rc=ota_host_app_compatible(fl_off,b,mine);
         if(rc)return rc;
     }
-    if(!etch_ota_available(b))return -15;
+    /* The five 4-KiB sectors at 0xE0000 are *dedicated OTA staging*.
+     * Old custom/stock loaders or interrupted attempts may have left a
+     * non-BEETLE owner marker here. Ordinary incoming firmware still has to
+     * prove ownership/blank space. For byte-pinned official V15 only, the
+     * reserved staging area can be safely REUSED, so a return through the
+     * Firmware Hub is not blocked by stale foreign OTA staging data.
+     * This exception does not authorize erasing project/sample sectors. */
+    if(!official_stock_restore && !etch_ota_available(b))return -15;
     /* 4. stage the package's loader: erase, body, verify, head last */
     ota_show(3, 0);
     if (ota_read(ota_off, b, 512))

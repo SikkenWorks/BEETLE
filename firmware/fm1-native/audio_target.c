@@ -337,7 +337,10 @@ etch_native_reset(&native_audio);native_audio.keys=keys&0x7ffffffu;}
    const uint16_t verified_gain=beetle_master_safe_gain(native_controls.gain,
                                    etch_ms,native_master_last_good_ms);
    left=track_master_apply((int16_t)left,verified_gain,&gain_prev);
-   right=(int32_t)(((int64_t)right*(gain_prev>>16u))/32767);
+   /* Right uses the identical final Q15 gain from the left ramp. Both
+    * int16 PCM and <=32767 gain fit a signed 32-bit product; avoiding
+    * 64-bit division here removes a second hot-loop software helper. */
+   right=(int32_t)(((int32_t)right*(gain_prev>>16u))/32767);
    native_audio.master_gain_q16=gain_prev;
 #endif
    uint32_t pl=(uint32_t)(left<0?-left:left),pr=(uint32_t)(right<0?-right:right);

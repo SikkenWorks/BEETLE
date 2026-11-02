@@ -18,6 +18,10 @@ static inline int16_t track_master_apply(int16_t sample,uint16_t knob,int32_t *s
   if(value>limit)value=limit;
  }
  *smoothed_q16=value;
- return (int16_t)(((int64_t)sample*(value>>16u))/32767);
+ /* BEETLE V1.8.2: 16-bit sample * Q15 gain is bounded to
+  * [-1073709056, 1073676289], entirely within signed 32-bit. Avoid a
+  * software-emulated 64-bit division on every sample in the ALNK0 ISR.
+  * Integer division still truncates toward zero: PCM stays bit-exact. */
+ return (int16_t)(((int32_t)sample*(int32_t)(value>>16u))/32767);
 }
 #endif

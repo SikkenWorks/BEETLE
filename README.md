@@ -299,6 +299,8 @@ The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project
 
 **Storage and firmware safety:** On-device flash capacity is finite; a completely filled 48-pattern project or thirteen long samples may not fit. Storage V2 migration explicitly erases the BEETLE-owned **`0x97000–0xDFFFF`** partition after a verified project backup, then restores projects. It is **not power-loss atomic**, and older ETCH/Felucca user storage within those sectors could be lost. Obtain a verified full-flash backup and a working independent recovery method before destructive storage or firmware updates. The WebInstaller does not make a full device backup, and successful checksums do not guarantee safe boot, DMA behavior, a successful Firmware Hub switch or reliable recovery. BEETLE retains guarded outgoing OTA checks for selected Felucca-family loaders, not unrestricted cross-firmware flashing.
 
+**Returning to official firmware:** The FM-1 Firmware Hub offers **Back to official V15**. The BEETLE OTA receiver accepts the exact M-VAVE V15 flash image and its matching official loader, independently verified before any staging writes. The source firmware must still be running and accepting USB-MIDI; this does not guarantee recovery from a failed boot or power interruption. Make independent backups of all twelve projects **and** the global user-sample library before switching. The official firmware cannot read BEETLE projects; storage overlap may make old data unavailable. Official V16 is a separate firmware image and is not covered by BEETLE's V15-only compatibility audit. If normal USB-MIDI updating is unavailable, follow the Hub's separately documented USB rescue procedure rather than bypassing image validation.
+
 For setup and build instructions, see [`docs/START-HERE.md`](docs/START-HERE.md). For version history and release-specific changes, see [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Support
@@ -328,6 +330,3 @@ BEETLE is developed by **SikkenWorks (Joppe Sikken)**. It builds on earlier open
 **Source licence and redistribution.** BEETLE's native firmware and derivatives are distributed under **GNU GPL v3 only (`GPL-3.0-only`)**, preserving the licence of the Felucca-derived source. The full text is provided in [`LICENSE`](LICENSE). When distributing modified firmware, provide the complete corresponding source and applicable copyright, SPDX and upstream licence notices. A binary, WebInstaller or bootloader alone does not satisfy source-offer obligations. For detailed file-level provenance and third-party notices, see [`docs/CREDITS-AND-LICENSES.md`](docs/CREDITS-AND-LICENSES.md), [`LICENSES/FELUCCA-LICENSING.txt`](LICENSES/FELUCCA-LICENSING.txt) and the source-file headers. Where lineage is uncertain, retain upstream notices rather than claiming exclusive authorship.
 
 <p align="center"><strong>BEETLE · SikkenWorks · Born out of passion.</strong></p>
-<p align="center">
-  <img src="SikkenWorks-theBEETLES.png" alt="BEETLE" width="320">
-</p>
