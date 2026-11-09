@@ -91,3 +91,13 @@
   }
 </style>
 <link rel="icon" type="image/png" href="{{ '/favicon.png' | relative_url }}">
+
+<script>
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+});
+
+document.addEventListener('selectstart', function(e) {
+    e.preventDefault();
+});
+</script>
