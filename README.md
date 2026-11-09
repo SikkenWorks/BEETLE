@@ -303,6 +303,10 @@ The [BEETLE Project Manager](https://sikkenworks.github.io/BEETLE/BEETLE-Project
 
 For setup and build instructions, see [`docs/START-HERE.md`](docs/START-HERE.md). For version history and release-specific changes, see [`CHANGELOG.md`](CHANGELOG.md).
 
+### FM1 flash-chip compatibility
+
+BEETLE recognizes both supported 1 MiB SPI NOR chips: the original **Puya P25Q80** (JEDEC `0x856014`) and the newer **UCUN UC25HQ80** (`0xB36014`). Unknown IDs are not authorized for project writes or OTA staging. The app uses the same standard NOR operations for both supported parts. The included Felucca-lineage update loader supports the same two IDs and writes only the firmware application region, not saved projects or samples. This loader is new to BEETLE and **has not been physically verified** on the UC25HQ80. Older installed firmware can still refuse an update before a compatible loader runs; use a validated ROM/UBOOT recovery route if necessary. See [`docs/V1.8.3-UC25HQ80-DUAL-FLASH.md`](docs/V1.8.3-UC25HQ80-DUAL-FLASH.md) for details.
+
 ## Support
 
 For a bug report, include your BEETLE firmware version, the screen and buttons involved, steps to reproduce, and relevant project details. Share diagnostic logs only when safe; do **not** upload a private full-flash dump publicly. Contributions should preserve real-time audio safety, backward compatibility and third-party attributions.
@@ -322,6 +326,8 @@ BEETLE is developed by **SikkenWorks (Joppe Sikken)**. It builds on earlier open
 | **[Nes_Snd_Emu](https://github.com/jamesathey/Nes_Snd_Emu)** · **Shay Green (blargg)**, fork maintained by **James Athey** | NES APU technical reference for BEETLE's `NES PULSE`, `NES TRIANGLE` and `NES NOISE` types. Upstream library: **LGPL-2.1**. BEETLE implements an independent, lightweight fixed-point C engine in `firmware/fm1-native/beetle_nes_apu.h`. **Original Nes_Snd_Emu C++ code is not copied, embedded, compiled or linked** and this is not cycle-accurate NES APU emulation. See `LICENSES/NES-SND-EMU-LGPL-2.1.txt`. |
 
 **Battery indicator attribution.** **BEETLE uses battery-level detection logic originating from [Felucca](https://github.com/hugelton/Felucca)**, authored by **Leo Kuroshita (@kurogedelic), Hügelton Instruments**, under **GPL-3.0-only**. The original `batt_level()` implementation in `ui_draw.c` defines the FM1 ADC voltage-level boundaries `531 / 561 / 591`. BEETLE BLUE provides the adapted visual presentation, input filtering and invalid-reading indication used by BEETLE. The displayed bars represent approximate voltage ranges, **not** calibrated battery charge percentages or verified charging status. The Felucca source and licensing attribution must be preserved in all redistributions.
+
+**Dual-flash OTA loader.** The included app-only USB-MIDI update loader is derived from **[Felucca](https://github.com/hugelton/Felucca)** (Leo Kuroshita / Hügelton Instruments, GPL-3.0-only), including its USB communication, SPI NOR support, loader core and LZ4 wrapper. BEETLE adds explicit Puya/UCUN JEDEC acceptance and retains the original upstream source notices. The independently verified M-VAVE stock-V15 restore path remains separate.
 
 **Additional upstream attributions.** The preserved [`LICENSES/FELUCCA-LICENSING.txt`](LICENSES/FELUCCA-LICENSING.txt) acknowledges **DaisySP** (Electrosmith / Emilie Gillet, MIT), **Rings** (Emilie Gillet, MIT), **msfa/Dexed** (Google / Pascal Gauthier, Apache-2.0), **CrispyZebra**, **Fukiai**, **Inter Tight**, **DotGothic16**, **Versilian Studios VSCO-2**, **klattsch** and **X0X**. These are attributions within the broader upstream project; BEETLE does **not** claim to include all of those engines, fonts or sound assets.
 

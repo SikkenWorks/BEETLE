@@ -1,3 +1,9 @@
+## V1.8.3 — Puya / UCUN UC25HQ80 dual flash support (EXPERIMENTAL)
+
+- Explicitly recognize JEDEC IDs `0x856014` (Puya P25Q80) and `0xB36014` (UCUN UC25HQ80) in firmware storage/OTA write guards and in the Felucca-lineage app-only update loader. Reject unknown IDs before flash writes.
+- Replace the inherited binary OTA loader in the BEETLE package with a fully source-provided, rebuilt GPL app-only loader. Protected boothead and stock-V15 verification remain unchanged. This is an experimental loader change, not a physically verified recovery solution.
+- Keep TRK1 V26, Storage V2, samples, USB audio, synth functionality and README's existing structure intact. See `docs/V1.8.3-UC25HQ80-DUAL-FLASH.md` and `V1.8.3-VALIDATION.md` for the implementation, tests and risks.
+
 ## V1.8.2 — Official V15 return via Firmware Hub (software-tested)
 
 - Improved the outgoing native OTA route for a **byte-pinned M-VAVE official V15 return**. Before erasing staging flash, verify BOTH the original V15 0x93000-byte flash.bin SHA-256 and the exact 19,969-byte M-VAVE ota.bin SHA-256; retain the original firmware-loader header/CRC checks.

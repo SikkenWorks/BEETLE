@@ -8,6 +8,22 @@
 #error "Standalone BEETLE storage cannot be linked into an ETCH storage build"
 #endif
 static uint8_t beetle_write_permit;
+/* The LCD must not be performing SPI DMA while probing the NOR bus.
+ * This is called only from stopped/non-realtime flash write paths.
+ * A failed read is NOT a reason to guess a chip type or write anyway.
+ * Zero = untested, 1 = known, -1 = unsupported/read failed. */
+static int8_t beetle_nor_id_state;
+static uint32_t beetle_nor_jedec_id;
+static int beetle_nor_id_ok(void){
+ if(beetle_nor_id_state==0){
+  fm1_irq_off();
+  beetle_nor_jedec_id=FL_FAR(fl_jedec_ram)();
+  fm1_irq_enable_all();
+  beetle_nor_id_state=FL_JEDEC_OK(beetle_nor_jedec_id)?1:-1;
+ }
+ return beetle_nor_id_state==1;
+}
+
 /* Only the physical on-device double-YES PROJECTS flow may set this. */
 static uint8_t beetle_full_wipe_confirmed;
 static int beetle_storage_last_audit=BEETLE_CLAIM_INVALID;
@@ -71,7 +87,7 @@ static int beetle_hal_journal_read(void *ctx,uint8_t slot,uint8_t bank,
 }
 static int beetle_hal_journal_erase(void *ctx,uint8_t slot,uint8_t bank){
  uint32_t addr;(void)ctx;
- if(!beetle_write_permit||beetle_hal_probe_ownership()!=BEETLE_CLAIM_EXISTING||
+ if(!beetle_nor_id_ok()||!beetle_write_permit||beetle_hal_probe_ownership()!=BEETLE_CLAIM_EXISTING||
     beetle_flash_map(slot,bank,0u,TRACK_JOURNAL_BANK_BYTES,&addr))return -1;
  for(uint32_t at=0u;at<TRACK_JOURNAL_BANK_BYTES;at+=BEETLE_FLASH_SECTOR){
   uint32_t took=0u;
@@ -83,7 +99,7 @@ static int beetle_hal_journal_erase(void *ctx,uint8_t slot,uint8_t bank){
 static int beetle_hal_journal_program(void *ctx,uint8_t slot,uint8_t bank,
  uint32_t offset,const uint8_t *src,uint32_t n){
  uint32_t addr;(void)ctx;
- if(!src||!n||!beetle_write_permit||beetle_hal_probe_ownership()!=BEETLE_CLAIM_EXISTING||
+ if(!src||!n||!beetle_nor_id_ok()||!beetle_write_permit||beetle_hal_probe_ownership()!=BEETLE_CLAIM_EXISTING||
     beetle_flash_map(slot,bank,offset,n,&addr))return -1;
  while(n){
   uint32_t k=256u-(addr&255u);if(k>n)k=n;
@@ -113,7 +129,7 @@ static int beetle_hal_marker_audit(void){
  return 1; /* repair is eligible, but still requires explicit MIDI consent */
 }
 static int beetle_hal_restore_marker(void){
- if(!beetle_write_permit||native_safe||native_tripped||native_updating)return -1;
+ if(!beetle_nor_id_ok()||!beetle_write_permit||native_safe||native_tripped||native_updating)return -1;
  if(beetle_hal_marker_audit()!=1)return -1;
  uint32_t took=0u;
  fm1_irq_off();int rc=FL_FAR(fl_erase4k_ram)(BEETLE_FLASH_MARKER,&took);fm1_irq_enable_all();
@@ -140,7 +156,7 @@ static int beetle_hal_wipe_projects(void (*progress)(uint8_t,uint8_t)){
 #if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
  if(beetle_hal_v2_marker_prefix()!=0)return -1;
 #endif
- if(!beetle_write_permit||!beetle_full_wipe_confirmed||native_safe||native_tripped||native_updating)return -1;
+ if(!beetle_nor_id_ok()||!beetle_write_permit||!beetle_full_wipe_confirmed||native_safe||native_tripped||native_updating)return -1;
  int owner=beetle_hal_probe_ownership();
  if(owner==BEETLE_CLAIM_IO||owner==BEETLE_CLAIM_INVALID)return -1;
  /* FOREIGN and BLANK are allowed ONLY after two physical confirmations.
@@ -183,7 +199,7 @@ static int beetle_hal_init_exclusive(void (*progress)(uint8_t,uint8_t)){
 #if defined(BEETLE_NATIVE_V2) && BEETLE_NATIVE_V2
  if(beetle_hal_v2_marker_prefix()!=0)return -1;
 #endif
- if(native_safe||native_tripped||native_updating)return -1;
+ if(!beetle_nor_id_ok()||native_safe||native_tripped||native_updating)return -1;
  int prev=beetle_hal_probe_ownership();
  if(prev==BEETLE_CLAIM_EXISTING)return 0; /* never erase saved BEETLE files */
  if(prev==BEETLE_CLAIM_IO||prev==BEETLE_CLAIM_INVALID)return -1;
@@ -220,7 +236,7 @@ static int beetle_v2_hal_read(void *ctx,uint32_t address,uint8_t *data,uint32_t 
 }
 static int beetle_v2_hal_program(void *ctx,uint32_t address,const uint8_t *data,uint32_t n){
  (void)ctx;
- if(!data||!n||!beetle_write_permit||native_safe||native_tripped||native_updating||
+ if(!data||!n||!beetle_nor_id_ok()||!beetle_write_permit||native_safe||native_tripped||native_updating||
     address<BEETLE_FLASH_BASE||address>BEETLE_FLASH_END||
     n>BEETLE_FLASH_END-address||((address&255u)+n)>256u)return -1;
  uint32_t took=0;
@@ -229,7 +245,7 @@ static int beetle_v2_hal_program(void *ctx,uint32_t address,const uint8_t *data,
 }
 static int beetle_v2_hal_erase(void *ctx,uint32_t address){
  (void)ctx;
- if(!beetle_write_permit||native_safe||native_tripped||native_updating||
+ if(!beetle_nor_id_ok()||!beetle_write_permit||native_safe||native_tripped||native_updating||
     (address&4095u)||address<BEETLE_FLASH_BASE||
     address>BEETLE_FLASH_END-4096u)return -1;
  uint32_t took=0;

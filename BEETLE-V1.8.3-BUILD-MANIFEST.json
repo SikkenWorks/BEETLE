@@ -1,0 +1,27 @@
+{
+  "version": "V1.8.3",
+  "identity": "FM-1_2123",
+  "firmware_filename": "BEETLE-V1.8.3-DUAL-FLASH-EXPERIMENTAL.fwsc",
+  "firmware_sha256": "1c88c620b6d8763835597e085c3287b54dba9921d535efc764f4b4c5f3468538",
+  "app_sha256": "178f94e9e714a87eb2f2628f884adac6da4f0d6cbed23b0b49dcf478eaa272f2",
+  "loader_sha256": "62ce8ac520e4868c03815ea6b9935c43aad20514c3c3ca6cf5b080b6ea70036c",
+  "loader_source": "firmware/loader/loader.c; Felucca GPL-3.0-only",
+  "app_bytes": 519464,
+  "app_headroom_bytes": 62100,
+  "supported_flash_ids": [
+    "0x856014",
+    "0xB36014"
+  ],
+  "source_loader_recompiled": true,
+  "inherited_ota_loader_identical": false,
+  "protected_16k_header_identical": true,
+  "project_schema": "TRK1 V26",
+  "stock_v15_sha256_pins_untouched": true,
+  "hardware_tested": false,
+  "uc25hq80_hardware_tested": false,
+  "dma_deadlines_eliminated": false,
+  "loader_hardware_tested": false,
+  "readme": "README.md",
+  "changelog": "CHANGELOG.md",
+  "validation": "V1.8.3-VALIDATION.md"
+}

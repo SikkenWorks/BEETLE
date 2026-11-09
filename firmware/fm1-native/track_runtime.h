@@ -2489,7 +2489,7 @@ static void track_fm1_paint(void){
   const char *const options[]={"NEW PROJECT","LOAD PROJECT"};
   track_web_list(options,2u,track_boot_menu_choice,82u,32u);
   track_pix_center("K1 CHOOSE   SEL OPEN",120u,209u,TRACK_PINK);
-  track_pix_center("BEETLE V1.8.2",120u,224u,TRACK_BRIGHT);
+  track_pix_center("BEETLE V1.8.3",120u,224u,TRACK_BRIGHT);
   return;
  }
  if(track_page==28u){

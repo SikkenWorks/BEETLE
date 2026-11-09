@@ -39,11 +39,11 @@ static void ota_idle(void){
  }
 }
 static int ota_erase(uint32_t off){
- if(!ETCH_NATIVE_OTA||!native_updating||!FL_IN(off,0x1000u,OTA_AREA,OTA_AREA+OTA_AREA_LEN)||(off&0xfffu))return -8;
+ if(!ETCH_NATIVE_OTA||!native_updating||!beetle_nor_id_ok()||!FL_IN(off,0x1000u,OTA_AREA,OTA_AREA+OTA_AREA_LEN)||(off&0xfffu))return -8;
  uint32_t took;fm1_irq_off();int rc=FL_FAR(fl_erase4k_ram)(off,&took);fm1_irq_enable_all();fm1_wdt_feed();return rc;
 }
 static int ota_prog(uint32_t off,const void *src,uint32_t n){
- if(!ETCH_NATIVE_OTA||!native_updating||!FL_IN(off,n,OTA_AREA,OTA_AREA+OTA_AREA_LEN))return -8;
+ if(!ETCH_NATIVE_OTA||!native_updating||!beetle_nor_id_ok()||!FL_IN(off,n,OTA_AREA,OTA_AREA+OTA_AREA_LEN))return -8;
  const uint8_t *p=src;uint8_t page[256];
  while(n){uint32_t k=256u-(off&255u);if(k>n)k=n;uint32_t took;
   for(uint32_t i=0;i<k;i++)page[i]=p[i]; /* Constants may reside in XIP. */
