@@ -1,3 +1,13 @@
+## V1.9 — OTA cross-firmware switching and flash recovery preflight (EXPERIMENTAL)
+
+- Fix a persistent failed JEDEC probe blocking all subsequent OTA writes: recheck the flash chip twice, with audio paused and LCD synchronized, before OTA. Both Puya `0x856014` and UCUN `0xB36014` remain supported; unstable/unknown IDs still cause zero writes.
+- Permit an explicitly requested, fully prevalidated firmware update to reclaim BEETLE's dedicated `0xE0000..0xE4FFF` OTA-staging range even if old firmware left an unrecognized record there. The device never writes outside that range during staging, and malformed loader/application packages are still refused before erasing anything.
+- Accept a bounded, variable `app.bin` slot size in the common FM1 application layout rather than insisting every incoming image use BEETLE's original exact size. Every byte still passes the firmware CRC checks and the writer retains its fixed protected boundaries.
+- Fix loader transition metadata to identify the Felucca-style app-only update phase as `ota-FM-1_900` rather than claiming the official V15 loader (`ota-FM-1_015`). The included GPL loader now reports `ota-FM-1_900`; the exactly pinned M-VAVE V15 branch retains `ota-FM-1_015`.
+- Explicitly reject larger-than-0x93000 images, including M-VAVE's stock V16, **before any flash writes**. V16 reaches `0xA8FFF` and needs its different boot area; forcing it through an app-only loader could brick the FM1. Provide independent ROM/UBOOT recovery directions instead of a false guarantee.
+- Existing synth engines, audio, UI, TRK1 V26, Storage V2, 12 projects, user samples, battery UI, USB modes, versioned README structure, third-party notices and protected boot header remain intact.
+- Host-level OTA and regression validation only. The Firmware Hub hardware handoff, both physical flashchip types and power-loss recovery are **NOT independently verified**. This version does not guarantee that every other firmware safely runs on UC25HQ80 or that a bricked FM1 can start its own OTA app.
+
 ## V1.8.3 — Puya / UCUN UC25HQ80 dual flash support (EXPERIMENTAL)
 
 - Explicitly recognize JEDEC IDs `0x856014` (Puya P25Q80) and `0xB36014` (UCUN UC25HQ80) in firmware storage/OTA write guards and in the Felucca-lineage app-only update loader. Reject unknown IDs before flash writes.

@@ -312,7 +312,7 @@ static void ota_sfc_decrypt(uint8_t *p, uint32_t off, uint32_t n)
  * No destination header comparison: APP_ONLY writer does not use it. */
 static int ota_host_app_compatible(uint32_t fl_off, uint8_t *b, uint8_t *scratch)
 {
-    uint32_t j, isd_off, isd_len, isd_crc, app_area_len, app_crc, area_crc;
+    uint32_t j, isd_off, isd_len, isd_crc, app_area_len, app_crc, area_crc, app_size;
     uint32_t chip_key=0, threshold=0, rel, n, low, high, isd_seen_crc=0;
     uint32_t want_area_crc, want_app_crc;
     if(ota_read(fl_off,scratch,160u))return -4;
@@ -346,14 +346,18 @@ static int ota_host_app_compatible(uint32_t fl_off, uint8_t *b, uint8_t *scratch
     if(ota_read(fl_off+OTA_FM1_APP_OFFSET,b,0x120u))return -4;
     ota_sfc_decrypt(b,0u,0x120u);
     app_area_len=ota_rd32(b+8u);
+    app_size=ota_rd32(b+0x28u);
+    /* Community firmware may reserve a smaller app.bin slot than BEETLE.
+     * Accept a variable, bounded slot ONLY after validating every byte with
+     * the package's CRCs. Never extend past the app-only loader's hard stop. */
     if(ota_rd16(b)!=ota_crc16(b+2u,30u,0) ||
        ota_rd32(b+4u)!=OTA_FM1_APP_XIP ||
-       app_area_len<OTA_FM1_APP_REL+OTA_FM1_APP_SLOT ||
+       app_size<0x1000u || app_size>0x93000u-OTA_FM1_APP_OFFSET-OTA_FM1_APP_REL ||
+       app_area_len<OTA_FM1_APP_REL+app_size ||
        app_area_len>0x93000u-OTA_FM1_APP_OFFSET ||
        b[12]!=0x83u || !ota_named(b+16u,"app_area_head",16u) ||
        ota_rd16(b+0x20u)!=ota_crc16(b+0x22u,30u,0) ||
        ota_rd32(b+0x24u)!=OTA_FM1_APP_REL ||
-       ota_rd32(b+0x28u)!=OTA_FM1_APP_SLOT ||
        b[0x2cu]!=0x82u || !ota_named(b+0x30u,"app.bin",16u))return -23;
     want_area_crc=ota_rd16(b+2u);
     want_app_crc=ota_rd16(b+0x22u);
@@ -365,7 +369,7 @@ static int ota_host_app_compatible(uint32_t fl_off, uint8_t *b, uint8_t *scratch
         ota_sfc_decrypt(b,rel,n);
         area_crc=ota_crc16(b,n,area_crc);
         low=rel>OTA_FM1_APP_REL?rel:OTA_FM1_APP_REL;
-        high=rel+n<OTA_FM1_APP_REL+OTA_FM1_APP_SLOT?rel+n:OTA_FM1_APP_REL+OTA_FM1_APP_SLOT;
+        high=rel+n<OTA_FM1_APP_REL+app_size?rel+n:OTA_FM1_APP_REL+app_size;
         if(high>low)app_crc=ota_crc16(b+low-rel,high-low,app_crc);
         ota_idle();
     }
@@ -393,6 +397,9 @@ static const uint8_t etch_ota_digest[32]={0xd0,0xb1,0xa0,0x5c,0x63,0x03,0x0b,0x5
 static const uint8_t etch_ota_owner[16]="BEETLE-OTA-STAGE";
 static const uint8_t etch_ota_old_owner[16]="ETCH-OTA-STAGE-1";
 static uint8_t ota_touched;
+/* The committed record must describe the loader handoff family, not the
+ * identity of the BEETLE application that is being replaced. */
+static uint8_t ota_selected_stock_loader;
 /* The tag is at an offset inside the loader's first LZ4-literal segment.
  * The entry point must stay in the verified loader RAM window. No writes. */
 static int beetle_compatible_felucca_loader(const uint8_t *header512, uint32_t body_len)
@@ -495,6 +502,7 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
     ota_show(1, 0);
     if ((rc = ota_ufw(hdr, &fl_off, &fl_len, &ota_off, &ota_len)) != 0)
         return rc;
+    if(fl_len>0x93000u)return -26; /* V16/extended image requires boot+layout upgrade: ROM recovery */
     if (fl_off < 0x400u || fl_len != 0x93000u || fl_off > 0x200000u-fl_len || ota_off < fl_off+fl_len || ota_len < 64u || ota_len > OTA_AREA_LEN || ota_off > 0x200000u-ota_len)
         return -3;
     if(ETCH_TEST_RESTORE_ONLY&&!etch_ota_stock(fl_off,b))return -20;
@@ -551,7 +559,14 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
      * reserved staging area can be safely REUSED, so a return through the
      * Firmware Hub is not blocked by stale foreign OTA staging data.
      * This exception does not authorize erasing project/sample sectors. */
-    if(!official_stock_restore && !etch_ota_available(b))return -15;
+    /* V1.9: The FM1 is running BEETLE and its [0xE0000,0xE5000) area is
+     * reserved for update staging, never project/sample storage. A previous
+     * firmware may have left a foreign staging signature here. A user-
+     * initiated upgrade of a FULLY preflighted compatible package may reclaim
+     * this region, instead of trapping users in BEETLE. No other addresses
+     * are ever authorized by ota_erase/ota_prog. An invalid package is
+     * rejected before any erase, regardless of what the staging contains. */
+    (void)etch_ota_available; /* legacy read-only ownership inspector retained */
     /* 4. stage the package's loader: erase, body, verify, head last */
     ota_show(3, 0);
     if (ota_read(ota_off, b, 512))
@@ -589,6 +604,7 @@ static int ota_stage(void)                       /* steps 1..6; 0 = host said su
        !etch_ota_hash(OTA_AREA+32,b,0))return -16;
     if (ota_stage_head(len))
         return -12;
+    ota_selected_stock_loader=official_stock_restore;
     /* 6. the host confirms: nothing is committed without it */
     ota_show(4, 0);
     for (i = 0; i < 4u; i++)
@@ -611,7 +627,7 @@ static int ota_session(void)
     uint8_t back[112];
     uint32_t i;
     int rc;
-    ota_touched=0;
+    ota_touched=0;ota_selected_stock_loader=0u;
     ota_deadline = ota_now_ms() + 300000u;          /* native CRC replay reads the full app; finite 5-minute session limit */
     rc = ota_stage();
     if (rc) {
@@ -625,8 +641,12 @@ static int ota_session(void)
     ota_wr16(parm + 2, 0x5A0Du);
     ota_wr16(parm + 4, 0x5A01u);
     ota_wr16(parm + 6, 0x5441u);
-    for (i = 0; i < 12u; i++)
-        parm[8 + i] = (uint8_t)"ota-FM-1_015"[i];    /* the loader's own USB identity */
+    {
+        /* Official M-VAVE V15 loader identifies as ota-FM-1_015. Felucca-
+         * lineage app-only loaders use ota-FM-1_900 (not FM-1_2123). */
+        const char *loader_identity=ota_selected_stock_loader?"ota-FM-1_015":"ota-FM-1_900";
+        for(i=0;i<12u;i++)parm[8u+i]=(uint8_t)loader_identity[i];
+    }
     ota_wr32(parm + 72, OTA_AREA);
     ota_wr16(parm, ota_crc16(parm + 2, 78, 0));
 #if FELUCCA_OTA_DRYRUN

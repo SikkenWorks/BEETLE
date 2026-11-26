@@ -63,8 +63,9 @@ with tempfile.TemporaryDirectory(prefix='beetle-v182-stock-') as td:
         if p.returncode:print('STDERR',p.stderr);raise AssertionError('native replay result differs')
     run(v15_fake,0,False)
     run(v15_fake,0,True)
-    # A valid community image and foreign OTA staging must not be allowed.
-    run((root/'BEETLE-V1.8.1-AUDIO-STABILITY-EXPERIMENTAL.fwsc').read_bytes(),-15,True)
+    # V1.9: A structurally checked, valid community update may reclaim BEETLE's
+    # dedicated staging area even if previous firmware left a foreign record.
+    run((root/'BEETLE-V1.8.1-AUDIO-STABILITY-EXPERIMENTAL.fwsc').read_bytes(),0,True)
     broken=bytearray(loader);broken[1000]^=1
     # Recreate a valid UFW but keep the signed stock-identity + outer nested
     # header. This case fails the separate full-loader hash before any erases.
@@ -73,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix='beetle-v182-stock-') as td:
     run(fw.build_fwsc(bad_flash,bytes(loader),'FM-1_015'),-16,False)
     # Production, non-overridden host code MUST reject the synthetic stock.
     assert hashlib.sha256(flash).digest()!=bytes.fromhex('c1068a403c04a6378a626afb66cc217f72d13f10aa200e983b7a9817cc1dac03')
-    print('PASS: native OTA accepts pinned V15-shaped fixture with stale staged data; rejects corrupt loader and unsafe community overwrite')
+    print('PASS: native OTA accepts pinned V15-shaped fixture with stale staged data; rejects corrupt loader, allows fully validated community update over foreign staging')
     if opts.official_v15:
         raw=opts.official_v15.read_bytes()
         expected='db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a'

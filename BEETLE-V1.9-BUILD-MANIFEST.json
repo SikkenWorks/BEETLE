@@ -1,0 +1,31 @@
+{
+  "version": "V1.9",
+  "identity": "FM-1_2123",
+  "firmware_filename": "BEETLE-V1.9-FIRMWARE-SWITCHING-EXPERIMENTAL.fwsc",
+  "firmware_sha256": "7cfc368c914df0aa5ae21803d7f5c87fa2457d9470b2c8a6cb516d99392f02f7",
+  "app_sha256": "ec7e6285ad3fc40c01ae597adb7730e715f1ce125b013581f4dec96a1ab45791",
+  "loader_sha256": "b5895c7628e2809a4296e60f6c1a2ab353c345054d55a5bf386a7d311384babc",
+  "loader_source": "firmware/loader/loader.c; Felucca GPL-3.0-only",
+  "app_bytes": 519432,
+  "app_headroom_bytes": 62132,
+  "supported_flash_ids": [
+    "0x856014",
+    "0xB36014"
+  ],
+  "source_loader_recompiled": true,
+  "inherited_ota_loader_identical": false,
+  "protected_16k_header_identical": true,
+  "project_schema": "TRK1 V26",
+  "stock_v15_sha256_pins_untouched": true,
+  "stock_v16_ota_supported": false,
+  "compatible_felucca_apponly_ota_hosttested": true,
+  "foreign_staging_reclaim_after_preflight": true,
+  "reprobe_flash_id_before_ota": true,
+  "hardware_tested": false,
+  "uc25hq80_hardware_tested": false,
+  "dma_deadlines_eliminated": false,
+  "loader_hardware_tested": false,
+  "readme": "README.md",
+  "changelog": "CHANGELOG.md",
+  "validation": "V1.9-VALIDATION.md"
+}

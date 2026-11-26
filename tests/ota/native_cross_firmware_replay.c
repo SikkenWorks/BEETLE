@@ -14,6 +14,7 @@ static uint8_t response_wire[700];
 static uint32_t response_size,ticks,read_count,erase_count,commit_count;
 static uint32_t error_request;
 static int response_pending;
+static char committed_loader_identity[13];
 
 static int ota_wire_send(const uint8_t *p,uint32_t size){
  uint8_t q[700],reply[620],wire[700];
@@ -45,18 +46,23 @@ static int ota_erase(uint32_t off){if(off<OTA_AREA||off>=OTA_AREA+OTA_AREA_LEN||
 static int ota_prog(uint32_t off,const void *data,uint32_t n){if(off<OTA_AREA||off>OTA_AREA+OTA_AREA_LEN||n>OTA_AREA+OTA_AREA_LEN-off)return -1;const uint8_t *p=data;for(uint32_t i=0;i<n;i++)device_flash[off+i]&=p[i];return 0;}
 static int ota_fread(uint32_t off,void *dst,uint32_t n){if(off>sizeof(device_flash)||n>sizeof(device_flash)-off)return -1;memcpy(dst,device_flash+off,n);return 0;}
 static void ota_show(uint32_t step,int32_t rc){(void)step;(void)rc;}
-static void ota_commit(const uint8_t *parm){(void)parm;commit_count++;}
+static void ota_commit(const uint8_t *parm){memcpy(committed_loader_identity,parm+8u,12u);committed_loader_identity[12]=0;commit_count++;}
 int main(int argc,char **argv){
- if(argc!=4){fprintf(stderr,"usage: native_cross_firmware_replay logical.bin expected_exit expected_commit\n");return 2;}
+ if(argc<4||argc>5){fprintf(stderr,"usage: native_cross_firmware_replay logical.bin expected_exit expected_commit\n");return 2;}
  FILE *f=fopen(argv[1],"rb");if(!f)return 3;
  fseek(f,0,SEEK_END);host_length=(uint32_t)ftell(f);rewind(f);
  host_image=malloc(host_length);if(!host_image)return 3;
  if(fread(host_image,1,host_length,f)!=host_length)return 3;fclose(f);
  memset(device_flash,0xff,sizeof(device_flash));
+ if(argc==5 && strcmp(argv[4],"foreign")==0){
+  /* Foreign old data left in BEETLE's dedicated update staging. */
+  device_flash[OTA_AREA+128]=0u;
+  device_flash[OTA_AREA+0x1200]=0x37u;
+ }
  int result=ota_session();
  int expected=atoi(argv[2]),expected_commit=atoi(argv[3]);
- printf("native_ota_result=%d read_requests=%u erases=%u commits=%u staged_loader=%s\n",result,read_count,erase_count,commit_count,
-  memcmp(device_flash+OTA_AREA+16,"LOADER.BIN",10)==0?"yes":"no");
+ printf("native_ota_result=%d read_requests=%u erases=%u commits=%u staged_loader=%s loader_identity=%s\n",result,read_count,erase_count,commit_count,
+  memcmp(device_flash+OTA_AREA+16,"LOADER.BIN",10)==0?"yes":"no",committed_loader_identity);
  if(result!=expected||commit_count!=(uint32_t)expected_commit)return 1;
  if(result!=0&&(erase_count!=0||commit_count!=0))return 1;
  if(result==0&&(erase_count!=5||commit_count!=1))return 1;

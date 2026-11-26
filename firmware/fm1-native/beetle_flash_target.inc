@@ -23,6 +23,20 @@ static int beetle_nor_id_ok(void){
  }
  return beetle_nor_id_state==1;
 }
+/* V1.9: The first failed JEDEC probe is NOT a permanent hardware verdict.
+ * Before an explicitly requested update, audio and LCD DMA are stopped and
+ * the SPI bus is idle. Recheck independently, twice, without allowing an
+ * unknown/read-error ID to authorize an erase. Never probe in audio IRQ. */
+static int beetle_nor_id_refresh_for_ota(void){
+ uint32_t a,b;
+ fm1_irq_off();
+ a=FL_FAR(fl_jedec_ram)();
+ b=FL_FAR(fl_jedec_ram)();
+ fm1_irq_enable_all();
+ beetle_nor_jedec_id=(a==b)?a:0u;
+ beetle_nor_id_state=FL_JEDEC_OK(beetle_nor_jedec_id)?1:-1;
+ return beetle_nor_id_state==1;
+}
 
 /* Only the physical on-device double-YES PROJECTS flow may set this. */
 static uint8_t beetle_full_wipe_confirmed;

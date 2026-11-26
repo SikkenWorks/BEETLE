@@ -2445,6 +2445,10 @@ void fm1_cstart(void){
     uint8_t resume=!muted&&!native_tripped;
     native_pause();native_updating=1;fm1_irq_off();native_midi_drain(0);fm1_irq_enable_all();
 #ifdef TRACK_FIRMWARE
+    /* A stale failed first JEDEC probe must not permanently prohibit updates.
+     * Wait for LCD SPI DMA before two stable, read-only chip-ID probes. */
+    lcd_sync();
+    uint8_t ota_flash_ready=(uint8_t)beetle_nor_id_refresh_for_ota();
     /* App-owned update screen, prior to handoff; protected mask-ROM/loader
      * owns the screen after this point and cannot be recolored safely. */
     ota_matrix_band_index=0u;
@@ -2453,7 +2457,13 @@ void fm1_cstart(void){
     ota_matrix_error=0;
     for(uint8_t band=0u;band<6u;band++)ota_matrix_paint_band(band);
 #endif
-    int result=ota_session();native_updating=0;
+#ifdef TRACK_FIRMWARE
+    int result=ota_flash_ready?ota_session():-28;
+    if(!ota_flash_ready)ota_show(9,result); /* unsupported/unstable JEDEC, zero writes */
+#else
+    int result=ota_session();
+#endif
+    native_updating=0;
     if(result==-17){resume=0;native_safe=safe=muted=native_boot_muted=1;
      native_recovery_reason=ETCH_RECOVERY_OTA_CLEANUP;
      etch_boot.failed=2;etch_boot.pending=1;native_stop();}
